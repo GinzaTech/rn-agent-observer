@@ -1,6 +1,6 @@
 ---
 name: rn-agent-observer
-description: Runtime observability for React Native/Expo apps on Android. Use when debugging RN UI, performance (FPS, JS blocking), network, re-renders, or runtime errors on a running app — capture screenshots, UI trees, ref snapshots, per-request network, CDP console/heap/CPU profiles, run deterministic diagnosis, and compare before/after code changes with evidence. Works via CLI (rn-observe) or MCP, fully offline.
+description: Runtime observability for React Native/Expo apps on Android. Use when debugging RN UI, performance (FPS, JS blocking), network, re-renders, or runtime errors on a running app — understand the current screen and UI findings, capture screenshots, UI trees, ref snapshots, per-request network, CDP console/heap/CPU profiles, run deterministic diagnosis, and compare before/after code changes with evidence. Works via CLI (rn-observe) or MCP, fully offline.
 ---
 
 # RN Agent Observer Skill
@@ -31,6 +31,8 @@ $env:RN_OBSERVER_DEVICE_ID = '<serial>'                        # required if mul
 # RN_OBSERVER_APP_ID only if the app has no expo.android.package
 
 pnpm rn-observe devices          # sanity: device ready
+pnpm rn-observe session start    # copy the returned id into RN_OBSERVER_SESSION_ID
+$env:RN_OBSERVER_SESSION_ID = '<session-id>'
 pnpm rn-observe launch           # cold start the app
 pnpm rn-observe app-state        # confirms process + foreground
 ```
@@ -43,14 +45,15 @@ Never keep React Native DevTools open simultaneously — one inspector connectio
 ## The debugging loop (always follow this order)
 
 ```text
-observe -> session start -> reproduce (semantic testID first) ->
+session start -> observe -> understand-screen -> reproduce (semantic testID first) ->
 performance/network/logs -> diagnose -> smallest fix -> reload --fast ->
-reproduce the SAME scenario -> compare -> session stop -> report evidence
+reproduce the SAME scenario -> understand-screen -> compare -> session stop -> report evidence
 ```
 
 Rules that make evidence trustworthy:
 
 - Prefer semantic targets: `tap --test-id` >> `tap --ref` >> coordinates.
+- Treat `understand-screen` state/issues as deterministic heuristic evidence. Open `screenshotPath`; call again after the threshold when state is `loading` to detect `loading-stuck`.
 - `diagnose` findings = hypotheses; quote evidence and `confidenceBasis`. Confidence is a heuristic score, never a probability.
 - After fixing code: reproduce **identically**, then `compare` both PNG and UI-tree JSON.
 - Apps you don't own: READ-ONLY. Never purchase/login/change settings unless the user explicitly allowed it for this session.
@@ -61,6 +64,7 @@ Rules that make evidence trustworthy:
 | Situation                    | Command                                                                                                                 |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | First look at a screen       | `pnpm rn-observe observe`                                                                                               |
+| Understand visible UI/errors | `pnpm rn-observe understand-screen` (MCP `understand_screen`); inspect state, headline, actions, issues and artifacts   |
 | Element list for interaction | `pnpm rn-observe snapshot -i` then `tap --ref eN --settle 1500` (diff included)                                         |
 | Lag / animation jank         | `pnpm rn-observe performance` then `trace start/stop` if deeper                                                         |
 | API latency / loading        | `pnpm rn-observe network summary` (needs instrumentation) or `metro-network --duration 10000` (CDP, no instrumentation) |
@@ -82,29 +86,30 @@ Rules that make evidence trustworthy:
 
 User: "the cart screen feels laggy when I tap add"
 
-1. `observe` + `session start` (export RN_OBSERVER_SESSION_ID).
+1. `session start` (export RN_OBSERVER_SESSION_ID), then `observe` + `understand-screen`.
 2. `tap --test-id add-to-cart` (use the app's real testID from `snapshot`), then `performance`.
 3. `diagnose` → if finding says "Long JS task ~120ms", inspect the handler; if "Low UI frame rate" without JS evidence, suspect native list work.
 4. Make the minimal fix, `reload --fast`, repeat step 2 exactly.
-5. `screenshot` + `compare` with baseline; report before/after metric values and artifact paths.
+5. `understand-screen` + `compare` with baseline; report before/after state/findings, metric values and artifact paths.
 6. `session stop`, then summarize: what was measured, what changed, what remains uncertain.
 
 ## Failure recovery
 
-| Error                                             | Fix                                                                                                         |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `DEVICE_NOT_FOUND`                                | `adb devices -l`; accept USB prompt; unlock screen                                                          |
-| `MULTIPLE_DEVICES`                                | set `RN_OBSERVER_DEVICE_ID`                                                                                 |
-| `APP_ID_NOT_FOUND`                                | set `RN_OBSERVER_APP_ID` or add `expo.android.package`                                                      |
-| `UI_ELEMENT_NOT_FOUND`                            | element hidden/off-screen — `snapshot` again, check `visible`                                               |
-| `METRO_UNREACHABLE` / `DEVTOOLS_TARGET_NOT_FOUND` | start Metro for the app, `adb reverse`, relaunch app so it loads from Metro                                 |
-| `DEVTOOLS_CONNECT_FAILED`                         | close React Native DevTools, retry                                                                          |
-| `CDP_LOCK_HELD`                                   | another observer command exceeded the 180s CDP queue timeout; retry after it finishes                       |
-| `EVIDENCE_NOT_RECORDED` warning                   | start a session and export `RN_OBSERVER_SESSION_ID` before collecting evidence                              |
-| adb back exited the app                           | RN single-activity: use the app's own back button testID, not `rn-observe back`, unless exiting is intended |
+| Error                                             | Fix                                                                                                                |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `DEVICE_NOT_FOUND`                                | `adb devices -l`; accept USB prompt; unlock screen                                                                 |
+| `MULTIPLE_DEVICES`                                | set `RN_OBSERVER_DEVICE_ID`                                                                                        |
+| `APP_ID_NOT_FOUND`                                | set `RN_OBSERVER_APP_ID` or add `expo.android.package`                                                             |
+| `UI_ELEMENT_NOT_FOUND`                            | element hidden/off-screen — `snapshot` again, check `visible`                                                      |
+| `METRO_UNREACHABLE` / `DEVTOOLS_TARGET_NOT_FOUND` | start Metro for the app, `adb reverse`, relaunch app so it loads from Metro                                        |
+| `DEVTOOLS_CONNECT_FAILED`                         | close React Native DevTools, retry                                                                                 |
+| `CDP_LOCK_HELD`                                   | another observer command exceeded the 180s CDP queue timeout; retry after it finishes                              |
+| `EVIDENCE_NOT_RECORDED` warning                   | start a session and export `RN_OBSERVER_SESSION_ID` before collecting evidence                                     |
+| `loading-stuck` finding                           | correlate network/log evidence and the state transition that should dismiss loading; do not extend timeout blindly |
+| adb back exited the app                           | RN single-activity: use the app's own back button testID, not `rn-observe back`, unless exiting is intended        |
 
 ## Full documentation
 
 - Project overview: `PROJECT.md` in the repo
-- All 37 CLI commands & 43 MCP tools: `docs/protocol.md`
+- All 38 CLI commands & 44 MCP tools: `docs/protocol.md`
 - Detailed workflows: `docs/usage.md`; reference test battery: `docs/test-blueprint.md`

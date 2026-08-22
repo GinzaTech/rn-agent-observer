@@ -10,6 +10,7 @@ export const ArtifactSchema = z.object({
     'network',
     'summary',
     'ui-tree',
+    'ui-understanding',
     'devtools-export',
     'profile',
   ]),

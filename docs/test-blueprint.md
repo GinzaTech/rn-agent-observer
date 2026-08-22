@@ -1276,6 +1276,38 @@ Tổng: **~160 case** (tính cả biến thể).
 
 - **PASS**: bounds px đổi sang dp theo density; element clickable có label nhưng width/height <48dp sinh `small-touch-target`; unlabeled và small target có counter riêng.
 
+### 6.26 UIU — Screen understanding cho agent
+
+#### UIU-001 — Content summary + actions (T0/T1)
+
+- **Chạy**: mở màn có title và ít nhất hai action → `understand-screen`.
+- **PASS**: `state: content`; headline khớp text heading không-interactive; `visibleText` mô tả nội dung; action có ref/label/testID/bounds; screenshot/UI-tree/understanding paths tồn tại.
+
+#### UIU-002 — Visible error (T1)
+
+- **Fixture**: màn hiển thị user-facing error như `Không thể tải dữ liệu`.
+- **PASS**: `state: error`; issue `runtime-error-text` severity error trích đúng label/ref và artifact IDs; không suy nguyên nhân khi chưa có log/network evidence.
+
+#### UIU-003 — Blank screen (T1/T2)
+
+- **Fixture**: màn chỉ có nền đồng nhất, không meaningful text/action.
+- **PASS**: semantic tree rỗng + dominant pixel ratio cao/variance thấp sinh `state: blank` và `blank-screen`; màn canvas có pixel variation không bị kết luận blank chỉ vì UI tree rỗng.
+
+#### UIU-004 — Loading → loading-stuck (T0/T1)
+
+- **Chạy**: gọi `understand-screen --stuck-after 1000` hai lần trên cùng loading screen, cách nhau >1s.
+- **PASS**: lần đầu `loading-state`; lần sau cùng fingerprint/stateSince trả `loading-stuck`; khi content xuất hiện fingerprint/stateSince reset.
+
+#### UIU-005 — Text-field privacy (T0)
+
+- **Fixture**: EditText/WebView input có password/token/email.
+- **PASS**: raw value không xuất hiện trong persisted UI tree, ref snapshot, screen-understanding hoặc session artifact; text-field `value: null`, label dùng testID/resource/class.
+
+#### UIU-006 — Agent repair loop (T2)
+
+- **Chạy**: capture `understand-screen` before → tái hiện issue → sửa component nhỏ nhất → reload → cùng scenario → capture after + compare/replay.
+- **PASS**: issue/state hoặc evidence mong đợi biến mất/thay đổi; screenshot/UI structural compare và replay pass; báo limitation còn lại thay vì tuyên bố từ một heuristic finding.
+
 ## 7. Ma trận traceability Lab ↔ Case
 
 | Lab / nguồn    | Case tiêu biểu                                                          |
@@ -1385,3 +1417,4 @@ Quy tắc: mỗi dòng FAIL phải kèm hypothesis nguyên nhân và case tái h
 | 1.2.0     | 2026-08-22 | Observer 2.2.0: NET-017..019 (metro-network), APP-009 (reload --fast), REC-001..005 (screenrecord), DTL-008/009 (profile/song song), MCP 31 tools, fixture `network-real`                                                                |
 | 1.3.0     | 2026-08-22 | Observer 2.3.0: domain SNP (4), RPL (3), ASM (5) — tổng hợp từ agent-device/Expo MCP/agent-devtools; MCP 41 tools; fixture `dump-state`                                                                                                  |
 | 1.4.0     | 2026-08-22 | Observer 2.4.0: DIA-013 (confidence + thresholds), ENV-008 (CDP queue), PERF-013 (freshness), RPL-004 (auto replay), SES-012/013 (cleanup/warning), SEC-007 (allowlist), ASM-006 (touch-target); known limitations RN 0.86; MCP 43 tools |
+| 1.5.0     | 2026-08-22 | Unreleased: domain UIU (6 case) cho structured screen understanding, loading-stuck persistence, blank/error/empty detection, agent repair loop và text-field privacy; MCP 44 tools                                                       |

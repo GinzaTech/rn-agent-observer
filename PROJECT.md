@@ -7,7 +7,7 @@ RN Agent Observer là cầu nối quan sát runtime cục bộ (local runtime ob
 ```text
 AI Agent ──CLI (37 lệnh)──┐
                            ├──> ObserverCore ──> ADB / UIAutomator / Perfetto (Android)
-AI Agent ──MCP (43 tools)─┘        │      ──> Metro CDP (console/network/profile/heap)
+AI Agent ──MCP (44 tools)─┘        │      ──> Metro CDP (console/network/profile/heap)
                                    │      ──> RN instrumentation (fetch/route/render/JS task)
                                    v
                         SQLite session + artifact trên đĩa (.artifacts/)
@@ -114,7 +114,7 @@ rn-agent-observer/
 │   │       ├── session/        # SQLite WAL SessionStore (sessions/events/artifacts)
 │   │       └── artifacts/      # ArtifactManager (đĩa) + config.ts (app ID resolution)
 │   ├── cli/                # rn-observe — parse flag + in JSON, KHÔNG chứa logic
-│   ├── mcp-server/         # MCP stdio server — 43 tools, adapter mỏng gọi core
+│   ├── mcp-server/         # MCP stdio server — 44 tools, adapter mỏng gọi core
 │   └── rn-instrumentation/ # package dev-only cài vào app (fetch/route/render/js-task/app-data
 │                           # + redactUrl/redactSensitiveText/redactHeaders) — dependency-free
 ├── apps/
@@ -188,7 +188,7 @@ Thiết bị & app:
   deep-link --uri URI | permissions [list|grant|revoke --perm NAME]
 
 Quan sát màn hình & tương tác:
-  screenshot | ui-tree | snapshot [--interactive|-i]
+  screenshot | ui-tree | snapshot [--interactive|-i] | understand-screen [--stuck-after MS]
   tap (--test-id ID | --ref E1 [--settle MS] | --x X --y Y)
   swipe --from X,Y --to X,Y [--duration MS] | type-text --text VALUE | back
 
@@ -316,7 +316,7 @@ pnpm mcp:check    # health check
 pnpm mcp:start    # stdio server
 ```
 
-Cấu hình client (Claude/OpenCode/Cursor...) — xem danh sách 43 tools trong `docs/protocol.md`:
+Cấu hình client (Claude/OpenCode/Cursor...) — xem danh sách 44 tools trong `docs/protocol.md`:
 
 ```json
 {
@@ -509,7 +509,7 @@ rn-agent-observer/
 │   │       ├── session/        # SQLite WAL SessionStore (sessions/events/artifacts)
 │   │       └── artifacts/      # ArtifactManager (disk) + config.ts (app ID resolution)
 │   ├── cli/                # rn-observe — flag parsing + JSON printing, NO logic
-│   ├── mcp-server/         # MCP stdio server — 43 tools, thin adapter over core
+│   ├── mcp-server/         # MCP stdio server — 44 tools, thin adapter over core
 │   └── rn-instrumentation/ # dev-only package for the observed app (fetch/route/render/
 │                           # js-task/app-data + redactUrl/redactSensitiveText/redactHeaders)
 ├── apps/
@@ -582,7 +582,7 @@ Device & app:
   deep-link --uri URI | permissions [list|grant|revoke --perm NAME]
 
 Screen & interaction:
-  screenshot | ui-tree | snapshot [--interactive|-i]
+  screenshot | ui-tree | snapshot [--interactive|-i] | understand-screen [--stuck-after MS]
   tap (--test-id ID | --ref E1 [--settle MS] | --x X --y Y)
   swipe --from X,Y --to X,Y [--duration MS] | type-text --text VALUE | back
 
@@ -710,7 +710,7 @@ pnpm mcp:check    # health check
 pnpm mcp:start    # stdio server
 ```
 
-Client config (Claude/OpenCode/Cursor...) — see all 43 tools in `docs/protocol.md`:
+Client config (Claude/OpenCode/Cursor...) — see all 44 tools in `docs/protocol.md`:
 
 ```json
 {

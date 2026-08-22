@@ -16,6 +16,8 @@ pnpm --filter @rn-agent-observer/demo-expo exec expo export --platform android -
 
 Kết quả 2.4.0: lint, Prettier, TypeScript build, MCP initialization, CLI version và **61 unit tests** pass. Phạm vi gồm schema validation, ADB/UI/log/frame/memory/CPU parsers, allowlist redaction, heuristic diagnosis + threshold validation, CDP queue, performance freshness, SQLite session/artifact/cleanup, stable refs, auto replay, pixel/UI-tree comparison, CLI và MCP.
 
+Kết quả Unreleased screen-understanding: `pnpm check` pass lint, Prettier, TypeScript build và **68 tests**; `pnpm mcp:check` và Expo Android export pass. Bảy test mới bao phủ schema/result có route nullable, content/action refs, error/blank/loading-stuck, pixel statistics và redaction UI-tree/snapshot.
+
 ## Demo Expo native dogfood
 
 Development build `dev.rnagentobserver.demo` đã build Gradle, cài và mở thành công trên thiết bị thật. Observer của chính repo đã thực thi:
@@ -58,6 +60,21 @@ Dogfood 2.4.0 bằng CLI của repo trên package `com.android.vshop`, Metro `--
 - ba lần đọc gfxinfo từng trả đúng cùng cửa sổ 113 frame. Bản fix freshness đã được verify: lần đầu available, lần kế tiếp cùng signature trả `available: false` + reason `No new gfx frame samples...`;
 - PNG compare cho cùng ảnh đạt similarity 1;
 - RN 0.86 bridgeless từ chối `Profiler.enable`; observer trả đúng `DEVTOOLS_PROFILE_FAILED` recoverable thay vì `INTERNAL_ERROR`.
+
+## Screen-understanding dogfood (Unreleased)
+
+Trên cùng thiết bị thật/Vshop, CLI mới được chạy trong session `06911da4-9703-4be0-aff5-302cb59bc050`:
+
+- màn Profile ổn định: `state: content`, headline `Vshop`, 144 visible elements, 16 actions, 0 unlabeled và 6 small-touch-target findings;
+- cold dev-client: lần đầu `state: loading`, headline `Connecting to the development server...`; gọi lại cùng fingerprint sau ngưỡng trả `loading-stuck` và giữ nguyên `stateSince`;
+- sau khi bundle/data hoàn tất: state trở lại `content`, headline `Vshop`, fingerprint đổi;
+- mỗi response liên kết screenshot, UI tree đã redact và artifact `ui-understanding` JSON; không trả image bytes;
+- unit tests xác nhận visible-error, blank screen, loading-stuck, pixel statistics và text-field/PII redaction. Giá trị text-field không xuất hiện trong UI-tree/snapshot output.
+- build cuối được gọi lại trên Vshop trong session `7dd5dd63-00e6-4384-81b9-48a5b7c361ac`: `content`, route `null` trung thực, headline `Vshop`, 156 visible elements, 19 actions, 0 runtime error và 9 small-touch targets. Screenshot được agent mở để kiểm tra trực quan; lớp nổi ở góc phải chưa được quy kết là lỗi app vì không có ownership trong UI tree.
+
+Artifact chính: `C:\Users\kona\Desktop\Vshop\.artifacts\sessions\06911da4-9703-4be0-aff5-302cb59bc050\summaries\summary.json`.
+
+Final-contract artifact: `C:\Users\kona\Desktop\Vshop\.artifacts\sessions\7dd5dd63-00e6-4384-81b9-48a5b7c361ac\summaries\summary.json`.
 
 ## Boundary còn lại
 

@@ -13,7 +13,8 @@ Usage:
   rn-observe devices | device-info | launch | reload [--fast]
   rn-observe app-state | device-network [--window MS] | routes
   rn-observe metro-network [--duration MS] [--metro URL]
-  rn-observe screenshot | ui-tree | snapshot [--interactive] | logs | performance | render-stats | network | observe
+  rn-observe screenshot | ui-tree | snapshot [--interactive] | understand-screen [--stuck-after MS]
+  rn-observe logs | performance | render-stats | network | observe
   rn-observe tap (--test-id ID | --ref E1 [--settle MS] | --x X --y Y)
   rn-observe swipe --from X,Y --to X,Y [--duration MS]
   rn-observe type-text --text VALUE | back | deep-link --uri URI
@@ -184,6 +185,14 @@ export async function runCli(
           ...(args.includes('-i') || args.includes('--interactive')
             ? { interactiveOnly: true }
             : {}),
+        }),
+      );
+    } else if (command === 'understand-screen') {
+      const stuckAfterMs = numberFlag(args, '--stuck-after');
+      print(
+        io,
+        await core.understandScreen({
+          ...(stuckAfterMs !== undefined ? { stuckAfterMs } : {}),
         }),
       );
     } else if (command === 'tap') {

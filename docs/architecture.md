@@ -18,7 +18,7 @@ Shared Zod schemas validate public data contracts.
 | `@rn-agent-observer/schemas`            | Zod schemas và shared TypeScript types                                          |
 | `@rn-agent-observer/core`               | ADB process adapter, parser, observation, session, trace, diagnosis, comparison |
 | `@rn-agent-observer/cli`                | Parse command/flag và in JSON có cấu trúc                                       |
-| `@rn-agent-observer/mcp-server`         | Đăng ký 43 MCP tools, chuyển input/output sang core                             |
+| `@rn-agent-observer/mcp-server`         | Đăng ký 44 MCP tools, chuyển input/output sang core                             |
 | `@rn-agent-observer/rn-instrumentation` | Opt-in dev telemetry cho route, fetch, render và long JS task                   |
 | `@rn-agent-observer/demo-expo`          | Fixture integration xác định để dogfood observer                                |
 
@@ -29,9 +29,10 @@ Shared Zod schemas validate public data contracts.
 3. Parser chuẩn hóa device, logcat, UIAutomator XML, gfx framestats, meminfo, top CPU và display refresh.
 4. Instrumentation phát event có prefix vào log phát triển. Core parse JSON cho route/network/render/JS task.
 5. `observe_screen` hợp nhất ảnh, số node UI, route, performance, network summary và lỗi gần đây.
-6. SessionStore lưu timeline/reference trong SQLite WAL; PNG, JSON UI tree, `.perfetto-trace`, replay và summary nằm dưới `.artifacts/sessions/<id>`.
-7. `record()` phát `EVIDENCE_NOT_RECORDED` nếu không có session; `session stop` tự materialize interaction timeline thành replay JSON.
-8. Các command CDP dùng atomic cross-process queue để một target không bị nhiều WebSocket observer giành kết nối.
+6. `understand_screen` kết hợp cây UI đã redact, thống kê pixel screenshot, app-state và error log thành state/finding deterministic cho agent; fingerprint persisted giúp nhận diện loading không đổi qua nhiều process.
+7. SessionStore lưu timeline/reference trong SQLite WAL; PNG, JSON UI tree, `.perfetto-trace`, replay và summary nằm dưới `.artifacts/sessions/<id>`.
+8. `record()` phát `EVIDENCE_NOT_RECORDED` nếu không có session; `session stop` tự materialize interaction timeline thành replay JSON.
+9. Các command CDP dùng atomic cross-process queue để một target không bị nhiều WebSocket observer giành kết nối.
 
 ## Provider strategy
 

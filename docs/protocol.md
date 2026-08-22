@@ -18,7 +18,7 @@ status
 devices | device-info | launch | reload [--fast]
 app-state | device-network [--window MS] | routes
 metro-network [--duration MS] [--metro URL]
-screenshot | ui-tree | snapshot [--interactive]
+screenshot | ui-tree | snapshot [--interactive] | understand-screen [--stuck-after MS]
 tap (--test-id ID | --ref E1 [--settle MS] | --x X --y Y)
 swipe --from X,Y --to X,Y [--duration MS]
 type-text --text VALUE | back | deep-link --uri URI
@@ -45,13 +45,13 @@ CLI in JSON ra stdout. Lỗi in JSON ra stderr và exit code 2.
 
 ## MCP stdio
 
-43 tools hiện có:
+44 tools hiện có:
 
 | Nhóm              | Tools                                                                                                                                                                      |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status/device/app | `observer_status`, `device_list`, `device_info`, `app_launch`, `app_reload`                                                                                                |
 | Fallback evidence | `app_state`, `get_device_network`                                                                                                                                          |
-| Screen/action     | `screenshot`, `get_ui_tree`, `snapshot`, `press`, `tap`, `swipe`, `type_text`, `back`, `open_deep_link`                                                                    |
+| Screen/action     | `screenshot`, `get_ui_tree`, `snapshot`, `understand_screen`, `press`, `tap`, `swipe`, `type_text`, `back`, `open_deep_link`                                               |
 | Device state      | `list_permissions`, `set_permission`, `list_routes`                                                                                                                        |
 | Evidence          | `get_logs`, `performance_snapshot`, `start_trace`, `stop_trace`, `get_react_render_stats`, `get_network_requests`, `get_network_summary`, `get_app_data`, `observe_screen` |
 | DevTools/CDP      | `devtools_export`, `devtools_profile`, `get_metro_network`                                                                                                                 |
@@ -92,6 +92,8 @@ Ví dụ client config sau khi build:
 `start_recording`/`stop_recording` quay màn hình mp4, tối đa 180000ms/clip.
 
 `snapshot` trả ref cho phần tử visible (`interactive_only: true` chỉ còn phần tử tương tác). Trong session, registry identity giữ ref ổn định qua reorder/scroll và không tái sử dụng ref đã mất; state nằm trong thư mục session. `press` tap theo ref; cung cấp `settle_ms` để sau settle nhận diff `+/-/=`.
+
+`understand_screen` hợp nhất screenshot, UIAutomator, app-state và error log gần đây thành state có cấu trúc: `content`, `loading`, `error`, `empty`, `blank`, `background` hoặc `not-running`. Response có route instrumentation (hoặc `null`), `headline`, `visibleText`, action refs, issue severity/evidence/suggestion, fingerprint và ba artifact path. Gọi lại cùng màn loading sau `stuck_after_ms` để nhận `loading-stuck`. Đây là heuristic evidence; agent phải mở `screenshotPath` và tái hiện trước khi sửa. Nội dung text-field được redact trước khi persist/return.
 
 `replay_run` nhận path script JSON `{ steps: [{ action: "tap"|"swipe"|"type-text"|"back"|"deep-link"|"reload"|"assert"|"wait"|"screenshot", ... }] }`; dừng ở step fail đầu trừ `continueOnError: true`.
 

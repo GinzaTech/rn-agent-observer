@@ -56,17 +56,25 @@ export function buildSnapshot(
       ? isInteractive(element)
       : isInteractive(element) || Boolean(element.text),
   );
-  const elements: SnapshotElement[] = selected.map((element, index) => ({
-    ref: `e${index + 1}`,
-    kind: elementKind(element),
-    label:
-      element.contentDescription ?? element.text ?? element.id ?? element.type,
-    value: element.text ?? null,
-    testId: element.id ?? null,
-    interactive: isInteractive(element),
-    visible: element.visible ?? true,
-    bounds: element.bounds ?? null,
-  }));
+  const elements: SnapshotElement[] = selected.map((element, index) => {
+    const kind = elementKind(element);
+    const textField = kind === 'text-field';
+    return {
+      ref: `e${index + 1}`,
+      kind,
+      label: textField
+        ? (element.id ?? element.resourceId ?? element.type)
+        : (element.contentDescription ??
+          element.text ??
+          element.id ??
+          element.type),
+      value: textField ? null : (element.text ?? null),
+      testId: element.id ?? null,
+      interactive: isInteractive(element),
+      visible: element.visible ?? true,
+      bounds: element.bounds ?? null,
+    };
+  });
   return {
     snapshotId: randomUUID(),
     timestamp: tree.timestamp,

@@ -23,6 +23,7 @@ import {
   type PerformanceSnapshot,
   type ReactRenderStat,
   type ScreenComparison,
+  type ScreenUnderstanding,
   type ScreenSnapshot,
   type Session,
   type Trace,
@@ -77,6 +78,13 @@ import {
 import { expoRouterSitemap, hasAppDir } from './routes/sitemap.js';
 import { ScreenRecorder } from './recording/screen-recorder.js';
 import { SessionStore } from './session/session-store.js';
+import {
+  analyzePixels,
+  analyzeScreen,
+  auditAccessibility,
+  redactSensitiveUiTree,
+  type PriorUnderstandingState,
+} from './ui/understanding.js';
 
 export * from './adb/parsers.js';
 export * from './diagnosis/rules.js';
@@ -85,6 +93,7 @@ export * from './network/network.js';
 export * from './refs/snapshot.js';
 export * from './replay/replay.js';
 export * from './routes/sitemap.js';
+export * from './ui/understanding.js';
 
 function readObserverVersion(): string {
   const packageJson = JSON.parse(
@@ -112,6 +121,7 @@ export const IMPLEMENTED_COMMANDS = [
   'screenshot',
   'ui-tree',
   'snapshot',
+  'understand-screen',
   'tap',
   'swipe',
   'type-text',
@@ -338,7 +348,7 @@ export class ObserverCore {
   }
 
   async getUiTree(): Promise<UITree> {
-    const tree = await this.adb.uiTree();
+    const tree = redactSensitiveUiTree(await this.adb.uiTree());
     const artifact = this.artifacts.write('ui-tree', JSON.stringify(tree), {
       ...(this.activeSessionId ? { sessionId: this.activeSessionId } : {}),
       extension: '.json',
@@ -602,6 +612,18 @@ export class ObserverCore {
       : join(this.artifacts.root, 'snapshots', 'last.json');
   }
 
+  private understandingStatePath(): string {
+    return this.activeSessionId
+      ? join(
+          this.artifacts.root,
+          'sessions',
+          this.activeSessionId,
+          'state',
+          'screen-understanding.json',
+        )
+      : join(this.artifacts.root, 'screen-understanding', 'last.json');
+  }
+
   private loadLastSnapshot(): {
     snapshot: UiSnapshot;
     interactiveOnly: boolean;
@@ -631,10 +653,10 @@ export class ObserverCore {
     }
   }
 
-  async snapshot(
+  private snapshotFromTree(
+    tree: UITree,
     options: { interactiveOnly?: boolean } = {},
-  ): Promise<UiSnapshot> {
-    const tree = await this.getUiTree();
+  ): UiSnapshot {
     let priorRegistry: SnapshotRefRegistry | undefined;
     try {
       priorRegistry = this.loadLastSnapshot().refRegistry;
@@ -661,6 +683,88 @@ export class ObserverCore {
       interactiveOnly: options.interactiveOnly ?? false,
     });
     return snap;
+  }
+
+  async snapshot(
+    options: { interactiveOnly?: boolean } = {},
+  ): Promise<UiSnapshot> {
+    return this.snapshotFromTree(await this.getUiTree(), options);
+  }
+
+  async understandScreen(
+    options: { stuckAfterMs?: number } = {},
+  ): Promise<ScreenUnderstanding> {
+    const stuckAfterMs = Math.max(
+      1_000,
+      Math.min(options.stuckAfterMs ?? 15_000, 300_000),
+    );
+    const screenshot = await this.screenshot();
+    const tree = await this.getUiTree();
+    const snapshot = this.snapshotFromTree(tree);
+    const appState = await this.getAppState();
+    const logs = await this.getLogs({ limit: 200 });
+    const device = await this.adb.deviceInfo().catch(() => undefined);
+    let prior: PriorUnderstandingState | undefined;
+    try {
+      prior = JSON.parse(
+        readFileSync(this.understandingStatePath(), 'utf8'),
+      ) as PriorUnderstandingState;
+    } catch {
+      prior = undefined;
+    }
+    const image = PNG.sync.read(readFileSync(screenshot.artifact.path));
+    const result = analyzeScreen({
+      tree,
+      snapshot,
+      screen: screenshot.screen,
+      screenshotPath: screenshot.artifact.path,
+      pixelStatistics: analyzePixels(image),
+      densityDpi: device?.densityDpi ?? 420,
+      appState,
+      errorLogs: logs.filter(
+        (entry) => entry.level === 'error' || entry.level === 'fatal',
+      ),
+      route: routeFromLogs(logs),
+      stuckAfterMs,
+      ...(prior ? { prior } : {}),
+    });
+    const artifact = this.artifacts.write(
+      'ui-understanding',
+      JSON.stringify(result, null, 2),
+      {
+        ...(this.activeSessionId ? { sessionId: this.activeSessionId } : {}),
+        extension: '.json',
+        mimeType: 'application/json',
+        name: 'screen-understanding.json',
+      },
+    );
+    this.sessions.artifact(this.activeSessionId, artifact);
+    const complete: ScreenUnderstanding = {
+      ...result,
+      artifacts: {
+        ...result.artifacts,
+        understandingId: artifact.id,
+        understandingPath: artifact.path,
+      },
+    };
+    mkdirSync(dirname(this.understandingStatePath()), { recursive: true });
+    writeFileSync(
+      this.understandingStatePath(),
+      JSON.stringify({
+        state: complete.state,
+        fingerprint: complete.fingerprint,
+        firstSeenAt: complete.stateSince,
+      } satisfies PriorUnderstandingState),
+    );
+    this.record('screen_understanding', {
+      state: complete.state,
+      fingerprint: complete.fingerprint,
+      issueCodes: complete.issues.map((issue) => issue.code),
+      screenshotId: complete.artifacts.screenshotId,
+      uiTreeId: complete.artifacts.uiTreeId,
+      understandingId: artifact.id,
+    });
+    return complete;
   }
 
   async press(
@@ -817,55 +921,11 @@ export class ObserverCore {
     }>;
   }> {
     const tree = await this.getUiTree();
-    const interactive = flattenUiTree(tree.roots).filter(
-      (element) => (element.clickable ?? false) && element.visible !== false,
-    );
-    const issues: Array<{
-      className: string;
-      issue: 'unlabeled' | 'small-touch-target';
-      bounds?: unknown;
-    }> = [];
-    // Android minimum touch target is 48dp x 48dp; convert px using density.
     const device = await this.adb.deviceInfo().catch(() => undefined);
-    const density = device?.densityDpi ?? 420;
-    const dp = (px: number) => (px * 160) / density;
-    const minDp = 48;
-    for (const element of interactive) {
-      const hasLabel =
-        Boolean(element.text) ||
-        Boolean(element.contentDescription) ||
-        Boolean(element.id);
-      if (!hasLabel) {
-        issues.push({
-          className: element.className ?? element.type,
-          issue: 'unlabeled',
-          ...(element.bounds ? { bounds: element.bounds } : {}),
-        });
-      } else if (element.bounds) {
-        const widthDp = dp(element.bounds.width);
-        const heightDp = dp(element.bounds.height);
-        if (widthDp < minDp || heightDp < minDp) {
-          issues.push({
-            className: element.className ?? element.type,
-            issue: 'small-touch-target',
-            bounds: {
-              ...element.bounds,
-              widthDp: Math.round(widthDp),
-              heightDp: Math.round(heightDp),
-            },
-          });
-        }
-      }
-    }
+    const audit = auditAccessibility(tree, device?.densityDpi ?? 420);
     const result = {
       timestamp: new Date().toISOString(),
-      totalInteractive: interactive.length,
-      unlabeledCount: issues.filter((issue) => issue.issue === 'unlabeled')
-        .length,
-      smallTouchTargets: issues.filter(
-        (issue) => issue.issue === 'small-touch-target',
-      ).length,
-      issues,
+      ...audit,
     };
     this.record('a11y_audit', {
       totalInteractive: result.totalInteractive,

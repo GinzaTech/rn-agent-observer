@@ -205,6 +205,23 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
       ),
   );
   server.registerTool(
+    'understand_screen',
+    {
+      description:
+        'Explain the current Android screen for an agent: instrumented route when available, semantic state/headline/text/actions, visible UI and recent runtime error findings, screenshot/UI-tree evidence, and stable loading detection across calls. Text-field values are redacted.',
+      inputSchema: z.object({
+        stuck_after_ms: z
+          .number()
+          .int()
+          .min(1_000)
+          .max(300_000)
+          .default(15_000),
+      }),
+    },
+    ({ stuck_after_ms }) =>
+      safe(() => core.understandScreen({ stuckAfterMs: stuck_after_ms })),
+  );
+  server.registerTool(
     'press',
     {
       description:

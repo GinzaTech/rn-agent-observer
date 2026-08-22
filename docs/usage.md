@@ -73,6 +73,31 @@ pnpm rn-observe network requests
 pnpm rn-observe network summary
 ```
 
+## 3b. Cho agent hiểu màn hình và lỗi UI
+
+```powershell
+pnpm rn-observe understand-screen
+pnpm rn-observe understand-screen --stuck-after 15000
+```
+
+Lệnh này chụp đúng một screenshot, một UI tree đã redact, app-state và error log gần đây rồi trả:
+
+- `state`: `content`, `loading`, `error`, `empty`, `blank`, `background` hoặc `not-running`;
+- `headline`, `visibleText` và `actions[]` có ref/testID/bounds để agent biết màn đang hiển thị gì và có thể thao tác ở đâu;
+- `issues[]` gồm severity, evidence artifact IDs và suggestion cho blank screen, error text, loading stuck, empty state, runtime error, a11y, duplicate testID và control có bounds lỗi;
+- `fingerprint` + `stateSince`: gọi lại cùng màn loading sau ngưỡng sẽ đổi finding từ `loading-state` thành `loading-stuck`;
+- `screenshotPath`, `uiTreePath`, `understandingPath`: agent mở ảnh/JSON để kiểm chứng trước khi sửa.
+
+Ví dụ vòng tự sửa có evidence:
+
+```text
+understand-screen -> reproduce -> inspect issue + screenshot/log/network
+  -> locate owning route/component -> smallest edit -> reload
+  -> understand-screen -> compare before/after -> replay
+```
+
+Classification là heuristic deterministic, không tự chứng minh nguyên nhân. UIAutomator không thấy off-screen FlatList, React props/component owner, contrast hoặc focus order. Giá trị hiện tại của mọi text-field bị redact trước khi ghi artifact và snapshot ref không bao giờ trả nội dung ô nhập.
+
 ## 4. Điều khiển UI
 
 Ưu tiên semantic target từ `ui-tree`:

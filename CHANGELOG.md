@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased — screen understanding cho Codex/agent
+
+### Agent biết màn hình đang hiển thị gì
+
+- Thêm CLI `understand-screen [--stuck-after MS]` và MCP `understand_screen` (tool 44). Core hợp nhất screenshot, UIAutomator, app-state và error/fatal log gần đây thành một response token-efficient.
+- Response có `state` (`content`, `loading`, `error`, `empty`, `blank`, `background`, `not-running`), `stateSince`, fingerprint, route từ instrumentation (hoặc `null`, không đoán), headline, visible text, action refs/testID/bounds, counters, thống kê pixel và artifact paths.
+- `issues[]` có severity + evidence + suggestion cho visible error text, recent runtime log, blank screen, loading/loading-stuck, empty state, unlabeled/small touch target, duplicate testID, zero-size và off-screen control.
+- Classification là heuristic deterministic và ghi limitation ngay trong response; agent vẫn phải mở `screenshotPath`, tái hiện và compare trước/sau thay đổi.
+
+### Loading-stuck bền qua nhiều process
+
+- Fingerprint màn + `stateSince` được lưu dưới state của session/standalone. Gọi lại cùng loading screen sau ngưỡng sẽ nâng `loading-state` (info) thành `loading-stuck` (warning), thay vì đoán chỉ từ một ảnh.
+- Khi UI đổi sang content/error/empty, fingerprint và thời điểm state reset; không kéo finding cũ sang màn mới.
+
+### Privacy UI fail-closed
+
+- `getUiTree()` redact trước khi persist hoặc return. Mọi `EditText`/`TextInput` bỏ nội dung hiện tại và content description; email, JWT, sensitive key/value và opaque token dài trong static UI text cũng được che.
+- Snapshot ref của text-field luôn trả `value: null`; label lấy từ testID/resource/class thay vì nội dung người dùng nhập. Fix này đóng lỗ hổng credential WebView phát hiện khi dogfood Vshop.
+- Artifact mới kind `ui-understanding` chứa JSON structured result; screenshot/UI tree vẫn là path/reference, không nhúng binary/base64 vào MCP.
+
+### Workflow cho agent
+
+- Cập nhật `AGENTS.md`, skill, README và docs theo vòng `session -> observe -> understand-screen -> reproduce -> diagnose -> smallest fix -> understand-screen -> compare -> replay`.
+- MCP description hướng dẫn Codex/Claude/Cursor đọc state/headline/actions/findings và kiểm chứng artifact, không tự coi heuristic là nguyên nhân chắc chắn.
+
+### Test và runtime dogfood
+
+- `pnpm check` pass toàn bộ lint, Prettier, TypeScript build và **68 tests**; MCP initialization và Expo Android export cũng pass.
+- Unit test bao phủ content summary/action refs, route instrumentation, visible error, blank screen từ semantic + pixel evidence, loading → loading-stuck, pixel statistics và text-field/PII redaction.
+- Device thật Xiaomi 23013PC75G / Android 15 / Vshop: content nhận đúng headline `Vshop`, 144 visible elements, 16 actions và 6 small touch targets; cold dev-client nhận `loading` rồi cùng fingerprint chuyển `loading-stuck`, sau khi load xong chuyển về `content` với fingerprint mới.
+- Session evidence: `C:\Users\kona\Desktop\Vshop\.artifacts\sessions\06911da4-9703-4be0-aff5-302cb59bc050\summaries\summary.json`.
+- Final contract được chạy lại từ build cuối trong session `7dd5dd63-00e6-4384-81b9-48a5b7c361ac`: `state: content`, `route: null` (Vshop không instrumentation), headline `Vshop`, 156 visible elements, 19 actions, 0 runtime error và 9 small touch targets. Agent cũng mở screenshot artifact để review trực quan thay vì chỉ tin semantic tree.
+
+### Giới hạn còn lại
+
+- Đây chưa phải React component/props owner tree: UIAutomator không thấy off-screen FlatList, component stack, contrast hoặc focus order. Agent dùng route/file search, instrumentation và DevTools để tìm component sở hữu sau khi screen-understanding chỉ ra symptom/evidence.
+- Blank detection dùng semantic emptiness + pixel distribution; theme/canvas tối giản có thể cần người/agent mở screenshot để xác nhận.
+- Runtime log lỗi có thể gồm ReactHost/system soft error; response ghi rõ phải correlate timestamp, không coi số log là proof app defect.
+
 ## 2.4.0 — 2026-08-22
 
 Xử lý các điểm yếu ưu tiên đã thừa nhận, kèm runtime verification có phạm vi trên device thật (Xiaomi 23013PC75G, Android 15, MIUI). Các case chưa chạy đúng fixture vẫn giữ trạng thái `NOT VERIFIED`.

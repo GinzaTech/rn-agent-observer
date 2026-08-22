@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DeviceSchema, MetricSchema, ObserverStatusSchema } from './index.js';
+import {
+  DeviceSchema,
+  MetricSchema,
+  ObserverStatusSchema,
+  ScreenUnderstandingSchema,
+} from './index.js';
 
 describe('shared schemas', () => {
   it('validates a device record', () => {
@@ -44,6 +49,44 @@ describe('shared schemas', () => {
         projectRoot: 'C:\\app',
         implementedCommands: ['help'],
         plannedCommands: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('validates structured screen understanding without image bytes', () => {
+    expect(
+      ScreenUnderstandingSchema.safeParse({
+        timestamp: '2026-08-22T00:00:00.000Z',
+        source: 'android-uiautomator+screenshot+app-state+logcat',
+        state: 'content',
+        stateSince: '2026-08-22T00:00:00.000Z',
+        fingerprint: 'abc123',
+        route: '/home',
+        headline: 'Home',
+        summary: 'Home screen',
+        visibleText: ['Home'],
+        actions: [],
+        counts: {
+          visibleElements: 1,
+          textElements: 1,
+          interactiveElements: 0,
+          unlabeledControls: 0,
+          smallTouchTargets: 0,
+          runtimeErrors: 0,
+        },
+        visual: {
+          sampledPixels: 100,
+          dominantColorRatio: 0.5,
+          luminanceStdDev: 20,
+        },
+        issues: [],
+        artifacts: {
+          screenshotId: 'shot',
+          screenshotPath: 'C:\\shot.png',
+          uiTreeId: 'tree',
+          uiTreePath: 'C:\\tree.json',
+        },
+        limitations: ['heuristic'],
       }).success,
     ).toBe(true);
   });

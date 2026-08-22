@@ -61,6 +61,26 @@ describe('ref snapshots', () => {
     expect(snap.elements).toHaveLength(0);
   });
 
+  it('never exposes editable text values in snapshots', () => {
+    const snap = buildSnapshot(
+      tree([
+        {
+          type: 'android.widget.EditText',
+          text: 'super-secret',
+          id: 'password-input',
+          clickable: true,
+          focusable: true,
+        },
+      ]),
+    );
+    expect(snap.elements[0]).toMatchObject({
+      kind: 'text-field',
+      label: 'password-input',
+      value: null,
+    });
+    expect(JSON.stringify(snap)).not.toContain('super-secret');
+  });
+
   it('keeps refs stable when elements reorder and never reuses removed refs', () => {
     const first = stabilizeSnapshotRefs(
       buildSnapshot(
