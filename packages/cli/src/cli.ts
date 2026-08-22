@@ -2,6 +2,7 @@ import {
   OBSERVER_VERSION,
   ObserverCore,
   asObserverError,
+  type DiagnosisThresholds,
 } from '@rn-agent-observer/core';
 
 export const HELP_TEXT = `rn-observe ${OBSERVER_VERSION}
@@ -22,8 +23,11 @@ Usage:
   rn-observe trace start [--duration MS] | trace stop TRACE_ID
   rn-observe record start [--duration MS] | record stop RECORDING_ID
   rn-observe replay run SCRIPT.json
+  rn-observe replay export SESSION_ID
+  rn-observe artifacts cleanup [--days N] [--dry-run]
   rn-observe session start | session stop [SESSION_ID] | session get SESSION_ID
-  rn-observe diagnose | compare BEFORE.png AFTER.png [--before-ui TREE.json --after-ui TREE.json]
+  rn-observe diagnose [--ui-fps-low N --ui-fps-critical N --js-blocking N --js-blocking-high N --slow-request N --very-slow-request N --render-count N]
+  rn-observe compare BEFORE.png AFTER.png [--before-ui TREE.json --after-ui TREE.json]
   rn-observe devtools-export [--duration MS] [--metro URL]
   rn-observe devtools-profile [--duration MS] [--metro URL]
 
@@ -69,6 +73,27 @@ function point(value: string | undefined): { x: number; y: number } {
     throw new Error('Expected coordinates in X,Y format');
   }
   return { x: x ?? 0, y: y ?? 0 };
+}
+
+function diagnosisThresholdFlags(
+  args: readonly string[],
+): Partial<DiagnosisThresholds> {
+  const uiFpsLow = numberFlag(args, '--ui-fps-low');
+  const uiFpsCritical = numberFlag(args, '--ui-fps-critical');
+  const jsBlockingMs = numberFlag(args, '--js-blocking');
+  const jsBlockingHighMs = numberFlag(args, '--js-blocking-high');
+  const slowRequestMs = numberFlag(args, '--slow-request');
+  const verySlowRequestMs = numberFlag(args, '--very-slow-request');
+  const renderCount = numberFlag(args, '--render-count');
+  return {
+    ...(uiFpsLow !== undefined ? { uiFpsLow } : {}),
+    ...(uiFpsCritical !== undefined ? { uiFpsCritical } : {}),
+    ...(jsBlockingMs !== undefined ? { jsBlockingMs } : {}),
+    ...(jsBlockingHighMs !== undefined ? { jsBlockingHighMs } : {}),
+    ...(slowRequestMs !== undefined ? { slowRequestMs } : {}),
+    ...(verySlowRequestMs !== undefined ? { verySlowRequestMs } : {}),
+    ...(renderCount !== undefined ? { renderCount } : {}),
+  };
 }
 
 function print(io: CliIO, value: unknown): void {
@@ -218,6 +243,18 @@ export async function runCli(
     } else if (command === 'replay' && subcommand === 'run') {
       if (!positional) throw new Error('replay run requires SCRIPT.json');
       print(io, await core.runReplay(positional));
+    } else if (command === 'replay' && subcommand === 'export') {
+      if (!positional) throw new Error('replay export requires SESSION_ID');
+      print(io, core.exportReplayScript(positional));
+    } else if (command === 'artifacts' && subcommand === 'cleanup') {
+      const days = numberFlag(args, '--days') ?? 14;
+      print(
+        io,
+        core.cleanupArtifacts({
+          olderThanDays: days,
+          ...(args.includes('--dry-run') ? { dryRun: true } : {}),
+        }),
+      );
     } else if (command === 'swipe') {
       print(
         io,
@@ -269,8 +306,9 @@ export async function runCli(
     } else if (command === 'session' && subcommand === 'get') {
       if (!positional) throw new Error('session get requires SESSION_ID');
       print(io, core.getSession(positional));
-    } else if (command === 'diagnose') print(io, await core.diagnose());
-    else if (command === 'compare') {
+    } else if (command === 'diagnose') {
+      print(io, await core.diagnose(diagnosisThresholdFlags(args)));
+    } else if (command === 'compare') {
       if (!subcommand || !positional) {
         throw new Error('compare requires BEFORE.png AFTER.png');
       }

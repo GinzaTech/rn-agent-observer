@@ -1,13 +1,13 @@
 # RN Agent Observer
 
-**VI** · [EN](#english) · Version 2.3.0 · Android + Windows
+**VI** · [EN](#english) · Version 2.4.0 · Android + Windows
 
 RN Agent Observer là cầu nối quan sát runtime cục bộ (local runtime observability bridge) cho ứng dụng React Native/Expo trên Android. Công cụ cho phép AI coding agent (OpenCode, Claude Code, Codex, Cursor...) hoặc lập trình viên **quan sát, chẩn đoán và xác minh** ứng dụng đang chạy mà không cần nhìn màn hình — mọi bằng chứng runtime (screenshot, UI tree, FPS, network, render, console, heap, trace, video) đều có cấu trúc, đo đếm được và so sánh trước/sau được.
 
 ```text
-AI Agent ──CLI (35 lệnh)──┐
+AI Agent ──CLI (37 lệnh)──┐
                            ├──> ObserverCore ──> ADB / UIAutomator / Perfetto (Android)
-AI Agent ──MCP (41 tools)─┘        │      ──> Metro CDP (console/network/profile/heap)
+AI Agent ──MCP (43 tools)─┘        │      ──> Metro CDP (console/network/profile/heap)
                                    │      ──> RN instrumentation (fetch/route/render/JS task)
                                    v
                         SQLite session + artifact trên đĩa (.artifacts/)
@@ -62,12 +62,12 @@ pnpm rn-observe diagnose
 2. session start    → mọi lệnh sau ghi timeline vào SQLite, bền qua nhiều process
 3. tái hiện         → tap --test-id / tap --ref (semantic, không đoán tọa độ)
 4. evidence sâu     → performance / metro-network / devtools-export / trace / record
-5. diagnose         → finding dạng "Long JS task, 100ms, confidence 0.97" (hypothesis có bằng chứng)
+5. diagnose         → finding + confidenceBasis (heuristic, không phải xác suất)
 6. sửa code nhỏ nhất
 7. reload (--fast)  → JS-only qua CDP, giữ native state
 8. tái hiện y hệt   → cùng testID, cùng kịch bản
 9. compare          → pixel diff + structural UI diff (similarity, vùng đổi, added/removed/changed)
-10. session stop    → summary.json; agent báo before/after metrics + artifact paths
+10. session stop    → summary.json + auto replay; agent báo before/after metrics + artifact paths
 ```
 
 ### Ba lớp thu thập dữ liệu
@@ -81,9 +81,9 @@ pnpm rn-observe diagnose
 ### Nguyên tắc evidence (áp dụng toàn hệ thống)
 
 1. **Metric envelope**: mọi số liệu phải đủ `{name, value, unit, source, timestamp, available}`. Khi `available: false` phải có `reason` (VD: `js_fps` luôn unavailable vì ADB không có tín hiệu JS FPS đáng tin cậy).
-2. **Finding = hypothesis có evidence**: `diagnose` trả findings với severity, confidence (0.72–0.99), evidence string chứa số đo, recommendation — không phải chân lý tuyệt đối.
+2. **Finding = hypothesis có evidence**: `diagnose` trả severity, heuristic confidence, `confidenceBasis`, evidence và recommendation. Score phụ thuộc độ vượt ngưỡng + độ mạnh của sample/source, không phải xác suất thống kê.
 3. **Artifact là citizen hạng nhất**: PNG/JSON/trace/mp4 nằm trên đĩa dưới `.artifacts/`; SQLite và MCP response chỉ chứa metadata/path — không base64, không binary blob.
-4. **Redact tại nguồn**: instrumentation che token/secret/PII trong URL/body/header **trước khi** event ra logcat — mọi artifact hạ nguồn tự sạch.
+4. **Redact fail-closed tại nguồn**: URL query/header/body preview dùng allowlist; key lạ bị che **trước khi** event ra logcat.
 5. **Lỗi có cấu trúc**: `{error: {code, message, recoverable, suggestion}}` — luôn kèm gợi ý khắc phục, không có stack trace trong response.
 
 ## Kiến trúc
@@ -98,7 +98,7 @@ rn-agent-observer/
 │   │                       # diagnosis, observer, artifact, trace, status, devtools, app-state
 │   ├── core/               # TOÀN BỘ device/runtime logic — bộ não duy nhất
 │   │   └── src/
-│   │       ├── index.ts        # ObserverCore façade: 35 commands, session/artifact wiring
+│   │       ├── index.ts        # ObserverCore façade: 37 commands, session/artifact wiring
 │   │       ├── adb/            # AdbClient + parsers (devices/UI tree/logcat/framestats/
 │   │       │                   # meminfo/top/resumed-activity/proc-net-dev/permissions)
 │   │       ├── devtools/       # CDP client (ws), metro discovery, devtools-exporter,
@@ -106,15 +106,15 @@ rn-agent-observer/
 │   │       ├── diagnosis/      # rule engine deterministic (5 rules)
 │   │       ├── comparison/     # pixelmatch + structural UI-tree diff
 │   │       ├── network/        # instrumentation event parsers + summarize + redactUrl
-│   │       ├── performance/    # Perfetto trace manager (start/stop qua 2 process)
+│   │       ├── performance/    # Perfetto + phát hiện gfx frame window stale
 │   │       ├── recording/      # screenrecord manager (max 180s/clip)
-│   │       ├── refs/           # ref snapshot (e1..eN) + settle diff
+│   │       ├── refs/           # ref ổn định theo session + settle diff
 │   │       ├── replay/         # replay script runner (9 loại bước)
 │   │       ├── routes/         # expo-router sitemap từ filesystem
 │   │       ├── session/        # SQLite WAL SessionStore (sessions/events/artifacts)
 │   │       └── artifacts/      # ArtifactManager (đĩa) + config.ts (app ID resolution)
 │   ├── cli/                # rn-observe — parse flag + in JSON, KHÔNG chứa logic
-│   ├── mcp-server/         # MCP stdio server — 41 tools, adapter mỏng gọi core
+│   ├── mcp-server/         # MCP stdio server — 43 tools, adapter mỏng gọi core
 │   └── rn-instrumentation/ # package dev-only cài vào app (fetch/route/render/js-task/app-data
 │                           # + redactUrl/redactSensitiveText/redactHeaders) — dependency-free
 ├── apps/
@@ -160,7 +160,10 @@ CLI observe
 | Session timeline + artifact metadata | `.artifacts/observer.sqlite` (WAL)                                                                       | Có — mọi process CLI/MCP cùng project root |
 | Trace đang chạy                      | `.artifacts/active-traces/<id>.json`                                                                     | Có — start/stop hai terminal khác nhau     |
 | Recording đang chạy                  | `.artifacts/active-recordings/<id>.json`                                                                 | Có — như trên                              |
-| Snapshot ref gần nhất                | `.artifacts/snapshots/last.json`                                                                         | Có — ref hợp lệ với snapshot mới nhất      |
+| Snapshot ref trong session           | `.artifacts/sessions/<id>/state/last-snapshot.json`                                                      | Có — identity giữ ref qua reorder/scroll   |
+| Snapshot ref standalone              | `.artifacts/snapshots/last.json`                                                                         | Có — dùng ngoài session                    |
+| CDP connection lock                  | `.artifacts/cdp-locks/inspector.lock`                                                                    | Có — atomic queue giữa process             |
+| Gfx frame freshness                  | `.artifacts/performance-state/<appId>.json`                                                              | Có — không tái dùng sample window cũ       |
 | Artifact binary                      | `.artifacts/sessions/<id>/{screenshots,ui-trees,traces,recordings,devtools-exports,profiles,summaries}/` | Có                                         |
 
 ## Hướng dẫn sử dụng
@@ -176,7 +179,7 @@ CLI observe
 | `RN_OBSERVER_METRO_URL`    | Base URL Metro cho tính năng CDP             | `http://127.0.0.1:8081`            |
 | `RN_OBSERVER_ADB`          | Đường dẫn adb executable khác                | `adb`                              |
 
-### Lệnh CLI theo nhóm (35 lệnh)
+### Lệnh CLI theo nhóm (37 lệnh)
 
 ```text
 Thiết bị & app:
@@ -206,7 +209,8 @@ Trace & recording:
 
 Verify & lặp lại:
   assert (--test-id ID | --text VALUE) [--visible true|false]
-  a11y-audit | replay run SCRIPT.json
+  a11y-audit | replay run SCRIPT.json | replay export SESSION_ID
+  artifacts cleanup [--days N] [--dry-run]
 
 Phân tích & session:
   diagnose | compare BEFORE.png AFTER.png [--before-ui T.json --after-ui T.json]
@@ -312,7 +316,7 @@ pnpm mcp:check    # health check
 pnpm mcp:start    # stdio server
 ```
 
-Cấu hình client (Claude/OpenCode/Cursor...) — xem danh sách 41 tools trong `docs/protocol.md`:
+Cấu hình client (Claude/OpenCode/Cursor...) — xem danh sách 43 tools trong `docs/protocol.md`:
 
 ```json
 {
@@ -404,7 +408,7 @@ pnpm mcp:check                                # MCP health check
 
 # English
 
-**EN** · [VI](#rn-agent-observer) · Version 2.3.0 · Android + Windows
+**EN** · [VI](#rn-agent-observer) · Version 2.4.0 · Android + Windows
 
 RN Agent Observer is a local runtime observability bridge for React Native/Expo apps on Android. It lets AI coding agents (OpenCode, Claude Code, Codex, Cursor...) or developers **observe, diagnose and verify** a running app without looking at the screen — every piece of runtime evidence (screenshot, UI tree, FPS, network, renders, console, heap, traces, video) is structured, measurable, and comparable before/after code changes.
 
@@ -455,12 +459,12 @@ pnpm rn-observe diagnose
 2. session start    → subsequent commands persist a SQLite timeline, durable across processes
 3. reproduce        → tap --test-id / tap --ref (semantic, no guessed coordinates)
 4. deep evidence    → performance / metro-network / devtools-export / trace / record
-5. diagnose         → finding like "Long JS task, 100ms, confidence 0.97" (evidence-backed hypothesis)
+5. diagnose         → finding + confidenceBasis (heuristic, not a probability)
 6. make the smallest fix
 7. reload (--fast)  → JS-only via CDP, keeps native state
 8. reproduce again  → same testIDs, same scenario
 9. compare          → pixel diff + structural UI diff (similarity, regions, added/removed/changed)
-10. session stop    → summary.json; agent reports before/after metrics + artifact paths
+10. session stop    → summary.json + auto replay; agent reports before/after metrics + artifact paths
 ```
 
 ### Three collection layers
@@ -474,9 +478,9 @@ pnpm rn-observe diagnose
 ### Evidence principles (enforced system-wide)
 
 1. **Metric envelope**: every measurement must carry `{name, value, unit, source, timestamp, available}`. When `available: false`, a `reason` is required (e.g. `js_fps` is always unavailable because ADB has no trustworthy JS FPS signal).
-2. **Findings are evidence-backed hypotheses**: `diagnose` returns findings with severity, confidence (0.72–0.99), evidence strings containing measured numbers, and recommendations — not absolute truths.
+2. **Findings are evidence-backed hypotheses**: `diagnose` returns severity, heuristic confidence, `confidenceBasis`, evidence, and recommendations. The score uses threshold deviation plus sample/source strength; it is not a statistical probability.
 3. **Artifacts are first-class**: PNG/JSON/traces/mp4 live on disk under `.artifacts/`; SQLite and MCP responses carry only metadata/paths — no base64, no binary blobs.
-4. **Redaction at the source**: instrumentation masks tokens/secrets/PII in URLs/bodies/headers **before** events reach logcat — everything downstream is clean by construction.
+4. **Fail-closed redaction at the source**: URL query/header/body previews use allowlists; unknown keys are masked **before** events reach logcat.
 5. **Structured errors**: `{error: {code, message, recoverable, suggestion}}` — always with a recovery hint, never a raw stack trace in responses.
 
 ## Architecture
@@ -489,7 +493,7 @@ rn-agent-observer/
 │   ├── schemas/            # Zod schemas + shared types — NO runtime logic
 │   ├── core/               # ALL device/runtime logic — the single brain
 │   │   └── src/
-│   │       ├── index.ts        # ObserverCore façade: 35 commands, session/artifact wiring
+│   │       ├── index.ts        # ObserverCore façade: 37 commands, session/artifact wiring
 │   │       ├── adb/            # AdbClient + parsers (devices/UI tree/logcat/framestats/
 │   │       │                   # meminfo/top/resumed-activity/proc-net-dev/permissions)
 │   │       ├── devtools/       # CDP client (ws), metro discovery, devtools-exporter,
@@ -497,15 +501,15 @@ rn-agent-observer/
 │   │       ├── diagnosis/      # deterministic rule engine (5 rules)
 │   │       ├── comparison/     # pixelmatch + structural UI-tree diff
 │   │       ├── network/        # instrumentation event parsers + summarize + redactUrl
-│   │       ├── performance/    # Perfetto trace manager (start/stop across processes)
+│   │       ├── performance/    # Perfetto + stale gfx frame-window detection
 │   │       ├── recording/      # screenrecord manager (max 180s/clip)
-│   │       ├── refs/           # ref snapshot (e1..eN) + settle diff
+│   │       ├── refs/           # session-stable refs + settle diff
 │   │       ├── replay/         # replay script runner (9 step types)
 │   │       ├── routes/         # expo-router sitemap from the filesystem
 │   │       ├── session/        # SQLite WAL SessionStore (sessions/events/artifacts)
 │   │       └── artifacts/      # ArtifactManager (disk) + config.ts (app ID resolution)
 │   ├── cli/                # rn-observe — flag parsing + JSON printing, NO logic
-│   ├── mcp-server/         # MCP stdio server — 41 tools, thin adapter over core
+│   ├── mcp-server/         # MCP stdio server — 43 tools, thin adapter over core
 │   └── rn-instrumentation/ # dev-only package for the observed app (fetch/route/render/
 │                           # js-task/app-data + redactUrl/redactSensitiveText/redactHeaders)
 ├── apps/
@@ -550,7 +554,10 @@ CLI observe
 | Session timeline + artifact metadata | `.artifacts/observer.sqlite` (WAL)                                                                       | Yes — any CLI/MCP process on the same project root |
 | Active traces                        | `.artifacts/active-traces/<id>.json`                                                                     | Yes — start and stop from different terminals      |
 | Active recordings                    | `.artifacts/active-recordings/<id>.json`                                                                 | Yes — same                                         |
-| Latest ref snapshot                  | `.artifacts/snapshots/last.json`                                                                         | Yes — refs valid against the latest snapshot       |
+| Session ref snapshot                 | `.artifacts/sessions/<id>/state/last-snapshot.json`                                                      | Yes — identity retains refs across reorder/scroll  |
+| Standalone ref snapshot              | `.artifacts/snapshots/last.json`                                                                         | Yes — used outside sessions                        |
+| CDP connection lock                  | `.artifacts/cdp-locks/inspector.lock`                                                                    | Yes — atomic cross-process queue                   |
+| Gfx frame freshness                  | `.artifacts/performance-state/<appId>.json`                                                              | Yes — prevents reuse of stale sample windows       |
 | Artifact binaries                    | `.artifacts/sessions/<id>/{screenshots,ui-trees,traces,recordings,devtools-exports,profiles,summaries}/` | Yes                                                |
 
 ## Usage Guide
@@ -566,7 +573,7 @@ CLI observe
 | `RN_OBSERVER_METRO_URL`    | Metro base URL for CDP features                       | `http://127.0.0.1:8081`              |
 | `RN_OBSERVER_ADB`          | Custom adb executable path                            | `adb`                                |
 
-### CLI commands by group (35 commands)
+### CLI commands by group (37 commands)
 
 ```text
 Device & app:
@@ -596,7 +603,8 @@ Trace & recording:
 
 Verify & repeat:
   assert (--test-id ID | --text VALUE) [--visible true|false]
-  a11y-audit | replay run SCRIPT.json
+  a11y-audit | replay run SCRIPT.json | replay export SESSION_ID
+  artifacts cleanup [--days N] [--dry-run]
 
 Analysis & sessions:
   diagnose | compare BEFORE.png AFTER.png [--before-ui T.json --after-ui T.json]
@@ -702,7 +710,7 @@ pnpm mcp:check    # health check
 pnpm mcp:start    # stdio server
 ```
 
-Client config (Claude/OpenCode/Cursor...) — see all 41 tools in `docs/protocol.md`:
+Client config (Claude/OpenCode/Cursor...) — see all 43 tools in `docs/protocol.md`:
 
 ```json
 {

@@ -57,7 +57,23 @@ Không bật instrumentation trong production. Network body mặc định luôn 
 - `METRO_UNREACHABLE`: Metro chưa chạy hoặc sai URL. Khởi động Metro cho đúng app, chạy `adb reverse tcp:8081 tcp:8081` (hoặc truyền `--metro http://127.0.0.1:<port>` khi Metro dùng port khác).
 - `DEVTOOLS_TARGET_NOT_FOUND`: app chưa kết nối Metro. Mở/relaunch app để nó load bundle từ Metro; kiểm tra `http://127.0.0.1:<port>/json` có target của app.
 - `DEVTOOLS_CONNECT_FAILED`: một phiên React Native DevTools khác đang giữ inspector. Đóng DevTools rồi thử lại.
+- `CDP_LOCK_HELD`: observer đã xếp hàng chờ inspector nhưng quá timeout 180s. Command sống không bị cướp lock theo tuổi; retry sau khi command kia xong hoặc đóng React Native DevTools.
 - Metro inspector từ chối handshake nếu thiếu header `Origin`; observer tự gửi origin suy từ URL — không dùng client WebSocket không cho phép set header.
+
+## metro-network rỗng hoặc devtools-profile lỗi
+
+- RN 0.86 bridgeless (Hermes) đã xác nhận **không expose CDP Network domain** (attach thành công nhưng 0 events) và **từ chối `Profiler.enable`**. Đây là giới hạn runtime, không phải lỗi observer.
+- Fallback network: dùng instrumentation (`installNetworkObserver`) — đã verify hoạt động trên cùng runtime.
+- `metro-network` trả requestCount 0 trung thực; không coi là lỗi.
+
+## Tap không tác dụng sau reload --fast
+
+- Trên một số device (xác nhận MIUI/Android 15): sau `reload --fast` (CDP Page.reload), JS tải lại nhưng input tap bị nuốt đến khi relaunch thật.
+- Khuyến nghị: dùng `reload --fast` cho quan sát không tương tác; trước khi tái hiện kịch bản tương tác, dùng `reload` đầy đủ (force-stop + launch).
+
+## record start không tạo file
+
+- Đã fix ở 2.4.0 (adb multi-arg mất quoting + cần `setsid` detach). Nếu gặp lại: kiểm tra `adb shell "ps -A | grep screenrecord"` và thử `record stop`; màn hình khóa cũng làm screenrecord dừng ngay.
 
 ## JS FPS hoặc JS blocking unavailable
 

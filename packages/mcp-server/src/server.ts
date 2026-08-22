@@ -226,6 +226,33 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
     ({ path }) => safe(() => core.runReplay(path)),
   );
   server.registerTool(
+    'replay_export',
+    {
+      description:
+        'Turn a recorded session timeline into a replayable script JSON artifact.',
+      inputSchema: z.object({ session_id: z.string().min(1) }),
+    },
+    ({ session_id }) => safe(() => core.exportReplayScript(session_id)),
+  );
+  server.registerTool(
+    'cleanup_artifacts',
+    {
+      description:
+        'Delete observer sessions and artifacts older than N days (default 14). Use dry_run first.',
+      inputSchema: z.object({
+        older_than_days: z.number().int().min(0).max(365).default(14),
+        dry_run: z.boolean().default(false),
+      }),
+    },
+    ({ older_than_days, dry_run }) =>
+      safe(() =>
+        core.cleanupArtifacts({
+          olderThanDays: older_than_days,
+          dryRun: dry_run,
+        }),
+      ),
+  );
+  server.registerTool(
     'open_deep_link',
     {
       description: 'Open an Android deep link in the configured app.',
@@ -508,10 +535,44 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
   server.registerTool(
     'diagnose',
     {
-      description: 'Run deterministic evidence-based diagnosis rules.',
-      inputSchema: z.object({}),
+      description:
+        'Run evidence-based diagnosis rules. Confidence is a documented heuristic, not a statistical probability; thresholds are configurable.',
+      inputSchema: z.object({
+        ui_fps_low: z.number().positive().optional(),
+        ui_fps_critical: z.number().positive().optional(),
+        js_blocking_ms: z.number().positive().optional(),
+        js_blocking_high_ms: z.number().positive().optional(),
+        slow_request_ms: z.number().positive().optional(),
+        very_slow_request_ms: z.number().positive().optional(),
+        render_count: z.number().int().positive().optional(),
+      }),
     },
-    () => safe(() => core.diagnose()),
+    (thresholds) =>
+      safe(() =>
+        core.diagnose({
+          ...(thresholds.ui_fps_low !== undefined
+            ? { uiFpsLow: thresholds.ui_fps_low }
+            : {}),
+          ...(thresholds.ui_fps_critical !== undefined
+            ? { uiFpsCritical: thresholds.ui_fps_critical }
+            : {}),
+          ...(thresholds.js_blocking_ms !== undefined
+            ? { jsBlockingMs: thresholds.js_blocking_ms }
+            : {}),
+          ...(thresholds.js_blocking_high_ms !== undefined
+            ? { jsBlockingHighMs: thresholds.js_blocking_high_ms }
+            : {}),
+          ...(thresholds.slow_request_ms !== undefined
+            ? { slowRequestMs: thresholds.slow_request_ms }
+            : {}),
+          ...(thresholds.very_slow_request_ms !== undefined
+            ? { verySlowRequestMs: thresholds.very_slow_request_ms }
+            : {}),
+          ...(thresholds.render_count !== undefined
+            ? { renderCount: thresholds.render_count }
+            : {}),
+        }),
+      ),
   );
   server.registerTool(
     'compare_screens',

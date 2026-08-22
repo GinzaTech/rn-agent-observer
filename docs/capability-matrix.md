@@ -59,6 +59,15 @@ Decision: keep it opt-in, development-only, batched, redacted, and measurable. N
 5. Use React Native DevTools for React/JS/network/performance evidence where export/automation is supported.
 6. Add minimal runtime instrumentation only for missing app-owned facts.
 
+## Observer 2.4 implementation status
+
+- CDP automation remains single-target, but observer commands now use an atomic cross-process queue. External React Native DevTools does not participate in this queue and must be closed.
+- Session refs preserve identity across reorder/scroll; this improves agent safety but does not provide React props/component stacks.
+- Session interaction timelines automatically export to replay JSON. Text contents are intentionally omitted to avoid persisting credentials.
+- URL/header/body preview redaction is allowlist-based and fail-closed. Body capture remains development-only and off by default.
+- Gfxinfo frame windows have freshness detection; repeated unchanged windows become unavailable instead of being reported as new benchmark samples.
+- Still absent: React component-tree protocol export, off-screen virtualized-list semantics, macOS/Linux host support, contrast/focus-order audit, and negotiated CDP protocol versions.
+
 ## Official sources
 
 - [Expo: agent-device and Expo](https://docs.expo.dev/agents/agent-device/)

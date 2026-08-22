@@ -2,9 +2,9 @@
 
 **VI** · [English](#rn-agent-observer-1)
 
-RN Agent Observer 2.3.0 là cầu nối quan sát runtime cục bộ cho React Native/Expo. Công cụ dùng cùng một core TypeScript cho CLI và MCP, điều khiển Android qua ADB/UIAutomator, nhận telemetry từ instrumentation phát triển, export console/exception/heap/JS CPU profile qua Chrome DevTools Protocol của Metro, thu network per-request không cần instrumentation, ref snapshot + diff + replay script, quay video màn hình, lưu session bằng SQLite và giữ ảnh/trace/UI tree ở dạng artifact trên đĩa.
+RN Agent Observer 2.4.0 là cầu nối quan sát runtime cục bộ cho React Native/Expo. Công cụ dùng cùng một core TypeScript cho CLI và MCP, điều khiển Android qua ADB/UIAutomator, nhận telemetry từ instrumentation phát triển, export console/exception/heap/JS CPU profile qua Chrome DevTools Protocol của Metro, thu network per-request không cần instrumentation, ref snapshot ổn định theo session + diff + auto-record replay, quay video màn hình, lưu session bằng SQLite và giữ ảnh/trace/UI tree ở dạng artifact trên đĩa.
 
-Phiên bản hiện tại hoàn thành Android v1 trên Windows: 41 MCP tools, CLI tương ứng, demo Expo có các lab xác định, chẩn đoán dựa trên rule và so sánh ảnh + cấu trúc UI.
+Phiên bản hiện tại hoàn thành Android v1 trên Windows: 43 MCP tools, CLI tương ứng, demo Expo có các lab xác định, chẩn đoán heuristic minh bạch và so sánh ảnh + cấu trúc UI.
 
 ## Yêu cầu
 
@@ -56,7 +56,7 @@ pnpm mcp:check
 pnpm mcp:start
 ```
 
-Server dùng stdio. Cấu hình client và danh sách 41 tool nằm trong [docs/protocol.md](docs/protocol.md).
+Server dùng stdio. Cấu hình client và danh sách 43 tool nằm trong [docs/protocol.md](docs/protocol.md).
 
 ## Tích hợp cho AI agent
 
@@ -104,11 +104,11 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 - [Kiểm thử và runtime verification](docs/testing.md)
 - [Lộ trình test chuẩn (test blueprint)](docs/test-blueprint.md)
 - [Xử lý sự cố](docs/troubleshooting.md)
-- [Release 2.0.0](CHANGELOG.md)
+- [Changelog](CHANGELOG.md)
 
 ## Phiên bản hiện tại
 
-- Android/Windows là target duy nhất của Observer 2.3.0.
+- Android/Windows là target duy nhất của Observer 2.4.0.
 - ADB không có tín hiệu JS FPS đáng tin cậy; field được trả `available: false`, không đoán số.
 - JS blocking, route, React renders và network metadata cần instrumentation phát triển trong app.
 - Export DevTools qua CDP (`devtools-export`, `devtools-profile`) và network per-request (`metro-network`) cần Metro đang chạy và app kết nối được Metro (`adb reverse tcp:8081 tcp:8081`); không dùng được khi một phiên React Native DevTools khác đang giữ kết nối.
@@ -116,15 +116,17 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 - App không có instrumentation: dùng `metro-network` (CDP), `app-state` (foreground activity, PID) và `device-network` (byte counters device-level, không quy về app) làm evidence fallback.
 - `record` (screenrecord) giới hạn 180s/clip theo Android.
 - Perfetto trace đã hỗ trợ Android; phân tích trace sâu vẫn dùng Perfetto UI/Android Studio.
-- Observer không thu network body mặc định. Opt-in development-only có cảnh báo và có thể làm lộ dữ liệu nhạy cảm.
+- Command CDP được queue giữa process; React Native DevTools bên ngoài vẫn phải đóng vì không dùng lock của observer.
+- `session stop` tự sinh replay; ref trong session ổn định qua reorder/scroll; thiếu session phát `EVIDENCE_NOT_RECORDED`.
+- Observer không thu network body mặc định. Opt-in development-only dùng allowlist fail-closed nhưng vẫn chỉ dùng với fixture development.
 
 ---
 
 # RN Agent Observer (English)
 
-RN Agent Observer 2.3.0 is a local runtime observability bridge for React Native/Expo. It uses one shared TypeScript core behind both a CLI and an MCP server, drives Android through ADB/UIAutomator, receives telemetry from development instrumentation, exports console/exceptions/heap/JS CPU profiles through Metro's Chrome DevTools Protocol, captures per-request network traffic without app instrumentation, provides ref snapshots + diffs + replay scripts, records on-screen video, persists sessions in SQLite, and keeps screenshots/traces/UI trees as on-disk artifacts.
+RN Agent Observer 2.4.0 is a local runtime observability bridge for React Native/Expo. It uses one shared TypeScript core behind both a CLI and an MCP server, drives Android through ADB/UIAutomator, receives telemetry from development instrumentation, exports console/exceptions/heap/JS CPU profiles through Metro's Chrome DevTools Protocol, captures per-request network traffic without app instrumentation, provides session-stable ref snapshots + diffs + automatically recorded replay scripts, records on-screen video, persists sessions in SQLite, and keeps screenshots/traces/UI trees as on-disk artifacts.
 
-The current release completes Android v1 on Windows: 41 MCP tools, the matching CLI, an Expo demo app with deterministic labs, rule-based diagnosis, and pixel + structural UI comparison.
+The current release completes Android v1 on Windows: 43 MCP tools, the matching CLI, an Expo demo app with deterministic labs, transparent heuristic diagnosis, and pixel + structural UI comparison.
 
 ## Requirements
 
@@ -176,7 +178,7 @@ pnpm mcp:check
 pnpm mcp:start
 ```
 
-The server speaks stdio. Client configuration and the full list of 41 tools are documented in [docs/protocol.md](docs/protocol.md).
+The server speaks stdio. Client configuration and the full list of 43 tools are documented in [docs/protocol.md](docs/protocol.md).
 
 ## Documentation
 
@@ -228,12 +230,14 @@ All three can be combined: the skill/AGENTS.md teach the _workflow_, MCP provide
 
 ## Current boundary
 
-- Android/Windows is the only supported target of Observer 2.3.0.
+- Android/Windows is the only supported target of Observer 2.4.0.
 - ADB has no trustworthy JS FPS signal; the field is returned as `available: false` — values are never guessed.
 - JS blocking, route, React renders, and network metadata require development instrumentation inside the app.
 - CDP features (`devtools-export`, `devtools-profile`, `metro-network`) need Metro running for the right app and the app connected to it (`adb reverse tcp:8081 tcp:8081`); they cannot attach while another React Native DevTools session holds the connection.
 - `reload --fast` uses CDP Page.reload (JS-only) and automatically falls back to force-stop when Metro is unavailable.
+- Observer CDP commands queue across processes; external React Native DevTools must still be closed because it does not participate in the observer lock.
+- `session stop` automatically writes a replay, session refs survive reorder/scroll, and missing sessions produce `EVIDENCE_NOT_RECORDED`.
+- Network body capture is off by default. Development-only opt-in uses fail-closed allowlists and should still be limited to fixtures.
 - Apps without instrumentation: use `metro-network` (CDP), `app-state` (foreground activity, PID), and `device-network` (device-level byte counters, not app-attributed) as fallback evidence.
 - `record` (screenrecord) is limited to 180s per clip by Android.
 - Perfetto tracing is supported on Android; deep trace analysis remains in Perfetto UI/Android Studio.
-- The observer does not capture network bodies by default. The opt-in is development-only, warns, and may expose sensitive data.

@@ -1,27 +1,38 @@
-const SENSITIVE_QUERY_KEYS = [
-  'access_token',
-  'refresh_token',
-  'api_key',
-  'apikey',
-  'password',
-  'secret',
-  'token',
-  'email',
-  'phone',
-  'address',
-  'ssn',
-] as const;
+const SAFE_QUERY_KEYS = new Set([
+  'q',
+  'query',
+  'page',
+  'limit',
+  'offset',
+  'sort',
+  'order',
+  'lang',
+  'locale',
+  'platform',
+  'version',
+]);
 
-const SENSITIVE_HEADER_KEYS = [
-  'authorization',
-  'proxy-authorization',
-  'cookie',
-  'set-cookie',
-  'x-api-key',
-  'token',
-  'password',
-  'secret',
-] as const;
+const SAFE_HEADER_KEYS = new Set([
+  'accept',
+  'accept-language',
+  'cache-control',
+  'content-length',
+  'content-type',
+  'etag',
+  'expires',
+  'last-modified',
+]);
+
+const SAFE_BODY_KEYS = new Set([
+  'code',
+  'count',
+  'limit',
+  'offset',
+  'ok',
+  'page',
+  'status',
+  'type',
+]);
 
 export interface InstrumentationConfig {
   enabled: boolean;
@@ -56,30 +67,50 @@ export function redactUrl(value: string): string {
   try {
     const url = new URL(value);
     for (const key of [...url.searchParams.keys()]) {
-      if (
-        SENSITIVE_QUERY_KEYS.some((sensitive) =>
-          key.toLowerCase().includes(sensitive),
-        )
-      ) {
+      if (!SAFE_QUERY_KEYS.has(key.toLowerCase())) {
         url.searchParams.set(key, '[REDACTED]');
       }
     }
     return url.toString();
   } catch {
     return value.replace(
-      /((?:access_token|refresh_token|api[_-]?key|password|secret|token)=)[^&\s]+/gi,
-      '$1[REDACTED]',
+      /(^|[?&\s])([a-zA-Z0-9_.-]+)=([^&\s]+)/g,
+      (match: string, prefix: string, key: string) =>
+        SAFE_QUERY_KEYS.has(key.toLowerCase())
+          ? match
+          : `${prefix}${key}=[REDACTED]`,
     );
   }
 }
 
+function redactBodyValue(value: unknown, safe = false): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactBodyValue(item, safe));
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        SAFE_BODY_KEYS.has(key.toLowerCase())
+          ? redactBodyValue(item, true)
+          : '[REDACTED]',
+      ]),
+    );
+  }
+  if (!safe) return '[REDACTED]';
+  return typeof value === 'string' ? value.slice(0, 128) : value;
+}
+
 export function redactSensitiveText(value: string): string {
-  return value
-    .replace(
-      /((?:authorization|cookie|set-cookie|x-api-key|access_token|refresh_token|api[_-]?key|password|secret|token|email|phone|address|ssn)["']?\s*[:=]\s*["']?)[^,"'&\s}]+/gi,
-      '$1[REDACTED]',
-    )
-    .slice(0, 4096);
+  try {
+    return JSON.stringify(redactBodyValue(JSON.parse(value) as unknown)).slice(
+      0,
+      4096,
+    );
+  } catch {
+    // Unstructured text has no trustworthy field boundary, so fail closed.
+    return '[REDACTED]';
+  }
 }
 
 export function redactHeaders(
@@ -87,11 +118,9 @@ export function redactHeaders(
 ): Record<string, string> {
   const redacted: Record<string, string> = {};
   for (const [key, value] of Object.entries(headers)) {
-    redacted[key] = SENSITIVE_HEADER_KEYS.some((sensitive) =>
-      key.toLowerCase().includes(sensitive),
-    )
-      ? '[REDACTED]'
-      : value;
+    redacted[key] = SAFE_HEADER_KEYS.has(key.toLowerCase())
+      ? value
+      : '[REDACTED]';
   }
   return redacted;
 }

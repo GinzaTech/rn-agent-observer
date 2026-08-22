@@ -164,6 +164,25 @@ export class SessionStore {
     };
   }
 
+  status(sessionId: string): Session['status'] | undefined {
+    const row = this.database
+      .prepare('SELECT status FROM sessions WHERE id = ?')
+      .get(sessionId) as Pick<SessionRow, 'status'> | undefined;
+    return row?.status;
+  }
+
+  deleteSession(sessionId: string): void {
+    this.database.transaction(() => {
+      this.database
+        .prepare('DELETE FROM events WHERE session_id = ?')
+        .run(sessionId);
+      this.database
+        .prepare('DELETE FROM artifacts WHERE session_id = ?')
+        .run(sessionId);
+      this.database.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+    })();
+  }
+
   close(): void {
     this.database.close();
   }

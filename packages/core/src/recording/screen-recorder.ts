@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { Trace } from '@rn-agent-observer/schemas';
+import type { Artifact, Trace } from '@rn-agent-observer/schemas';
 import type { AdbClient } from '../adb/adb-client.js';
 import type { ArtifactManager } from '../artifacts/artifact-manager.js';
 import { ObserverError } from '../errors.js';
@@ -15,6 +15,12 @@ import { ObserverError } from '../errors.js';
 interface ActiveRecording extends Trace {
   pid: string;
   remotePath: string;
+  sessionId?: string;
+}
+
+export interface CompletedRecording {
+  trace: Trace;
+  artifact: Artifact;
   sessionId?: string;
 }
 
@@ -48,11 +54,14 @@ export class ScreenRecorder {
     const client = await this.adb.selected();
     const id = randomUUID();
     const remotePath = `/sdcard/rn-observer-${id}.mp4`;
-    const pidOutput = await client.shell([
-      'sh',
-      '-c',
-      `screenrecord --time-limit ${Math.ceil(clamped / 1000)} ${remotePath} </dev/null >/dev/null 2>&1 & echo $!`,
-    ]);
+    // Pass the whole pipeline as ONE shell argument: adb's client joins
+    // multiple arguments with spaces without quoting, which would strip the
+    // command down to `sh -c setsid`. setsid detaches screenrecord from the
+    // adb session so adbd does not kill it when the connection closes.
+    const command =
+      `setsid screenrecord --time-limit ${Math.ceil(clamped / 1000)} ${remotePath} ` +
+      '</dev/null >/dev/null 2>&1 & echo $!';
+    const pidOutput = await client.text(['shell', command]);
     const pid = pidOutput.trim().split(/\s+/).at(-1) ?? '';
     if (!/^\d+$/.test(pid)) {
       throw new ObserverError(
@@ -74,7 +83,7 @@ export class ScreenRecorder {
     return recording;
   }
 
-  async stop(recordingId: string): Promise<Trace> {
+  async stop(recordingId: string): Promise<CompletedRecording> {
     const statePath = this.statePath(recordingId);
     let recording: ActiveRecording | undefined;
     try {
@@ -105,11 +114,15 @@ export class ScreenRecorder {
       .catch(() => undefined);
     if (existsSync(statePath)) unlinkSync(statePath);
     return {
-      id: recording.id,
-      source: recording.source,
-      startedAt: recording.startedAt,
-      stoppedAt: new Date().toISOString(),
-      artifactId: artifact.id,
+      trace: {
+        id: recording.id,
+        source: recording.source,
+        startedAt: recording.startedAt,
+        stoppedAt: new Date().toISOString(),
+        artifactId: artifact.id,
+      },
+      artifact,
+      ...(recording.sessionId ? { sessionId: recording.sessionId } : {}),
     };
   }
 }

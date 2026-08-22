@@ -32,8 +32,10 @@ observe
 trace start [--duration MS] | trace stop TRACE_ID
 record start [--duration MS] | record stop RECORDING_ID
 replay run SCRIPT.json
+replay export SESSION_ID
+artifacts cleanup [--days N] [--dry-run]
 session start | session stop [SESSION_ID] | session get SESSION_ID
-diagnose
+diagnose [--ui-fps-low N --ui-fps-critical N --js-blocking N --js-blocking-high N --slow-request N --very-slow-request N --render-count N]
 compare BEFORE.png AFTER.png [--before-ui TREE.json --after-ui TREE.json]
 devtools-export [--duration MS] [--metro URL]
 devtools-profile [--duration MS] [--metro URL]
@@ -43,7 +45,7 @@ CLI in JSON ra stdout. Lỗi in JSON ra stderr và exit code 2.
 
 ## MCP stdio
 
-41 tools hiện có:
+43 tools hiện có:
 
 | Nhóm              | Tools                                                                                                                                                                      |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -54,7 +56,8 @@ CLI in JSON ra stdout. Lỗi in JSON ra stderr và exit code 2.
 | Evidence          | `get_logs`, `performance_snapshot`, `start_trace`, `stop_trace`, `get_react_render_stats`, `get_network_requests`, `get_network_summary`, `get_app_data`, `observe_screen` |
 | DevTools/CDP      | `devtools_export`, `devtools_profile`, `get_metro_network`                                                                                                                 |
 | Recording         | `start_recording`, `stop_recording`                                                                                                                                        |
-| Verify/repeat     | `assert_element`, `a11y_audit`, `replay_run`                                                                                                                               |
+| Verify/repeat     | `assert_element`, `a11y_audit`, `replay_run`, `replay_export`                                                                                                              |
+| Maintenance       | `cleanup_artifacts`                                                                                                                                                        |
 | Session/analysis  | `start_session`, `stop_session`, `get_session`, `diagnose`, `compare_screens`                                                                                              |
 
 Ví dụ client config sau khi build:
@@ -88,9 +91,17 @@ Ví dụ client config sau khi build:
 
 `start_recording`/`stop_recording` quay màn hình mp4, tối đa 180000ms/clip.
 
-`snapshot` trả ref `e1..eN` cho phần tử visible (`interactive_only: true` chỉ còn phần tử tương tác). `press` tap theo ref; cung cấp `settle_ms` để sau settle nhận diff `+/-/=` (thêm/bớt/đổi giá trị). Ref chỉ hợp lệ với snapshot gần nhất — chạy `snapshot` lại sau mỗi settle.
+`snapshot` trả ref cho phần tử visible (`interactive_only: true` chỉ còn phần tử tương tác). Trong session, registry identity giữ ref ổn định qua reorder/scroll và không tái sử dụng ref đã mất; state nằm trong thư mục session. `press` tap theo ref; cung cấp `settle_ms` để sau settle nhận diff `+/-/=`.
 
 `replay_run` nhận path script JSON `{ steps: [{ action: "tap"|"swipe"|"type-text"|"back"|"deep-link"|"reload"|"assert"|"wait"|"screenshot", ... }] }`; dừng ở step fail đầu trừ `continueOnError: true`.
+
+`stop_session` tự ghi replay JSON từ interaction timeline. `replay_export` export lại một session theo yêu cầu; text nhập không được lưu để tránh lộ secret.
+
+`diagnose`/MCP `diagnose` cho phép override 7 threshold. Finding trả `confidenceBasis`; confidence là heuristic score được gate bởi sample/source strength, không phải xác suất. Input threshold sai quan hệ trả `DIAGNOSIS_THRESHOLDS_INVALID`.
+
+`cleanup_artifacts` mặc định 14 ngày, hỗ trợ dry-run, bỏ qua active session, và xóa metadata SQLite theo transaction cùng session directory.
+
+Khi một command tạo timeline event mà không có session, core phát `EVIDENCE_NOT_RECORDED`. CLI ghi cảnh báo ra stderr; MCP host nhận warning từ stderr server.
 
 `assert_element` cần `test_id` hoặc `text`, tùy chọn `visible`; trả `passed` + evidence. `get_app_data` đọc snapshot state mới nhất theo namespace từ instrumentation `reportAppData`. `list_routes` suy sitemap expo-router từ thư mục `app/`.
 

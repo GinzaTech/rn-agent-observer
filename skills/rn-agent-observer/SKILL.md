@@ -51,7 +51,7 @@ reproduce the SAME scenario -> compare -> session stop -> report evidence
 Rules that make evidence trustworthy:
 
 - Prefer semantic targets: `tap --test-id` >> `tap --ref` >> coordinates.
-- `diagnose` findings = hypotheses with confidence; quote the evidence strings.
+- `diagnose` findings = hypotheses; quote evidence and `confidenceBasis`. Confidence is a heuristic score, never a probability.
 - After fixing code: reproduce **identically**, then `compare` both PNG and UI-tree JSON.
 - Apps you don't own: READ-ONLY. Never purchase/login/change settings unless the user explicitly allowed it for this session.
 - Restore any intentionally modified fixture afterwards; stop the session.
@@ -74,7 +74,7 @@ Rules that make evidence trustworthy:
 ## Reading key metrics honestly
 
 - `js_blocking_ms` — only available with instrumentation (`reportJsTask`), window 5 min, confidence 0.99.
-- `ui_fps` is a windowed average: one 100ms JS block may not lower it — check `worst_frame_ms` + `dropped_frames` too.
+- `ui_fps` is a windowed average: one 100ms JS block may not lower it — check `worst_frame_ms` + `dropped_frames` too. If gfxinfo has no new samples, frame metrics are unavailable instead of reused.
 - `js_fps` is ALWAYS `available: false` (ADB has no trustworthy signal). Never invent one.
 - `device-network` deltas are whole-device counters — never attribute them to the app.
 
@@ -99,10 +99,12 @@ User: "the cart screen feels laggy when I tap add"
 | `UI_ELEMENT_NOT_FOUND`                            | element hidden/off-screen — `snapshot` again, check `visible`                                               |
 | `METRO_UNREACHABLE` / `DEVTOOLS_TARGET_NOT_FOUND` | start Metro for the app, `adb reverse`, relaunch app so it loads from Metro                                 |
 | `DEVTOOLS_CONNECT_FAILED`                         | close React Native DevTools, retry                                                                          |
+| `CDP_LOCK_HELD`                                   | another observer command exceeded the 180s CDP queue timeout; retry after it finishes                       |
+| `EVIDENCE_NOT_RECORDED` warning                   | start a session and export `RN_OBSERVER_SESSION_ID` before collecting evidence                              |
 | adb back exited the app                           | RN single-activity: use the app's own back button testID, not `rn-observe back`, unless exiting is intended |
 
 ## Full documentation
 
 - Project overview: `PROJECT.md` in the repo
-- All 35 CLI commands & 41 MCP tools: `docs/protocol.md`
+- All 37 CLI commands & 43 MCP tools: `docs/protocol.md`
 - Detailed workflows: `docs/usage.md`; reference test battery: `docs/test-blueprint.md`

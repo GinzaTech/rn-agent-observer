@@ -42,19 +42,29 @@ export function appDataFromLogs(logs: LogEntry[]): AppDataEvent[] {
   );
 }
 
-const SENSITIVE_QUERY_KEYS = [
-  'access_token',
-  'refresh_token',
-  'api_key',
-  'apikey',
-  'password',
-  'secret',
-  'token',
-  'email',
-  'phone',
-  'address',
-  'ssn',
-] as const;
+const SAFE_QUERY_KEYS = new Set([
+  'q',
+  'query',
+  'page',
+  'limit',
+  'offset',
+  'sort',
+  'order',
+  'lang',
+  'locale',
+  'platform',
+  'version',
+]);
+
+function redactQueryPairs(value: string): string {
+  return value.replace(
+    /(^|[?&\s])([a-zA-Z0-9_.-]+)=([^&\s]+)/g,
+    (match: string, prefix: string, key: string) =>
+      SAFE_QUERY_KEYS.has(key.toLowerCase())
+        ? match
+        : `${prefix}${key}=[REDACTED]`,
+  );
+}
 
 /**
  * Host-side URL redaction for CDP-collected requests. Kept in parallel with
@@ -65,20 +75,13 @@ export function redactUrl(value: string): string {
   try {
     const url = new URL(value);
     for (const key of [...url.searchParams.keys()]) {
-      if (
-        SENSITIVE_QUERY_KEYS.some((sensitive) =>
-          key.toLowerCase().includes(sensitive),
-        )
-      ) {
+      if (!SAFE_QUERY_KEYS.has(key.toLowerCase())) {
         url.searchParams.set(key, '[REDACTED]');
       }
     }
     return url.toString();
   } catch {
-    return value.replace(
-      /((?:access_token|refresh_token|api[_-]?key|password|secret|token)=)[^&\s]+/gi,
-      '$1[REDACTED]',
-    );
+    return redactQueryPairs(value);
   }
 }
 

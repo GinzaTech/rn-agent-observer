@@ -33,7 +33,9 @@ describe('MCP server', () => {
     expect(tools.tools.map((tool) => tool.name)).toContain('a11y_audit');
     expect(tools.tools.map((tool) => tool.name)).toContain('get_app_data');
     expect(tools.tools.map((tool) => tool.name)).toContain('list_routes');
-    expect(tools.tools).toHaveLength(41);
+    expect(tools.tools.map((tool) => tool.name)).toContain('replay_export');
+    expect(tools.tools.map((tool) => tool.name)).toContain('cleanup_artifacts');
+    expect(tools.tools).toHaveLength(43);
 
     const result = await client.callTool({
       name: 'observer_status',

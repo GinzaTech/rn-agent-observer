@@ -4,6 +4,7 @@ import type {
 } from '@rn-agent-observer/schemas';
 import { ObserverError } from '../errors.js';
 import { redactUrl, summarizeNetwork } from '../network/network.js';
+import { withCdpLock } from './cdp-lock.js';
 import { CdpConnection } from './cdp-client.js';
 import { listMetroTargets, metroUrlFromEnv, selectTarget } from './metro.js';
 
@@ -133,6 +134,19 @@ export function mergeCdpNetworkEvents(
 }
 
 export async function collectMetroNetwork(options: {
+  appId: string;
+  metroUrl?: string;
+  durationMs?: number;
+  artifactRoot?: string;
+}): Promise<MetroNetworkSnapshot> {
+  const run = () => collectNetworkFromMetro(options);
+  if (options.artifactRoot) {
+    return withCdpLock(options.artifactRoot, run);
+  }
+  return run();
+}
+
+async function collectNetworkFromMetro(options: {
   appId: string;
   metroUrl?: string;
   durationMs?: number;

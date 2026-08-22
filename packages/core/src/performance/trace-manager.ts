@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { Trace } from '@rn-agent-observer/schemas';
+import type { Artifact, Trace } from '@rn-agent-observer/schemas';
 import type { AdbClient } from '../adb/adb-client.js';
 import type { ArtifactManager } from '../artifacts/artifact-manager.js';
 import { ObserverError } from '../errors.js';
@@ -15,6 +15,12 @@ import { ObserverError } from '../errors.js';
 interface ActiveTrace extends Trace {
   pid: string;
   remotePath: string;
+  sessionId?: string;
+}
+
+export interface CompletedTrace {
+  trace: Trace;
+  artifact: Artifact;
   sessionId?: string;
 }
 
@@ -71,7 +77,7 @@ export class TraceManager {
     return trace;
   }
 
-  async stop(traceId: string): Promise<Trace> {
+  async stop(traceId: string): Promise<CompletedTrace> {
     const statePath = this.statePath(traceId);
     const trace =
       this.active.get(traceId) ??
@@ -100,11 +106,15 @@ export class TraceManager {
     this.active.delete(traceId);
     if (existsSync(statePath)) unlinkSync(statePath);
     return {
-      id: trace.id,
-      source: trace.source,
-      startedAt: trace.startedAt,
-      stoppedAt: new Date().toISOString(),
-      artifactId: artifact.id,
+      trace: {
+        id: trace.id,
+        source: trace.source,
+        startedAt: trace.startedAt,
+        stoppedAt: new Date().toISOString(),
+        artifactId: artifact.id,
+      },
+      artifact,
+      ...(trace.sessionId ? { sessionId: trace.sessionId } : {}),
     };
   }
 }

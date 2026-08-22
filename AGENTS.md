@@ -42,8 +42,8 @@ Không tuyên bố runtime Android hoạt động nếu chưa chạy trên devic
 ## Quy trình debug React Native bắt buộc
 
 1. Đặt `RN_OBSERVER_PROJECT_ROOT`, `RN_OBSERVER_DEVICE_ID` và app ID nếu cần (app ID tự suy ra từ `expo.android.package` trong app.json).
-2. `launch` hoặc `reload`, rồi `observe` trước khi sửa code.
-3. Bắt đầu session; chụp screenshot và UI tree trước thay đổi.
+2. `launch` hoặc `reload`, bắt đầu session và export `RN_OBSERVER_SESSION_ID`.
+3. `observe`; chụp screenshot và UI tree trước thay đổi. Nếu cố ý chạy standalone, phải ghi nhận warning `EVIDENCE_NOT_RECORDED`.
 4. Tái hiện bằng semantic `testID`; chỉ dùng tọa độ khi UI tree không có target.
 5. Đọc log có filter. Kiểm tra performance cho lag/animation, network cho loading/API, render stats cho rerender.
 6. Chạy `diagnose`; coi finding là hypothesis có evidence, không phải chân lý tuyệt đối.
@@ -52,7 +52,7 @@ Không tuyên bố runtime Android hoạt động nếu chưa chạy trên devic
 9. Dừng session, báo before/after metrics, artifact paths, uncertainty và limitation còn lại.
 
 ```text
-observe -> session start -> reproduce -> performance/network/logs
+session start -> observe -> reproduce -> performance/network/logs
         -> diagnose -> edit -> reload -> reproduce -> observe -> compare
         -> session stop -> report evidence
 ```

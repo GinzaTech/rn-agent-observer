@@ -2,7 +2,7 @@
 
 Tài liệu này là **bộ tham chiếu chuẩn (golden test battery)** để test mọi app React Native/Expo bằng RN Agent Observer, đồng thời regression-test chính observer. Mọi phiên làm việc debug/metrics trên app mới đều quy về và ghi nhận theo ID case trong tài liệu này.
 
-- Phiên bản blueprint: **1.3.0** (áp dụng observer 2.3.0, Android + Windows)
+- Phiên bản blueprint: **1.4.0** (áp dụng observer 2.4.0, Android + Windows)
 - App tham chiếu vàng (golden AUT): `apps/demo-expo` (`dev.rnagentobserver.demo`)
 - App ngoài repo tham chiếu chế độ read-only: Vshop (`com.android.vshop`)
 - Thiết bị xác minh gần nhất: `45218ba` — Xiaomi 23013PC75G, Android 15, 1080×2400, 120Hz
@@ -225,6 +225,12 @@ Tổng: **~160 case** (tính cả biến thể).
 
 - **Chạy**: `$env:RN_OBSERVER_ADB='<đường-dẫn-adb-khác>'; pnpm rn-observe devices`
 - **PASS**: dùng executable tùy chỉnh; xong env thì observer dùng lại `adb` mặc định.
+
+#### ENV-008 — CDP queue giữa process (T1/T3)
+
+- **Chạy**: khởi động đồng thời hai `devtools-export --duration 2000` cùng project/app/target.
+- **PASS**: cả hai hoàn thành nối tiếp, tổng wall time xấp xỉ ≥4s; command thứ hai không cướp WebSocket; lock file được dọn sau success/error.
+- **Timeout**: chờ quá 180s trả `CDP_LOCK_HELD` recoverable; không force-delete lock có PID còn sống.
 
 ### 6.2 DEV — Device
 
@@ -504,6 +510,11 @@ Tổng: **~160 case** (tính cả biến thể).
 - **Chạy**: force-stop app → `performance`
 - **PASS**: metrics app-specific unavailable có reason; process metrics null/available:false; không crash; error recoverable.
 
+#### PERF-013 — Không tái dùng gfx frame window cũ (T1)
+
+- **Chạy**: gọi `performance` hai lần liên tiếp mà không tạo frame mới.
+- **PASS**: lần sau cùng signature trả 5 frame metrics `available: false`, `value: null`, reason bắt đầu `No new gfx frame samples since`; memory/CPU/refresh rate không bị vô hiệu.
+
 ### 6.8 NET — Network
 
 #### NET-001 — Không instrumentation = rỗng trung thực (T0)
@@ -707,6 +718,16 @@ Tổng: **~160 case** (tính cả biến thể).
 - **Chạy**: 2 terminal chạy lệnh observer cùng lúc trên cùng project root
 - **PASS**: không lỗi database locked nghiêm trọng; event cả hai tiến trình đều được ghi (journal_mode WAL).
 
+#### SES-012 — Retention cleanup (T1/T3)
+
+- **Chạy**: tạo completed session cũ + active session cũ; chạy dry-run rồi cleanup thật trên fixture tạm.
+- **PASS**: dry-run không xóa; cleanup thật chỉ xóa completed session, đếm file/bytes và xóa SQLite trong transaction; active session luôn còn.
+
+#### SES-013 — Cảnh báo thiếu session (T0)
+
+- **Chạy**: bỏ `RN_OBSERVER_SESSION_ID`, gọi `app-state`.
+- **PASS**: data vẫn trả; stderr có `EVIDENCE_NOT_RECORDED` + hướng dẫn session; một core instance chỉ cảnh báo một lần.
+
 ### 6.13 TRC — Perfetto trace
 
 #### TRC-001 — start (T0)
@@ -749,12 +770,12 @@ Tổng: **~160 case** (tính cả biến thể).
 #### DIA-001 — Long JS task, FPS thường (T0)
 
 - **Fixture**: `trigger-js-block` (FPS demo thường ≥ 45)
-- **PASS**: finding `'Long JS task observed'`; severity high khi > 100ms; confidence 0.97; evidence chứa `JS blocking measured ~100.0ms`.
+- **PASS**: finding `'Long JS task observed'`; severity theo configured threshold; evidence có duration + threshold; `confidenceBasis` ghi signal/source strength và không phải xác suất.
 
 #### DIA-002 — FPS thấp + JS block (T1)
 
 - **Fixture**: cần AUT gây FPS < 45 bền (list nặng + animation tốn CPU); nếu demo không tạo được → `N/A — thiếu fixture`
-- **PASS**: finding `'JS thread blocking likely contributes to frame drops'` khi js_blocking > 40; confidence 0.9 khi có JS data, 0.72 khi không.
+- **PASS**: finding `'JS thread blocking likely contributes to frame drops'` khi vượt configured thresholds; confidence tăng theo deficit/sample strength và bị gate thấp khi chỉ có 1 frame.
 
 #### DIA-003 — FPS thấp không có JS data (T1)
 
@@ -768,7 +789,7 @@ Tổng: **~160 case** (tính cả biến thể).
 #### DIA-005 — Rerender (T1)
 
 - **Fixture**: `rerender-list` ×≥10
-- **PASS**: finding `'Potential unnecessary React re-renders'`; evidence `DemoApp: <n> renders`; confidence 0.82.
+- **PASS**: finding `'Potential unnecessary React re-renders'`; evidence `DemoApp: <n> renders`; confidence tăng theo render excess + số observation, không phải hằng số.
 
 #### DIA-006 — Runtime errors (T1)
 
@@ -801,6 +822,12 @@ Tổng: **~160 case** (tính cả biến thể).
 
 - **Fixture**: bấm JS block + network 2000 + console-error rồi `diagnose`
 - **PASS**: ≥3 findings, mỗi cái đúng rule tương ứng, không triệt tiêu lẫn nhau.
+
+#### DIA-013 — Threshold config + confidence data-derived (T0/T1)
+
+- **Unit**: cùng violation, 1 sample cho confidence thấp hơn 120 sample; violation nặng hơn không cho confidence thấp hơn violation nhẹ cùng evidence strength.
+- **CLI/MCP**: override đủ 7 threshold; evidence in threshold thực dùng. Quan hệ sai hoặc giá trị NaN/≤0 trả lỗi recoverable trước khi đo.
+- **Contract**: mọi finding có `confidenceBasis`, score ≤0.99 và dòng `Score is not a statistical probability`.
 
 ### 6.15 OBS — observe tổng hợp
 
@@ -940,7 +967,7 @@ Tổng: **~160 case** (tính cả biến thể).
 
 #### CLI-002 — version (T0)
 
-- **PASS**: `--version` in đúng `OBSERVER_VERSION` (2.0.0) — nguồn duy nhất từ core.
+- **PASS**: `--version` khớp `packages/core/package.json` — package metadata là nguồn duy nhất, không có version constant viết tay thứ hai.
 
 #### CLI-003 — Unknown command (T0)
 
@@ -986,6 +1013,10 @@ Tổng: **~160 case** (tính cả biến thể).
 
 - **AUT**: Vshop
 - **PASS**: chỉ dùng lệnh quan sát (devices/device-info/screenshot/ui-tree/logs/performance/observe/session/trace/compare); **cấm**: tap vào nút mua/queue/lock-agent/party/loadout, type-text credentials, mọi state-mutating action ngoài phạm vi được người dùng cho phép từng trường hợp.
+
+#### SEC-007 — Redaction allowlist fail-closed (T0)
+
+- **PASS**: URL giữ key an toàn (`q/page/limit/...`) nhưng redact `sid`, `jwt` và mọi key lạ; header chỉ giữ allowlist; JSON body chỉ giữ field an toàn; body text không cấu trúc trả `[REDACTED]`.
 
 ### 6.20 STR — Stress & ổn định
 
@@ -1214,6 +1245,11 @@ Tổng: **~160 case** (tính cả biến thể).
 - **Script**: deep-link URI không có activity nhận
 - **PASS**: step ok=false với message lỗi; process không crash.
 
+#### RPL-004 — Auto-record replay khi stop session (T0/T1)
+
+- **Chạy**: trong session thực hiện tap testID/ref, swipe, screenshot và type-text fixture; `session stop`; chạy artifact replay vừa sinh.
+- **PASS**: interaction có cấu trúc giữ đúng thứ tự; ref tap export thành testID/tọa độ; `type_text(length-only)` bị bỏ để không persist secret; JSON parse được và replay pass cùng kịch bản read-only.
+
 #### ASM-001 — assert tồn tại/visible (T1)
 
 - **PASS**: `assert --test-id open-VisualLab --visible true` → passed=true, evidence có matchCount/label; testId rác → passed=false (không throw).
@@ -1235,6 +1271,10 @@ Tổng: **~160 case** (tính cả biến thể).
 #### ASM-005 — deep-link + permissions (T2)
 
 - **PASS**: `deep-link --uri` mở đúng màn (verify snapshot); `permissions` list khớp Settings; `grant/revoke --perm` đổi trạng thái (list lại để verify); perm không runtime → lỗi recoverable.
+
+#### ASM-006 — Touch target size (T1/T2)
+
+- **PASS**: bounds px đổi sang dp theo density; element clickable có label nhưng width/height <48dp sinh `small-touch-target`; unlabeled và small target có counter riêng.
 
 ## 7. Ma trận traceability Lab ↔ Case
 
@@ -1338,9 +1378,10 @@ Quy tắc: mỗi dòng FAIL phải kèm hypothesis nguyên nhân và case tái h
 
 ### Lịch sử
 
-| Phiên bản | Ngày       | Thay đổi                                                                                                                                                                  |
-| --------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.0.0     | 2026-08-21 | Bản đầu (observer 2.0.0)                                                                                                                                                  |
-| 1.1.0     | 2026-08-21 | Observer 2.1.0: domain DTL (7 case), APP-008/NET-015/NET-016/OBS-006, MCP 27 tools, map CLI↔MCP thêm 3 hàng, fixture `network-body`                                       |
-| 1.2.0     | 2026-08-22 | Observer 2.2.0: NET-017..019 (metro-network), APP-009 (reload --fast), REC-001..005 (screenrecord), DTL-008/009 (profile/song song), MCP 31 tools, fixture `network-real` |
-| 1.3.0     | 2026-08-22 | Observer 2.3.0: domain SNP (4), RPL (3), ASM (5) — tổng hợp từ agent-device/Expo MCP/agent-devtools; MCP 41 tools; fixture `dump-state`                                   |
+| Phiên bản | Ngày       | Thay đổi                                                                                                                                                                                                                                 |
+| --------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0     | 2026-08-21 | Bản đầu (observer 2.0.0)                                                                                                                                                                                                                 |
+| 1.1.0     | 2026-08-21 | Observer 2.1.0: domain DTL (7 case), APP-008/NET-015/NET-016/OBS-006, MCP 27 tools, map CLI↔MCP thêm 3 hàng, fixture `network-body`                                                                                                      |
+| 1.2.0     | 2026-08-22 | Observer 2.2.0: NET-017..019 (metro-network), APP-009 (reload --fast), REC-001..005 (screenrecord), DTL-008/009 (profile/song song), MCP 31 tools, fixture `network-real`                                                                |
+| 1.3.0     | 2026-08-22 | Observer 2.3.0: domain SNP (4), RPL (3), ASM (5) — tổng hợp từ agent-device/Expo MCP/agent-devtools; MCP 41 tools; fixture `dump-state`                                                                                                  |
+| 1.4.0     | 2026-08-22 | Observer 2.4.0: DIA-013 (confidence + thresholds), ENV-008 (CDP queue), PERF-013 (freshness), RPL-004 (auto replay), SES-012/013 (cleanup/warning), SEC-007 (allowlist), ASM-006 (touch-target); known limitations RN 0.86; MCP 43 tools |

@@ -4,6 +4,7 @@ export const FindingSchema = z.object({
   title: z.string().min(1),
   severity: z.enum(['info', 'low', 'medium', 'high', 'critical']),
   confidence: z.number().min(0).max(1),
+  confidenceBasis: z.array(z.string()).optional(),
   evidence: z.array(z.string()),
   recommendation: z.string().optional(),
 });

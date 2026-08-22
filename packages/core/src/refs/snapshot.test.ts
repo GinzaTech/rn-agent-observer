@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildSnapshot, snapshotDiff } from './snapshot.js';
+import {
+  buildSnapshot,
+  snapshotDiff,
+  stabilizeSnapshotRefs,
+} from './snapshot.js';
 import type { UITree } from '@rn-agent-observer/schemas';
 
 function tree(elements: object[]): UITree {
@@ -55,6 +59,34 @@ describe('ref snapshots', () => {
       { interactiveOnly: true },
     );
     expect(snap.elements).toHaveLength(0);
+  });
+
+  it('keeps refs stable when elements reorder and never reuses removed refs', () => {
+    const first = stabilizeSnapshotRefs(
+      buildSnapshot(
+        tree([
+          { type: 'android.widget.Button', id: 'a', clickable: true },
+          { type: 'android.widget.Button', id: 'b', clickable: true },
+        ]),
+      ),
+    );
+    const second = stabilizeSnapshotRefs(
+      buildSnapshot(
+        tree([
+          { type: 'android.widget.Button', id: 'b', clickable: true },
+          { type: 'android.widget.Button', id: 'c', clickable: true },
+        ]),
+      ),
+      first.registry,
+    );
+    expect(first.snapshot.elements.map((element) => element.ref)).toEqual([
+      'e1',
+      'e2',
+    ]);
+    expect(second.snapshot.elements.map((element) => element.ref)).toEqual([
+      'e2',
+      'e3',
+    ]);
   });
 
   it('diffs added, removed, and changed values', () => {

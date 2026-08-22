@@ -6,6 +6,7 @@ import type {
   DevToolsTarget,
 } from '@rn-agent-observer/schemas';
 import { ObserverError } from '../errors.js';
+import { withCdpLock } from './cdp-lock.js';
 import { CdpConnection } from './cdp-client.js';
 import {
   listMetroTargets,
@@ -114,6 +115,7 @@ export async function collectDevToolsExport(options: {
   metroUrl?: string;
   durationMs?: number;
   connectTimeoutMs?: number;
+  artifactRoot?: string;
 }): Promise<Omit<DevToolsExport, 'artifactId'>> {
   const metroUrl = metroUrlFromEnv(options.metroUrl);
   const durationMs = Math.max(
@@ -122,6 +124,19 @@ export async function collectDevToolsExport(options: {
   );
   const targets = await listMetroTargets(metroUrl);
   const target = selectTarget(targets, options.appId);
+  const run = () => collectFromTarget(target, metroUrl, options, durationMs);
+  if (options.artifactRoot) {
+    return withCdpLock(options.artifactRoot, run);
+  }
+  return run();
+}
+
+async function collectFromTarget(
+  target: MetroTarget,
+  metroUrl: string,
+  options: { appId: string; connectTimeoutMs?: number },
+  durationMs: number,
+): Promise<Omit<DevToolsExport, 'artifactId'>> {
   let connection: CdpConnection;
   try {
     connection = await CdpConnection.connect(

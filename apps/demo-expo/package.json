@@ -1,6 +1,6 @@
 {
   "name": "@rn-agent-observer/demo-expo",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "license": "Apache-2.0",
   "main": "node_modules/expo/AppEntry.js",

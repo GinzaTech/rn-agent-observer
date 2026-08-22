@@ -75,23 +75,52 @@ export function buildSnapshot(
   };
 }
 
-function keyAssignments(elements: SnapshotElement[]): string[] {
+export function snapshotIdentityKeys(elements: SnapshotElement[]): string[] {
   const counters = new Map<string, number>();
   return elements.map((element) => {
-    if (element.testId) return `id:${element.testId}`;
-    if (element.value !== null && element.label === element.value) {
+    let base: string;
+    if (element.testId) {
+      base = `id:${element.testId}`;
+    } else if (element.value !== null && element.label === element.value) {
       // Pure text nodes key by ordinal within their kind so that a value
       // change surfaces as "changed" instead of removed+added.
-      const ordinal = (counters.get(element.kind) ?? 0) + 1;
-      counters.set(element.kind, ordinal);
-      return `seq:${element.kind}:${ordinal}`;
+      base = `seq:${element.kind}`;
+    } else if (element.label) {
+      base = `label:${element.kind}:${element.label}`;
+    } else if (element.bounds) {
+      base = `pos:${Math.round(element.bounds.x)},${Math.round(element.bounds.y)}`;
+    } else {
+      base = `kind:${element.kind}`;
     }
-    if (element.label) return `label:${element.kind}:${element.label}`;
-    if (element.bounds) {
-      return `pos:${Math.round(element.bounds.x)},${Math.round(element.bounds.y)}`;
-    }
-    return `kind:${element.kind}:${element.ref}`;
+    const ordinal = (counters.get(base) ?? 0) + 1;
+    counters.set(base, ordinal);
+    return `${base}#${ordinal}`;
   });
+}
+
+export interface SnapshotRefRegistry {
+  identities: Record<string, string>;
+  nextRef: number;
+}
+
+export function stabilizeSnapshotRefs(
+  snapshot: UiSnapshot,
+  previous?: SnapshotRefRegistry,
+): { snapshot: UiSnapshot; registry: SnapshotRefRegistry } {
+  const identities = { ...(previous?.identities ?? {}) };
+  let nextRef = previous?.nextRef ?? 1;
+  const keys = snapshotIdentityKeys(snapshot.elements);
+  const elements = snapshot.elements.map((element, index) => {
+    const key = keys[index];
+    if (!key) return element;
+    const ref = identities[key] ?? `e${nextRef++}`;
+    identities[key] = ref;
+    return { ...element, ref };
+  });
+  return {
+    snapshot: { ...snapshot, elements },
+    registry: { identities, nextRef },
+  };
 }
 
 function moved(a: SnapshotElement, b: SnapshotElement): boolean {
@@ -118,8 +147,8 @@ export function snapshotDiff(
   before: UiSnapshot,
   after: UiSnapshot,
 ): SnapshotDiff {
-  const beforeKeys = keyAssignments(before.elements);
-  const afterKeys = keyAssignments(after.elements);
+  const beforeKeys = snapshotIdentityKeys(before.elements);
+  const afterKeys = snapshotIdentityKeys(after.elements);
   const beforeMap = new Map(
     before.elements.map((element, index) => [beforeKeys[index], element]),
   );

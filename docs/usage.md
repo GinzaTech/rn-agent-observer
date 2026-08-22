@@ -1,6 +1,6 @@
 # Hướng dẫn sử dụng chi tiết
 
-Tài liệu áp dụng cho RN Agent Observer 2.0.0, target Android + Windows + Expo/React Native.
+Tài liệu áp dụng cho RN Agent Observer 2.4.0, target Android + Windows + Expo/React Native.
 
 ## 1. Cài đặt và kiểm tra môi trường
 
@@ -204,7 +204,7 @@ pnpm rn-observe tap --ref e2 --settle 1500
 # lines dạng: + @e7 [text-field] "Ada"  |  = @e3 [text] "idle" -> "done"
 ```
 
-Ref chỉ hợp lệ với snapshot gần nhất (state tại `.artifacts/snapshots/last.json`); sau mỗi settle, snapshot mới đã ghi đè — dùng ref từ diff/output mới nhất.
+Khi có session, ref registry nằm trong `.artifacts/sessions/<sessionId>/state/last-snapshot.json`: element cùng identity giữ ref qua reorder/scroll và ref đã mất không bị cấp lại cho element mới. Ngoài session, state standalone vẫn nằm ở `.artifacts/snapshots/last.json`.
 
 Assertion có evidence (nền cho replay):
 
@@ -216,7 +216,31 @@ Replay script (ghi lại thao tác thành JSON, chạy lại deterministic):
 
 ```powershell
 pnpm rn-observe replay run .\scripts\checkout.json
+pnpm rn-observe replay export <session-id>
 ```
+
+`session stop` tự export interaction timeline thành replay JSON. Vì an toàn, `type-text` chỉ ghi character count trong timeline và bị bỏ khỏi script; điền text fixture thủ công nếu kịch bản cần bước này.
+
+Nếu chạy command có timeline event mà quên session, CLI in warning `EVIDENCE_NOT_RECORDED` ra stderr. Data/artifact standalone vẫn được trả, nhưng không được phép báo cáo như session evidence.
+
+Cleanup retention nên preview trước:
+
+```powershell
+pnpm rn-observe artifacts cleanup --days 14 --dry-run
+pnpm rn-observe artifacts cleanup --days 14
+```
+
+Cleanup bỏ qua active session và xóa metadata SQLite đồng bộ với session directory.
+
+Diagnosis thresholds có thể tune cho app/fixture:
+
+```powershell
+pnpm rn-observe diagnose --ui-fps-low 55 --ui-fps-critical 35 `
+  --js-blocking 50 --js-blocking-high 120 `
+  --slow-request 1200 --very-slow-request 2500 --render-count 15
+```
+
+`confidenceBasis` giải thích signal/sample strength; confidence là heuristic score, không phải xác suất hay thống kê baseline.
 
 Ví dụ script:
 

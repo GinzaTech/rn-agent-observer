@@ -52,6 +52,8 @@ Không có tín hiệu thì trả rõ ràng:
 
 - Không tổng hợp số giả hoặc đổi UI FPS thành JS FPS.
 - Timestamp là UTC ISO 8601 của nguồn gần nhất.
-- `confidence` chỉ xuất hiện khi có cơ sở; instrumentation long-task dùng 0.99.
+- Diagnosis `confidence` là heuristic score `heuristic-v1`, không phải xác suất thống kê. `confidenceBasis` liệt kê signal strength và sample/source strength; ít mẫu sẽ gate score xuống.
+- Ngưỡng diagnosis cấu hình được qua core, các flag CLI `diagnose --ui-fps-low/--ui-fps-critical/--js-blocking/--js-blocking-high/--slow-request/--very-slow-request/--render-count`, và MCP `diagnose`; mặc định nằm trong `DEFAULT_THRESHOLDS`.
 - CPU là snapshot, không phải average session.
 - Perfetto trace là artifact thô; snapshot metrics không giả vờ thay thế trace analysis.
+- Nếu chữ ký 5 metric frame giống hệt lần đọc trước, observer trả chúng `available: false` với reason `No new gfx frame samples...`; không tái sử dụng cửa sổ gfxinfo cũ như một benchmark mới.

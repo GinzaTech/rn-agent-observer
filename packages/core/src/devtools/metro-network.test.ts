@@ -115,10 +115,11 @@ describe('metro CDP network', () => {
 
   it('redacts sensitive query params host-side', () => {
     const redacted = redactUrl(
-      'https://example.test/items?access_token=x&email=u@example.test&q=safe',
+      'https://example.test/items?access_token=x&sid=abc&unknown=ghi&q=safe',
     );
     expect(redacted).not.toContain('x&');
-    expect(redacted).not.toContain('u@example.test');
+    expect(redacted).not.toContain('abc');
+    expect(redacted).not.toContain('ghi');
     expect(redacted).toContain('q=safe');
     expect(redactUrl('not a url token=abc')).toBe('not a url token=[REDACTED]');
   });
