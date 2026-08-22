@@ -28,6 +28,7 @@ describe('rn-observe CLI', () => {
     expect(result.out[0]).toContain('record start');
     expect(result.out[0]).toContain('snapshot');
     expect(result.out[0]).toContain('understand-screen');
+    expect(result.out[0]).toContain('ui-model');
     expect(result.out[0]).toContain('replay run');
   });
 

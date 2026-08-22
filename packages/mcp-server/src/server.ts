@@ -222,6 +222,15 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
       safe(() => core.understandScreen({ stuckAfterMs: stuck_after_ms })),
   );
   server.registerTool(
+    'runtime_ui_model',
+    {
+      description:
+        'Correlate actionable React Native JSX source locations, instrumentation mount/press events, and the current Android native tree. Returns what is rendered, visible, disabled, or a verified press candidate without guessing through view flattening.',
+      inputSchema: z.object({}),
+    },
+    () => safe(() => core.runtimeUiModel()),
+  );
+  server.registerTool(
     'press',
     {
       description:

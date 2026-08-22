@@ -45,14 +45,22 @@ describe('ObserverCore', () => {
     }
   });
 
-  it('automatically writes a safe replay artifact when a session stops', () => {
+  it('automatically writes a safe replay artifact when a session stops', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rn-observer-replay-'));
-    const core = new ObserverCore({ projectRoot: root, onWarning: () => {} });
+    const core = new ObserverCore({
+      projectRoot: root,
+      onWarning: () => {},
+      captureRuntimeUiOnStop: false,
+    });
     try {
       const session = core.startSession();
       core.sessions.event(session.id, 'tap', { testId: 'open-store' });
+      core.sessions.event(session.id, 'app_interaction', {
+        phase: 'start',
+        testId: 'save-profile',
+      });
       core.sessions.event(session.id, 'type_text', { length: 12 });
-      const stopped = core.stopSession();
+      const stopped = await core.stopSession();
       const replayArtifact = stopped.artifacts.find(
         (artifact) =>
           artifact.kind === 'summary' &&
@@ -62,19 +70,26 @@ describe('ObserverCore', () => {
       const replay = JSON.parse(
         readFileSync(replayArtifact?.path ?? '', 'utf8'),
       ) as { steps: Array<{ action: string; testId?: string }> };
-      expect(replay.steps).toEqual([{ action: 'tap', testId: 'open-store' }]);
+      expect(replay.steps).toEqual([
+        { action: 'tap', testId: 'open-store' },
+        { action: 'tap', testId: 'save-profile' },
+      ]);
     } finally {
       core.sessions.close();
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it('cleans completed artifacts but never an active session', () => {
+  it('cleans completed artifacts but never an active session', async () => {
     const root = mkdtempSync(join(tmpdir(), 'rn-observer-cleanup-'));
-    const core = new ObserverCore({ projectRoot: root, onWarning: () => {} });
+    const core = new ObserverCore({
+      projectRoot: root,
+      onWarning: () => {},
+      captureRuntimeUiOnStop: false,
+    });
     try {
       const completed = core.startSession();
-      core.stopSession();
+      await core.stopSession();
       const completedPath = join(root, '.artifacts', 'sessions', completed.id);
       const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1_000);
       utimesSync(completedPath, old, old);
@@ -97,7 +112,7 @@ describe('ObserverCore', () => {
       expect(existsSync(completedPath)).toBe(false);
       expect(existsSync(activePath)).toBe(true);
       expect(readdirSync(activePath).length).toBeGreaterThan(0);
-      core.stopSession();
+      await core.stopSession();
     } finally {
       core.sessions.close();
       rmSync(root, { recursive: true, force: true });

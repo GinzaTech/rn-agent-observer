@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createInstrumentationConfig,
+  observeInteraction,
   redactHeaders,
   redactSensitiveText,
   redactUrl,
+  reportUiElement,
 } from './index.js';
 
 describe('runtime instrumentation', () => {
@@ -59,5 +61,45 @@ describe('runtime instrumentation', () => {
       }),
     );
     expect(redactSensitiveText('jwt=abc.def.ghi')).toBe('[REDACTED]');
+  });
+
+  it('records UI ownership and interaction outcome without arguments', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    reportUiElement({
+      elementId: 'save-profile',
+      testId: 'save-profile',
+      componentName: 'Button',
+      label: 'Save',
+      mounted: true,
+      visible: true,
+      enabled: true,
+    });
+    const handler = observeInteraction(
+      { elementId: 'save-profile', testId: 'save-profile', label: 'Save' },
+      (_secret: string) => {
+        void _secret;
+        return 'done';
+      },
+    );
+    expect(handler('never-log-this')).toBe('done');
+    const output = info.mock.calls.flat().join('\n');
+    expect(output).toContain('RN_AGENT_OBSERVER_UI_ELEMENT');
+    expect(output).toContain('RN_AGENT_OBSERVER_UI_INTERACTION');
+    expect(output).toContain('"phase":"success"');
+    expect(output).not.toContain('never-log-this');
+    info.mockRestore();
+  });
+
+  it('records handler errors and preserves the throw', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const handler = observeInteraction(
+      { elementId: 'broken', testId: 'broken' },
+      () => {
+        throw new Error('fixture failure');
+      },
+    );
+    expect(() => handler()).toThrow('fixture failure');
+    expect(info.mock.calls.flat().join('\n')).toContain('"phase":"error"');
+    info.mockRestore();
   });
 });

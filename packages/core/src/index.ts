@@ -22,6 +22,7 @@ import {
   type Observation,
   type PerformanceSnapshot,
   type ReactRenderStat,
+  type RuntimeUiModel,
   type ScreenComparison,
   type ScreenUnderstanding,
   type ScreenSnapshot,
@@ -54,6 +55,8 @@ import {
   renderStatsFromLogs,
   routeFromLogs,
   summarizeNetwork,
+  uiElementsFromLogs,
+  uiInteractionsFromLogs,
   type AppDataEvent,
 } from './network/network.js';
 import { TraceManager } from './performance/trace-manager.js';
@@ -85,6 +88,8 @@ import {
   redactSensitiveUiTree,
   type PriorUnderstandingState,
 } from './ui/understanding.js';
+import { buildRuntimeUiModel } from './ui/runtime-model.js';
+import { scanSourceUi } from './ui/source-model.js';
 
 export * from './adb/parsers.js';
 export * from './diagnosis/rules.js';
@@ -94,6 +99,8 @@ export * from './refs/snapshot.js';
 export * from './replay/replay.js';
 export * from './routes/sitemap.js';
 export * from './ui/understanding.js';
+export * from './ui/runtime-model.js';
+export * from './ui/source-model.js';
 
 function readObserverVersion(): string {
   const packageJson = JSON.parse(
@@ -122,6 +129,7 @@ export const IMPLEMENTED_COMMANDS = [
   'ui-tree',
   'snapshot',
   'understand-screen',
+  'ui-model',
   'tap',
   'swipe',
   'type-text',
@@ -154,6 +162,7 @@ export interface ObserverCoreOptions {
   artifactRoot?: string;
   adbExecutable?: string;
   sessionId?: string;
+  captureRuntimeUiOnStop?: boolean;
   onWarning?: (warning: ObserverWarning) => void;
 }
 
@@ -183,6 +192,7 @@ export class ObserverCore {
   private screenRecorder: ScreenRecorder | undefined;
   private readonly explicitAppId: string | undefined;
   private readonly onWarning: (warning: ObserverWarning) => void;
+  private readonly captureRuntimeUiOnStop: boolean;
   private activeSessionId: string | undefined;
   private warnedWithoutSession = false;
 
@@ -202,6 +212,7 @@ export class ObserverCore {
           code: warning.code,
           detail: warning.suggestion,
         }));
+    this.captureRuntimeUiOnStop = options.captureRuntimeUiOnStop ?? true;
     this.artifacts = new ArtifactManager(
       this.projectRoot,
       options.artifactRoot,
@@ -767,6 +778,96 @@ export class ObserverCore {
     return complete;
   }
 
+  private uiInteractionStatePath(sessionId: string): string {
+    return join(
+      this.artifacts.root,
+      'sessions',
+      sessionId,
+      'state',
+      'ui-interactions.json',
+    );
+  }
+
+  private ingestUiInteractions(
+    interactions: ReturnType<typeof uiInteractionsFromLogs>,
+  ): number {
+    const sessionId = this.activeSessionId;
+    if (!sessionId) return 0;
+    const statePath = this.uiInteractionStatePath(sessionId);
+    let ingested: Set<string>;
+    try {
+      ingested = new Set(
+        JSON.parse(readFileSync(statePath, 'utf8')) as string[],
+      );
+    } catch {
+      ingested = new Set();
+    }
+    let added = 0;
+    for (const interaction of interactions) {
+      const key = `${interaction.interactionId}:${interaction.phase}`;
+      if (ingested.has(key)) continue;
+      this.sessions.event(sessionId, 'app_interaction', interaction);
+      ingested.add(key);
+      added += 1;
+    }
+    mkdirSync(dirname(statePath), { recursive: true });
+    writeFileSync(statePath, JSON.stringify([...ingested]));
+    return added;
+  }
+
+  async runtimeUiModel(): Promise<RuntimeUiModel> {
+    const tree = await this.getUiTree();
+    const snapshot = this.snapshotFromTree(tree);
+    const sessionStartedAt = this.activeSessionId
+      ? this.sessions.get(this.activeSessionId).startedAt
+      : undefined;
+    const [logs, device] = await Promise.all([
+      this.getLogs({
+        limit: sessionStartedAt ? 20_000 : 5_000,
+        ...(sessionStartedAt ? { since: sessionStartedAt } : {}),
+      }),
+      this.adb.deviceInfo().catch(() => undefined),
+    ]);
+    const interactions = uiInteractionsFromLogs(logs);
+    const result = buildRuntimeUiModel({
+      sourceElements: scanSourceUi(this.projectRoot),
+      tree,
+      snapshot,
+      telemetry: uiElementsFromLogs(logs),
+      interactions,
+      route: routeFromLogs(logs),
+      viewport: device?.resolution ?? null,
+    });
+    const artifact = this.artifacts.write(
+      'runtime-ui-model',
+      JSON.stringify(result, null, 2),
+      {
+        ...(this.activeSessionId ? { sessionId: this.activeSessionId } : {}),
+        extension: '.json',
+        mimeType: 'application/json',
+        name: 'runtime-ui-model.json',
+      },
+    );
+    this.sessions.artifact(this.activeSessionId, artifact);
+    const complete: RuntimeUiModel = {
+      ...result,
+      artifacts: {
+        ...result.artifacts,
+        modelId: artifact.id,
+        modelPath: artifact.path,
+      },
+    };
+    const ingestedInteractions = this.ingestUiInteractions(interactions);
+    this.record('runtime_ui_model', {
+      route: complete.route,
+      counts: complete.counts,
+      issueCodes: complete.issues.map((entry) => entry.code),
+      modelId: artifact.id,
+      ingestedInteractions,
+    });
+    return complete;
+  }
+
   async press(
     ref: string,
     settleMs?: number,
@@ -1169,7 +1270,7 @@ export class ObserverCore {
     return session;
   }
 
-  stopSession(sessionId = this.activeSessionId): Session {
+  async stopSession(sessionId = this.activeSessionId): Promise<Session> {
     if (!sessionId) {
       throw new ObserverError(
         'SESSION_NOT_ACTIVE',
@@ -1184,6 +1285,19 @@ export class ObserverCore {
         true,
         'Start a new session or inspect the existing session',
       );
+    }
+    // Collect the final React/source/native model before exporting replay so
+    // physical in-app interactions emitted by instrumentation are persisted.
+    const priorActiveSessionId = this.activeSessionId;
+    this.activeSessionId = sessionId;
+    if (this.captureRuntimeUiOnStop) {
+      try {
+        await this.runtimeUiModel();
+      } catch (error) {
+        this.sessions.event(sessionId, 'runtime_ui_capture_failed', {
+          error: asObserverError(error).toJSON(),
+        });
+      }
     }
     // Every session becomes a replay script automatically. This runs before
     // stop so the export event and artifact are part of the final summary.
@@ -1213,7 +1327,10 @@ export class ObserverCore {
       },
     );
     this.sessions.artifact(sessionId, summary);
-    if (this.activeSessionId === sessionId) this.activeSessionId = undefined;
+    this.activeSessionId =
+      priorActiveSessionId && priorActiveSessionId !== sessionId
+        ? priorActiveSessionId
+        : undefined;
     return this.sessions.get(sessionId);
   }
 
@@ -1317,6 +1434,16 @@ export class ObserverCore {
           continue;
         }
         skipped.add('tap(unstructured)');
+        continue;
+      }
+      if (event.type === 'app_interaction') {
+        const data = event.data as {
+          phase?: string;
+          testId?: string | null;
+        } | null;
+        if (data?.phase === 'start' && data.testId) {
+          steps.push({ action: 'tap', testId: data.testId });
+        }
         continue;
       }
       if (event.type === 'swipe') {

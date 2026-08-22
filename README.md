@@ -4,7 +4,7 @@
 
 RN Agent Observer 2.4.0 là cầu nối quan sát runtime cục bộ cho React Native/Expo. Công cụ dùng cùng một core TypeScript cho CLI và MCP, điều khiển Android qua ADB/UIAutomator, nhận telemetry từ instrumentation phát triển, export console/exception/heap/JS CPU profile qua Chrome DevTools Protocol của Metro, thu network per-request không cần instrumentation, tạo screen-understanding có state/headline/actions/UI findings cho agent, ref snapshot ổn định theo session + diff + auto-record replay, quay video màn hình, lưu session bằng SQLite và giữ ảnh/trace/UI tree ở dạng artifact trên đĩa.
 
-Phiên bản hiện tại hoàn thành Android v1 trên Windows: 44 MCP tools, CLI tương ứng, demo Expo có các lab xác định, chẩn đoán heuristic minh bạch và so sánh ảnh + cấu trúc UI.
+Phiên bản hiện tại hoàn thành Android v1 trên Windows: 45 MCP tools, CLI tương ứng, demo Expo có các lab xác định, chẩn đoán heuristic minh bạch và so sánh ảnh + cấu trúc UI.
 
 ## Yêu cầu
 
@@ -35,6 +35,7 @@ $env:RN_OBSERVER_APP_ID = 'com.example.app'
 pnpm rn-observe launch
 pnpm rn-observe observe
 pnpm rn-observe understand-screen
+pnpm rn-observe ui-model
 pnpm rn-observe tap --test-id buy-button
 pnpm rn-observe performance
 pnpm rn-observe diagnose
@@ -57,7 +58,7 @@ pnpm mcp:check
 pnpm mcp:start
 ```
 
-Server dùng stdio. Cấu hình client và danh sách 44 tool nằm trong [docs/protocol.md](docs/protocol.md).
+Server dùng stdio. Cấu hình client và danh sách 45 tool nằm trong [docs/protocol.md](docs/protocol.md).
 
 ## Tích hợp cho AI agent
 
@@ -120,6 +121,8 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 - Command CDP được queue giữa process; React Native DevTools bên ngoài vẫn phải đóng vì không dùng lock của observer.
 - `session stop` tự sinh replay; ref trong session ổn định qua reorder/scroll; thiếu session phát `EVIDENCE_NOT_RECORDED`.
 - `understand-screen`/MCP `understand_screen` trả route instrumentation khi có, screen state, headline, text/action refs, UI findings và screenshot/UI-tree evidence; gọi lặp phát hiện loading không đổi. Classification là heuristic và text-field luôn được redact.
+- `ui-model`/MCP `runtime_ui_model` parse TSX bằng TypeScript AST để lấy component + `file:line`, rồi correlate với instrumentation và native tree. Kết quả phân biệt `rendered`, `visible/offscreen/hidden/unmounted/flattened-or-unobserved`, `enabled` và `canPress` có reason.
+- Babel plugin development-only tự thêm testID nguồn và wrap `onPress`; session stop thu interaction `start/success/error`, đưa tap có testID vào replay. Không ghi handler arguments, props hay input value.
 - Observer không thu network body mặc định. Opt-in development-only dùng allowlist fail-closed nhưng vẫn chỉ dùng với fixture development.
 
 ---
@@ -128,7 +131,7 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 
 RN Agent Observer 2.4.0 is a local runtime observability bridge for React Native/Expo. It uses one shared TypeScript core behind both a CLI and an MCP server, drives Android through ADB/UIAutomator, receives telemetry from development instrumentation, exports console/exceptions/heap/JS CPU profiles through Metro's Chrome DevTools Protocol, captures per-request network traffic without app instrumentation, produces structured screen understanding (state/headline/actions/UI findings) for agents, provides session-stable ref snapshots + diffs + automatically recorded replay scripts, records on-screen video, persists sessions in SQLite, and keeps screenshots/traces/UI trees as on-disk artifacts.
 
-The current release completes Android v1 on Windows: 44 MCP tools, the matching CLI, an Expo demo app with deterministic labs, transparent heuristic diagnosis, and pixel + structural UI comparison.
+The current release completes Android v1 on Windows: 45 MCP tools, the matching CLI, an Expo demo app with deterministic labs, transparent heuristic diagnosis, and pixel + structural UI comparison.
 
 ## Requirements
 
@@ -159,6 +162,7 @@ $env:RN_OBSERVER_APP_ID = 'com.example.app'
 pnpm rn-observe launch
 pnpm rn-observe observe
 pnpm rn-observe understand-screen
+pnpm rn-observe ui-model
 pnpm rn-observe tap --test-id buy-button
 pnpm rn-observe performance
 pnpm rn-observe diagnose
@@ -181,7 +185,7 @@ pnpm mcp:check
 pnpm mcp:start
 ```
 
-The server speaks stdio. Client configuration and the full list of 44 tools are documented in [docs/protocol.md](docs/protocol.md).
+The server speaks stdio. Client configuration and the full list of 45 tools are documented in [docs/protocol.md](docs/protocol.md).
 
 ## Documentation
 
@@ -241,6 +245,8 @@ All three can be combined: the skill/AGENTS.md teach the _workflow_, MCP provide
 - Observer CDP commands queue across processes; external React Native DevTools must still be closed because it does not participate in the observer lock.
 - `session stop` automatically writes a replay, session refs survive reorder/scroll, and missing sessions produce `EVIDENCE_NOT_RECORDED`.
 - `understand-screen`/MCP `understand_screen` returns the instrumented route when available, screen state, headline, text/action refs, UI findings, and screenshot/UI-tree evidence; repeated calls detect unchanged loading. Classification is heuristic and text-field values are always redacted.
+- `ui-model`/MCP `runtime_ui_model` parses TSX with the TypeScript AST for component + `file:line`, then correlates source with instrumentation and the native tree. It distinguishes rendered, visible/off-screen/hidden/unmounted/flattened-or-unobserved, enabled, and evidence-backed `canPress` states.
+- The development-only Babel plugin injects a source-derived testID and wraps `onPress`; session stop collects interaction start/success/error and promotes testID taps into replay. Handler arguments, props, and input values are never recorded.
 - Network body capture is off by default. Development-only opt-in uses fail-closed allowlists and should still be limited to fixtures.
 - Apps without instrumentation: use `metro-network` (CDP), `app-state` (foreground activity, PID), and `device-network` (device-level byte counters, not app-attributed) as fallback evidence.
 - `record` (screenrecord) is limited to 180s per clip by Android.

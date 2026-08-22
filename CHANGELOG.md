@@ -2,6 +2,22 @@
 
 ## Unreleased — screen understanding cho Codex/agent
 
+### Source-correlated runtime UI model
+
+- Thêm CLI `ui-model` và MCP `runtime_ui_model` (tool 45). Core parse `.tsx/.jsx` bằng TypeScript AST để lấy actionable component, explicit/generated testID, conditional/disabled state và `file:line:column`.
+- Model correlate source với telemetry React và UIAutomator: mỗi node phân biệt `rendered`, `visible`, `offscreen`, `hidden`, `unmounted`, `flattened-or-unobserved`, `enabled` và `canPress` kèm reason. Trạng thái thiếu evidence trả `unknown`, không đoán.
+- Thêm Babel plugin development-only tự inject `rnobs-<source-hash>` khi thiếu testID và wrap `onPress` bằng `observeInteraction`. Event chỉ ghi identity, `start/success/error`, duration và lỗi đã sanitize; không ghi handler arguments/return value/props/input.
+- `session stop` tự capture model cuối, ingest physical/user app interactions vào SQLite rồi đưa event `start` có testID vào replay. Capture lỗi được ghi `runtime_ui_capture_failed`, session vẫn stop an toàn.
+- Core `stopSession()` nay trả `Promise<Session>` vì phải thu runtime evidence trước khi finalize; CLI/MCP adapter đã await. Đây là thay đổi contract cần lưu ý cho consumer gọi core trực tiếp.
+- `reportUiElement` cho app báo mounted/visible/enabled mà không ép `collapsable={false}`; giữ nguyên tối ưu view flattening của React Native.
+
+### Verification runtime UI model
+
+- `pnpm check` pass lint, Prettier, TypeScript build và **77 tests**; MCP server initialization + Expo Android export có Babel plugin đều pass.
+- Unit/integration test bao phủ TypeScript AST source ownership, generated testID Babel transform, explicit testID preservation, source/native/telemetry correlation, flattened view honesty, sync handler success/error privacy và app-interaction → replay.
+- Static scan trên Vshop đọc được 115 source actions, 22 conditional và chỉ 1 explicit testID; đây là evidence rằng Vshop cần bật plugin hoặc bổ sung testID trước khi agent map source/runtime đáng tin cậy.
+- Runtime/device case của `ui-model` cuối phiên là **NOT VERIFIED**: device `45218ba` mất kết nối và command trả `ADB_COMMAND_FAILED`; session `796d71cf-ed96-4e31-ae4d-8260c4751beb` đã stop, timeline ghi `runtime_ui_capture_failed` thay vì bỏ evidence.
+
 ### Agent biết màn hình đang hiển thị gì
 
 - Thêm CLI `understand-screen [--stuck-after MS]` và MCP `understand_screen` (tool 44). Core hợp nhất screenshot, UIAutomator, app-state và error/fatal log gần đây thành một response token-efficient.
@@ -27,7 +43,7 @@
 
 ### Test và runtime dogfood
 
-- `pnpm check` pass toàn bộ lint, Prettier, TypeScript build và **68 tests**; MCP initialization và Expo Android export cũng pass.
+- Quality gate của phần screen-understanding trước runtime UI model pass **68 tests**; kết quả tổng mới được ghi ở mục verification phía trên sau khi chạy lại full gate.
 - Unit test bao phủ content summary/action refs, route instrumentation, visible error, blank screen từ semantic + pixel evidence, loading → loading-stuck, pixel statistics và text-field/PII redaction.
 - Device thật Xiaomi 23013PC75G / Android 15 / Vshop: content nhận đúng headline `Vshop`, 144 visible elements, 16 actions và 6 small touch targets; cold dev-client nhận `loading` rồi cùng fingerprint chuyển `loading-stuck`, sau khi load xong chuyển về `content` với fingerprint mới.
 - Session evidence: `C:\Users\kona\Desktop\Vshop\.artifacts\sessions\06911da4-9703-4be0-aff5-302cb59bc050\summaries\summary.json`.

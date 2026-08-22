@@ -1308,23 +1308,49 @@ Tổng: **~160 case** (tính cả biến thể).
 - **Chạy**: capture `understand-screen` before → tái hiện issue → sửa component nhỏ nhất → reload → cùng scenario → capture after + compare/replay.
 - **PASS**: issue/state hoặc evidence mong đợi biến mất/thay đổi; screenshot/UI structural compare và replay pass; báo limitation còn lại thay vì tuyên bố từ một heuristic finding.
 
+### 6.27 UIM — Source-correlated runtime UI model
+
+#### UIM-001 — TypeScript AST source catalog (T0)
+
+- **PASS**: `ui-model` nhận actionable JSX kể cả custom component có `onPress`; trả đúng `file:line:column`, explicit/generated testID, disabled và conditional state; không dùng regex source parsing.
+
+#### UIM-002 — Native visibility/canPress correlation (T1)
+
+- **PASS**: source testID khớp native visible+enabled action → `canPress: yes`; disabled/offscreen → `no`; thiếu evidence → `unknown` với reason, không đoán.
+
+#### UIM-003 — View flattening honesty (T0/T1)
+
+- **PASS**: instrumentation báo mounted nhưng native tree không có node → `flattened-or-unobserved`, không gán hidden/unmounted và không tuyên bố bấm được.
+
+#### UIM-004 — Automatic handler recording (T0/T1)
+
+- **PASS**: Babel plugin giữ explicit testID hoặc inject source-hash, wrap `onPress`; session có `start/success/error` và duration; handler argument/return/props/input không xuất hiện artifact.
+
+#### UIM-005 — Physical interaction replay (T1/T2)
+
+- **PASS**: tap trong app đã instrument được ingest lúc `ui-model`/`session stop`; replay chứa tap testID đúng thứ tự, không duplicate qua capture lặp.
+
+#### UIM-006 — Capture failure honesty (T0)
+
+- **PASS**: device/logcat unavailable lúc stop → timeline có `runtime_ui_capture_failed`, session vẫn complete và không tuyên bố runtime model verified.
+
 ## 7. Ma trận traceability Lab ↔ Case
 
-| Lab / nguồn    | Case tiêu biểu                                                          |
-| -------------- | ----------------------------------------------------------------------- |
-| Home           | INT-001, OBS-004, DIA-009                                               |
-| PerformanceLab | PERF-005/006, SCR-007, INT-008, E2E-001                                 |
-| NetworkLab     | NET-002..011, SEC-001, E2E-002                                          |
-| RenderLab      | REN-002, DIA-005, E2E-004                                               |
-| AnimationLab   | ANI-001..004, PERF-011                                                  |
-| ErrorLab       | LOG-005/006, DIA-006/008, E2E-005                                       |
-| VisualLab      | VIS-002..004, E2E-003                                                   |
-| Unit test repo | parsers, session, compare, network/diagnosis, cli, mcp, schemas, redact |
-| Vshop          | NET-001, NET-015, APP-008, SEC-006, E2E-006                             |
-| Metro/CDP      | DTL-001..009, NET-016..019, APP-009                                     |
-| Recording      | REC-001..005                                                            |
-| Snapshot/refs  | SNP-001..004                                                            |
-| Replay/assert  | RPL-001..003, ASM-001..005                                              |
+| Lab / nguồn    | Case tiêu biểu                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Home           | INT-001, OBS-004, DIA-009                                                                                         |
+| PerformanceLab | PERF-005/006, SCR-007, INT-008, E2E-001                                                                           |
+| NetworkLab     | NET-002..011, SEC-001, E2E-002                                                                                    |
+| RenderLab      | REN-002, DIA-005, E2E-004                                                                                         |
+| AnimationLab   | ANI-001..004, PERF-011                                                                                            |
+| ErrorLab       | LOG-005/006, DIA-006/008, E2E-005                                                                                 |
+| VisualLab      | VIS-002..004, E2E-003                                                                                             |
+| Unit test repo | parsers, session, compare, network/diagnosis, source/runtime UI, Babel instrumentation, cli, mcp, schemas, redact |
+| Vshop          | NET-001, NET-015, APP-008, SEC-006, E2E-006                                                                       |
+| Metro/CDP      | DTL-001..009, NET-016..019, APP-009                                                                               |
+| Recording      | REC-001..005                                                                                                      |
+| Snapshot/refs  | SNP-001..004                                                                                                      |
+| Replay/assert  | RPL-001..003, ASM-001..005                                                                                        |
 
 ## 8. Bộ chạy nhanh
 
@@ -1337,6 +1363,7 @@ pnpm rn-observe device-info                   # DEV-002
 pnpm rn-observe launch                        # APP-001/004
 pnpm rn-observe screenshot                    # SCR-001
 pnpm rn-observe ui-tree                       # SCR-003/004
+pnpm rn-observe ui-model                      # UIM-001..003
 pnpm rn-observe tap --test-id open-PerformanceLab   # INT-001
 pnpm rn-observe tap --test-id trigger-js-block      # (fixture)
 pnpm rn-observe performance                   # PERF-001..005
@@ -1418,3 +1445,4 @@ Quy tắc: mỗi dòng FAIL phải kèm hypothesis nguyên nhân và case tái h
 | 1.3.0     | 2026-08-22 | Observer 2.3.0: domain SNP (4), RPL (3), ASM (5) — tổng hợp từ agent-device/Expo MCP/agent-devtools; MCP 41 tools; fixture `dump-state`                                                                                                  |
 | 1.4.0     | 2026-08-22 | Observer 2.4.0: DIA-013 (confidence + thresholds), ENV-008 (CDP queue), PERF-013 (freshness), RPL-004 (auto replay), SES-012/013 (cleanup/warning), SEC-007 (allowlist), ASM-006 (touch-target); known limitations RN 0.86; MCP 43 tools |
 | 1.5.0     | 2026-08-22 | Unreleased: domain UIU (6 case) cho structured screen understanding, loading-stuck persistence, blank/error/empty detection, agent repair loop và text-field privacy; MCP 44 tools                                                       |
+| 1.6.0     | 2026-08-22 | Unreleased: domain UIM (6 case) cho TypeScript AST source ownership, native viewability/canPress, Babel interaction recording, physical replay và capture-failure honesty; MCP 45 tools                                                  |

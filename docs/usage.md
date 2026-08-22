@@ -98,6 +98,38 @@ understand-screen -> reproduce -> inspect issue + screenshot/log/network
 
 Classification là heuristic deterministic, không tự chứng minh nguyên nhân. UIAutomator không thấy off-screen FlatList, React props/component owner, contrast hoặc focus order. Giá trị hiện tại của mọi text-field bị redact trước khi ghi artifact và snapshot ref không bao giờ trả nội dung ô nhập.
 
+## 3c. Nối source React Native với runtime và tự ghi interaction
+
+```powershell
+pnpm rn-observe ui-model
+```
+
+`ui-model` parse `.tsx/.jsx` bằng TypeScript AST, lấy component actionable cùng `file:line:column`, testID, disabled/conditional state; sau đó correlate với UIAutomator và telemetry React. Mỗi node trả `rendered`, `visibility`, `enabled`, `canPress`, reason và ref/bounds nếu có. `unknown`/`flattened-or-unobserved` là trạng thái trung thực khi React Native view flattening làm source component không tồn tại thành native node.
+
+Để tự ghi cả tap do người dùng thực hiện trong app, bật Babel plugin chỉ trong development:
+
+```javascript
+// babel.config.cjs
+module.exports = function config(api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+    plugins: [
+      [
+        require.resolve('@rn-agent-observer/rn-instrumentation/babel-plugin'),
+        { projectRoot: __dirname },
+      ],
+    ],
+  };
+};
+```
+
+Plugin giữ testID explicit; nếu thiếu sẽ thêm `rnobs-<source-hash>` và wrap `onPress` bằng `observeInteraction`. Event chỉ chứa identity + `start/success/error` + duration, không chứa handler arguments/return value/props/input. Khi `session stop`, core tự thu model cuối, persist interaction vào SQLite và đưa tap có testID vào replay.
+
+Session capture đọc log từ `startedAt` với cửa sổ tối đa 20.000 dòng. Vì logcat là ring buffer hữu hạn, flow dài/nhiễu nên gọi `ui-model` sau mỗi chặng lớn để ingest incrementally; không được tuyên bố “mọi tap đã ghi” nếu timeline có `runtime_ui_capture_failed` hoặc buffer đã rollover.
+
+TestID explicit vẫn được khuyến nghị vì source-hash thay đổi khi dòng code dịch chuyển. App không cài instrumentation vẫn có static source catalog + native tree, nhưng physical tap bên trong app không thể được gán chắc chắn về handler React.
+
 ## 4. Điều khiển UI
 
 Ưu tiên semantic target từ `ui-tree`:

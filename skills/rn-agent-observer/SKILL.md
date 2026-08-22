@@ -45,15 +45,16 @@ Never keep React Native DevTools open simultaneously — one inspector connectio
 ## The debugging loop (always follow this order)
 
 ```text
-session start -> observe -> understand-screen -> reproduce (semantic testID first) ->
+session start -> observe -> understand-screen + ui-model -> reproduce (semantic testID first) ->
 performance/network/logs -> diagnose -> smallest fix -> reload --fast ->
-reproduce the SAME scenario -> understand-screen -> compare -> session stop -> report evidence
+reproduce the SAME scenario -> understand-screen + ui-model -> compare -> session stop -> report evidence
 ```
 
 Rules that make evidence trustworthy:
 
 - Prefer semantic targets: `tap --test-id` >> `tap --ref` >> coordinates.
 - Treat `understand-screen` state/issues as deterministic heuristic evidence. Open `screenshotPath`; call again after the threshold when state is `loading` to detect `loading-stuck`.
+- Use `ui-model` to map actionable JSX `file:line` to native refs and instrumented interactions. Never turn `unknown`/`flattened-or-unobserved` into a visibility claim; `canPress=yes` still requires verifying the post-press transition.
 - `diagnose` findings = hypotheses; quote evidence and `confidenceBasis`. Confidence is a heuristic score, never a probability.
 - After fixing code: reproduce **identically**, then `compare` both PNG and UI-tree JSON.
 - Apps you don't own: READ-ONLY. Never purchase/login/change settings unless the user explicitly allowed it for this session.
@@ -61,19 +62,20 @@ Rules that make evidence trustworthy:
 
 ## Command map (CLI; MCP tool names in docs/protocol.md)
 
-| Situation                    | Command                                                                                                                 |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| First look at a screen       | `pnpm rn-observe observe`                                                                                               |
-| Understand visible UI/errors | `pnpm rn-observe understand-screen` (MCP `understand_screen`); inspect state, headline, actions, issues and artifacts   |
-| Element list for interaction | `pnpm rn-observe snapshot -i` then `tap --ref eN --settle 1500` (diff included)                                         |
-| Lag / animation jank         | `pnpm rn-observe performance` then `trace start/stop` if deeper                                                         |
-| API latency / loading        | `pnpm rn-observe network summary` (needs instrumentation) or `metro-network --duration 10000` (CDP, no instrumentation) |
-| Rerender suspicion           | `pnpm rn-observe render-stats`                                                                                          |
-| Console errors / exceptions  | `pnpm rn-observe logs --level error` or `devtools-export --duration 8000` while reproducing                             |
-| Crash triage                 | logs + `devtools-export`, read `exceptions[]`                                                                           |
-| Prove a fix worked           | `compare <before.png> <after.png> --before-ui b.json --after-ui a.json`                                                 |
-| Repeatable regression check  | write a replay script JSON, `replay run script.json`                                                                    |
-| Verify a11y labels           | `pnpm rn-observe a11y-audit`                                                                                            |
+| Situation                     | Command                                                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| First look at a screen        | `pnpm rn-observe observe`                                                                                               |
+| Understand visible UI/errors  | `pnpm rn-observe understand-screen` (MCP `understand_screen`); inspect state, headline, actions, issues and artifacts   |
+| Map source to runtime actions | `pnpm rn-observe ui-model` (MCP `runtime_ui_model`); inspect source, visibility, enabled, canPress, interactions        |
+| Element list for interaction  | `pnpm rn-observe snapshot -i` then `tap --ref eN --settle 1500` (diff included)                                         |
+| Lag / animation jank          | `pnpm rn-observe performance` then `trace start/stop` if deeper                                                         |
+| API latency / loading         | `pnpm rn-observe network summary` (needs instrumentation) or `metro-network --duration 10000` (CDP, no instrumentation) |
+| Rerender suspicion            | `pnpm rn-observe render-stats`                                                                                          |
+| Console errors / exceptions   | `pnpm rn-observe logs --level error` or `devtools-export --duration 8000` while reproducing                             |
+| Crash triage                  | logs + `devtools-export`, read `exceptions[]`                                                                           |
+| Prove a fix worked            | `compare <before.png> <after.png> --before-ui b.json --after-ui a.json`                                                 |
+| Repeatable regression check   | write a replay script JSON, `replay run script.json`                                                                    |
+| Verify a11y labels            | `pnpm rn-observe a11y-audit`                                                                                            |
 
 ## Reading key metrics honestly
 
@@ -86,11 +88,11 @@ Rules that make evidence trustworthy:
 
 User: "the cart screen feels laggy when I tap add"
 
-1. `session start` (export RN_OBSERVER_SESSION_ID), then `observe` + `understand-screen`.
+1. `session start` (export RN_OBSERVER_SESSION_ID), then `observe` + `understand-screen` + `ui-model`.
 2. `tap --test-id add-to-cart` (use the app's real testID from `snapshot`), then `performance`.
 3. `diagnose` → if finding says "Long JS task ~120ms", inspect the handler; if "Low UI frame rate" without JS evidence, suspect native list work.
 4. Make the minimal fix, `reload --fast`, repeat step 2 exactly.
-5. `understand-screen` + `compare` with baseline; report before/after state/findings, metric values and artifact paths.
+5. `understand-screen` + `ui-model` + `compare` with baseline; report before/after state/findings, source ownership, metric values and artifact paths.
 6. `session stop`, then summarize: what was measured, what changed, what remains uncertain.
 
 ## Failure recovery
@@ -111,5 +113,5 @@ User: "the cart screen feels laggy when I tap add"
 ## Full documentation
 
 - Project overview: `PROJECT.md` in the repo
-- All 38 CLI commands & 44 MCP tools: `docs/protocol.md`
+- All 39 CLI commands & 45 MCP tools: `docs/protocol.md`
 - Detailed workflows: `docs/usage.md`; reference test battery: `docs/test-blueprint.md`

@@ -56,6 +56,24 @@ export interface NetworkEvent {
   error?: string;
 }
 
+export interface ObservedUiElement {
+  elementId: string;
+  testId?: string;
+  componentName: string;
+  role?: string;
+  label?: string;
+  parentId?: string;
+  mounted: boolean;
+  visible?: boolean;
+  enabled?: boolean;
+}
+
+export interface ObservedInteraction {
+  elementId: string;
+  testId?: string;
+  label?: string;
+}
+
 export function createInstrumentationConfig(
   enabled = false,
   captureNetworkBodies = false,
@@ -135,6 +153,17 @@ function requestUrl(input: Parameters<typeof fetch>[0]): string {
 
 function emit(prefix: string, payload: unknown): void {
   console.info(`${prefix} ${JSON.stringify(payload)}`);
+}
+
+function safeUiLabel(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return value
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[REDACTED_EMAIL]')
+    .replace(
+      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+      '[REDACTED]',
+    )
+    .slice(0, 160);
 }
 
 let nextNetworkEventId = 0;
@@ -226,6 +255,98 @@ export function reportRoute(route: string): void {
     route,
     timestamp: new Date().toISOString(),
   });
+}
+
+/**
+ * Reports React-owned mount/visibility state without serializing props or
+ * input values. Call on mount/update and once with mounted=false on cleanup.
+ */
+export function reportUiElement(element: ObservedUiElement): void {
+  emit('RN_AGENT_OBSERVER_UI_ELEMENT', {
+    ...element,
+    ...(element.label ? { label: safeUiLabel(element.label) } : {}),
+    timestamp: new Date().toISOString(),
+  });
+}
+
+let nextInteractionId = 0;
+
+function interactionId(): string {
+  nextInteractionId += 1;
+  return `${Date.now()}-ui-${nextInteractionId}`;
+}
+
+/**
+ * Wraps an app handler so physical/user presses are correlated with their
+ * owning testID and completion/error. Arguments and return values are never
+ * logged. The original sync/async behavior is preserved.
+ */
+export function observeInteraction<TArgs extends unknown[], TResult>(
+  element: ObservedInteraction,
+  handler: (...args: TArgs) => TResult,
+): (...args: TArgs) => TResult {
+  return (...args: TArgs): TResult => {
+    const id = interactionId();
+    const started = performance.now();
+    const base = {
+      interactionId: id,
+      elementId: element.elementId,
+      testId: element.testId ?? null,
+      label: safeUiLabel(element.label) ?? null,
+    };
+    emit('RN_AGENT_OBSERVER_UI_INTERACTION', {
+      ...base,
+      phase: 'start',
+      durationMs: null,
+      error: null,
+      timestamp: new Date().toISOString(),
+    });
+    try {
+      const result = handler(...args);
+      if (result instanceof Promise) {
+        void result.then(
+          () =>
+            emit('RN_AGENT_OBSERVER_UI_INTERACTION', {
+              ...base,
+              phase: 'success',
+              durationMs: performance.now() - started,
+              error: null,
+              timestamp: new Date().toISOString(),
+            }),
+          (error: unknown) =>
+            emit('RN_AGENT_OBSERVER_UI_INTERACTION', {
+              ...base,
+              phase: 'error',
+              durationMs: performance.now() - started,
+              error: safeUiLabel(
+                error instanceof Error ? error.message : String(error),
+              ),
+              timestamp: new Date().toISOString(),
+            }),
+        );
+      } else {
+        emit('RN_AGENT_OBSERVER_UI_INTERACTION', {
+          ...base,
+          phase: 'success',
+          durationMs: performance.now() - started,
+          error: null,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      return result;
+    } catch (error) {
+      emit('RN_AGENT_OBSERVER_UI_INTERACTION', {
+        ...base,
+        phase: 'error',
+        durationMs: performance.now() - started,
+        error: safeUiLabel(
+          error instanceof Error ? error.message : String(error),
+        ),
+        timestamp: new Date().toISOString(),
+      });
+      throw error;
+    }
+  };
 }
 
 /**

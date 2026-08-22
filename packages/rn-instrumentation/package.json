@@ -6,10 +6,14 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./babel-plugin": "./babel-plugin.cjs"
+  },
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
+    "babel-plugin.cjs",
     "!dist/**/*.test.js",
     "!dist/**/*.test.d.ts"
   ],
@@ -19,5 +23,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run --exclude dist/**"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.0.0"
   }
 }

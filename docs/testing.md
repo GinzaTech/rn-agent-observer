@@ -18,6 +18,13 @@ Kết quả 2.4.0: lint, Prettier, TypeScript build, MCP initialization, CLI ver
 
 Kết quả Unreleased screen-understanding: `pnpm check` pass lint, Prettier, TypeScript build và **68 tests**; `pnpm mcp:check` và Expo Android export pass. Bảy test mới bao phủ schema/result có route nullable, content/action refs, error/blank/loading-stuck, pixel statistics và redaction UI-tree/snapshot.
 
+## Source-correlated runtime UI model (Unreleased)
+
+- Focused tests pass cho TypeScript AST source scanner, generated/explicit testID Babel transform, instrumentation privacy, source/native/telemetry correlation, view-flattening state và physical-interaction replay export.
+- Static scan Vshop: 115 actionable source element, 22 conditional, chỉ 1 explicit testID. Scanner trả được file/line thật; phần lớn source/runtime ownership sẽ ở trạng thái chưa correlate cho tới khi app bật Babel plugin hoặc thêm testID.
+- Device `45218ba` mất kết nối trước runtime call cuối. `ui-model` trả `ADB_COMMAND_FAILED`; session `796d71cf-ed96-4e31-ae4d-8260c4751beb` đã complete với `runtime_ui_capture_failed`. Vì vậy case device cho feature mới giữ **NOT VERIFIED**; không tái sử dụng evidence screen-understanding cũ để tuyên bố pass.
+- Full gate cuối: `pnpm check` pass lint, Prettier, TypeScript build và **77 tests** (schemas 6, instrumentation/Babel 10, core 57, CLI 3, MCP 1); `pnpm mcp:check` và Expo Android export có Babel plugin đều pass.
+
 ## Demo Expo native dogfood
 
 Development build `dev.rnagentobserver.demo` đã build Gradle, cài và mở thành công trên thiết bị thật. Observer của chính repo đã thực thi:
@@ -81,5 +88,5 @@ Final-contract artifact: `C:\Users\kona\Desktop\Vshop\.artifacts\sessions\7dd5dd
 - `devtools-export` tự động có console/heap, nhưng RN 0.86 bridgeless không expose CDP Network/Profiler domains trên runtime đã thử. Không suy rộng giới hạn này sang mọi RN version.
 - JS FPS tiếp tục explicit unavailable; Perfetto là artifact thô, chưa tự phân tích thành app-specific CPU flame chart.
 - Vshop không được sửa source để thêm instrumentation, nên network/route/render event ở Vshop có thể rỗng. Đây là expected behavior, không phải dữ liệu 0 giả.
-- UIAutomator vẫn có latency và không có off-screen FlatList/React props tree. macOS/Linux host, tài liệu EN đầy đủ, contrast/focus-order audit, CDP protocol negotiation và loại native `better-sqlite3` vẫn là backlog.
+- UIAutomator vẫn có latency và không có off-screen FlatList. Runtime UI model đã có source location/handler ownership nhưng chưa export toàn bộ React props/component stack như DevTools. macOS/Linux host, tài liệu EN đầy đủ, contrast/focus-order audit, CDP protocol negotiation và loại native `better-sqlite3` vẫn là backlog.
 - Chỉ các case có artifact cụ thể ở trên được coi runtime verified; case blueprint chưa chạy đúng fixture vẫn là `NOT VERIFIED`.

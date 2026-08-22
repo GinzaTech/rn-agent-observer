@@ -4,6 +4,7 @@ import {
   MetricSchema,
   ObserverStatusSchema,
   ScreenUnderstandingSchema,
+  RuntimeUiModelSchema,
 } from './index.js';
 
 describe('shared schemas', () => {
@@ -87,6 +88,30 @@ describe('shared schemas', () => {
           uiTreePath: 'C:\\tree.json',
         },
         limitations: ['heuristic'],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('validates a source-correlated runtime UI model', () => {
+    expect(
+      RuntimeUiModelSchema.safeParse({
+        timestamp: '2026-08-22T00:00:00.000Z',
+        source: 'typescript-ast+rn-instrumentation+android-uiautomator+logcat',
+        route: '/home',
+        nodes: [],
+        interactions: [],
+        counts: {
+          sourceActions: 0,
+          nativeActions: 0,
+          visible: 0,
+          pressable: 0,
+          unknownVisibility: 0,
+          interactions: 0,
+          interactionErrors: 0,
+        },
+        issues: [],
+        artifacts: { uiTreeId: 'tree', uiTreePath: 'tree.json' },
+        limitations: ['evidence'],
       }).success,
     ).toBe(true);
   });

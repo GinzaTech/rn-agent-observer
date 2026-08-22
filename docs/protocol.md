@@ -18,7 +18,7 @@ status
 devices | device-info | launch | reload [--fast]
 app-state | device-network [--window MS] | routes
 metro-network [--duration MS] [--metro URL]
-screenshot | ui-tree | snapshot [--interactive] | understand-screen [--stuck-after MS]
+screenshot | ui-tree | snapshot [--interactive] | understand-screen [--stuck-after MS] | ui-model
 tap (--test-id ID | --ref E1 [--settle MS] | --x X --y Y)
 swipe --from X,Y --to X,Y [--duration MS]
 type-text --text VALUE | back | deep-link --uri URI
@@ -45,13 +45,13 @@ CLI in JSON ra stdout. Lỗi in JSON ra stderr và exit code 2.
 
 ## MCP stdio
 
-44 tools hiện có:
+45 tools hiện có:
 
 | Nhóm              | Tools                                                                                                                                                                      |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status/device/app | `observer_status`, `device_list`, `device_info`, `app_launch`, `app_reload`                                                                                                |
 | Fallback evidence | `app_state`, `get_device_network`                                                                                                                                          |
-| Screen/action     | `screenshot`, `get_ui_tree`, `snapshot`, `understand_screen`, `press`, `tap`, `swipe`, `type_text`, `back`, `open_deep_link`                                               |
+| Screen/action     | `screenshot`, `get_ui_tree`, `snapshot`, `understand_screen`, `runtime_ui_model`, `press`, `tap`, `swipe`, `type_text`, `back`, `open_deep_link`                           |
 | Device state      | `list_permissions`, `set_permission`, `list_routes`                                                                                                                        |
 | Evidence          | `get_logs`, `performance_snapshot`, `start_trace`, `stop_trace`, `get_react_render_stats`, `get_network_requests`, `get_network_summary`, `get_app_data`, `observe_screen` |
 | DevTools/CDP      | `devtools_export`, `devtools_profile`, `get_metro_network`                                                                                                                 |
@@ -95,9 +95,11 @@ Ví dụ client config sau khi build:
 
 `understand_screen` hợp nhất screenshot, UIAutomator, app-state và error log gần đây thành state có cấu trúc: `content`, `loading`, `error`, `empty`, `blank`, `background` hoặc `not-running`. Response có route instrumentation (hoặc `null`), `headline`, `visibleText`, action refs, issue severity/evidence/suggestion, fingerprint và ba artifact path. Gọi lại cùng màn loading sau `stuck_after_ms` để nhận `loading-stuck`. Đây là heuristic evidence; agent phải mở `screenshotPath` và tái hiện trước khi sửa. Nội dung text-field được redact trước khi persist/return.
 
+`runtime_ui_model`/CLI `ui-model` parse source JSX bằng TypeScript AST và correlate source location/testID với React instrumentation + native tree. `canPress: yes` chỉ được trả khi có action native visible/enabled; vẫn phải bấm rồi verify transition vì system overlay có thể intercept. `flattened-or-unobserved` giữ riêng, không bị gán nhầm thành hidden/unmounted. Interaction do Babel plugin ghi được ingest lúc gọi model hoặc `stop_session`; event `start` có testID được đưa vào replay.
+
 `replay_run` nhận path script JSON `{ steps: [{ action: "tap"|"swipe"|"type-text"|"back"|"deep-link"|"reload"|"assert"|"wait"|"screenshot", ... }] }`; dừng ở step fail đầu trừ `continueOnError: true`.
 
-`stop_session` tự ghi replay JSON từ interaction timeline. `replay_export` export lại một session theo yêu cầu; text nhập không được lưu để tránh lộ secret.
+`stop_session` tự capture runtime UI model rồi ghi replay JSON từ cả CLI action và app interaction đã instrument. Capture lỗi được lưu thành `runtime_ui_capture_failed` thay vì âm thầm bỏ; session vẫn stop an toàn. `replay_export` export lại một session theo yêu cầu; text nhập không được lưu để tránh lộ secret.
 
 `diagnose`/MCP `diagnose` cho phép override 7 threshold. Finding trả `confidenceBasis`; confidence là heuristic score được gate bởi sample/source strength, không phải xác suất. Input threshold sai quan hệ trả `DIAGNOSIS_THRESHOLDS_INVALID`.
 

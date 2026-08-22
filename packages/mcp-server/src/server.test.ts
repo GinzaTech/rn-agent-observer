@@ -28,6 +28,7 @@ describe('MCP server', () => {
     expect(tools.tools.map((tool) => tool.name)).toContain('stop_recording');
     expect(tools.tools.map((tool) => tool.name)).toContain('snapshot');
     expect(tools.tools.map((tool) => tool.name)).toContain('understand_screen');
+    expect(tools.tools.map((tool) => tool.name)).toContain('runtime_ui_model');
     expect(tools.tools.map((tool) => tool.name)).toContain('press');
     expect(tools.tools.map((tool) => tool.name)).toContain('replay_run');
     expect(tools.tools.map((tool) => tool.name)).toContain('assert_element');
@@ -36,7 +37,7 @@ describe('MCP server', () => {
     expect(tools.tools.map((tool) => tool.name)).toContain('list_routes');
     expect(tools.tools.map((tool) => tool.name)).toContain('replay_export');
     expect(tools.tools.map((tool) => tool.name)).toContain('cleanup_artifacts');
-    expect(tools.tools).toHaveLength(44);
+    expect(tools.tools).toHaveLength(45);
 
     const result = await client.callTool({
       name: 'observer_status',

@@ -3,6 +3,7 @@ import type {
   NetworkRequest,
   NetworkSummary,
   ReactRenderStat,
+  UiInteractionEvent,
 } from '@rn-agent-observer/schemas';
 
 const NETWORK_PREFIX = 'RN_AGENT_OBSERVER_NETWORK ';
@@ -10,6 +11,21 @@ const RENDER_PREFIX = 'RN_AGENT_OBSERVER_RENDER ';
 const ROUTE_PREFIX = 'RN_AGENT_OBSERVER_ROUTE ';
 const JS_TASK_PREFIX = 'RN_AGENT_OBSERVER_JS_TASK ';
 const APP_DATA_PREFIX = 'RN_AGENT_OBSERVER_APP_DATA ';
+const UI_ELEMENT_PREFIX = 'RN_AGENT_OBSERVER_UI_ELEMENT ';
+const UI_INTERACTION_PREFIX = 'RN_AGENT_OBSERVER_UI_INTERACTION ';
+
+export interface UiElementTelemetry {
+  elementId: string;
+  testId: string | null;
+  componentName: string;
+  role: string | null;
+  label: string | null;
+  parentId: string | null;
+  mounted: boolean;
+  visible: boolean | null;
+  enabled: boolean | null;
+  timestamp: string;
+}
 
 export interface AppDataEvent {
   namespace: string;
@@ -123,6 +139,65 @@ export function routeFromLogs(logs: LogEntry[]): string | null {
       .filter((value): value is { route: string } => value !== null)
       .at(-1)?.route ?? null
   );
+}
+
+export function uiElementsFromLogs(logs: LogEntry[]): UiElementTelemetry[] {
+  const latest = new Map<string, UiElementTelemetry>();
+  for (const entry of logs) {
+    const payload = parsePayload<Partial<UiElementTelemetry>>(
+      entry.message,
+      UI_ELEMENT_PREFIX,
+    );
+    if (
+      !payload?.elementId ||
+      !payload.componentName ||
+      typeof payload.mounted !== 'boolean'
+    ) {
+      continue;
+    }
+    latest.set(payload.elementId, {
+      elementId: payload.elementId,
+      testId: payload.testId ?? null,
+      componentName: payload.componentName,
+      role: payload.role ?? null,
+      label: payload.label ?? null,
+      parentId: payload.parentId ?? null,
+      mounted: payload.mounted,
+      visible: payload.visible ?? null,
+      enabled: payload.enabled ?? null,
+      timestamp: payload.timestamp ?? entry.timestamp,
+    });
+  }
+  return [...latest.values()];
+}
+
+export function uiInteractionsFromLogs(logs: LogEntry[]): UiInteractionEvent[] {
+  const events: UiInteractionEvent[] = [];
+  for (const entry of logs) {
+    const payload = parsePayload<Partial<UiInteractionEvent>>(
+      entry.message,
+      UI_INTERACTION_PREFIX,
+    );
+    if (
+      !payload?.interactionId ||
+      !payload.elementId ||
+      !payload.phase ||
+      !['start', 'success', 'error'].includes(payload.phase)
+    ) {
+      continue;
+    }
+    events.push({
+      interactionId: payload.interactionId,
+      elementId: payload.elementId,
+      testId: payload.testId ?? null,
+      label: payload.label ?? null,
+      phase: payload.phase,
+      timestamp: payload.timestamp ?? entry.timestamp,
+      durationMs: payload.durationMs ?? null,
+      error: payload.error ?? null,
+    });
+  }
+  return events;
 }
 
 export function jsTasksFromLogs(logs: LogEntry[]): JsTaskEvent[] {

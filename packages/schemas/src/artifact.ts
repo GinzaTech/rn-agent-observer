@@ -11,6 +11,7 @@ export const ArtifactSchema = z.object({
     'summary',
     'ui-tree',
     'ui-understanding',
+    'runtime-ui-model',
     'devtools-export',
     'profile',
   ]),

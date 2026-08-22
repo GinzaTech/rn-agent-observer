@@ -1,10 +1,12 @@
 import {
   createRenderTracker,
   installNetworkObserver,
+  observeInteraction,
   reportAppData,
   reportJsTask,
   reportNetworkRequest,
   reportRoute,
+  reportUiElement,
 } from '@rn-agent-observer/rn-instrumentation';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -53,12 +55,36 @@ function Button({
   onPress: () => void;
   testID: string;
 }) {
+  useEffect(() => {
+    reportUiElement({
+      elementId: testID,
+      testId: testID,
+      componentName: 'Button',
+      role: 'button',
+      label,
+      mounted: true,
+      visible: true,
+      enabled: true,
+    });
+    return () =>
+      reportUiElement({
+        elementId: testID,
+        testId: testID,
+        componentName: 'Button',
+        role: 'button',
+        label,
+        mounted: false,
+      });
+  }, [label, testID]);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       testID={testID}
-      onPress={onPress}
+      onPress={observeInteraction(
+        { elementId: testID, testId: testID, label },
+        onPress,
+      )}
       style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
     >
       <Text style={styles.buttonText}>{label}</Text>

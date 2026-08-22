@@ -13,7 +13,7 @@ Usage:
   rn-observe devices | device-info | launch | reload [--fast]
   rn-observe app-state | device-network [--window MS] | routes
   rn-observe metro-network [--duration MS] [--metro URL]
-  rn-observe screenshot | ui-tree | snapshot [--interactive] | understand-screen [--stuck-after MS]
+  rn-observe screenshot | ui-tree | snapshot [--interactive] | understand-screen [--stuck-after MS] | ui-model
   rn-observe logs | performance | render-stats | network | observe
   rn-observe tap (--test-id ID | --ref E1 [--settle MS] | --x X --y Y)
   rn-observe swipe --from X,Y --to X,Y [--duration MS]
@@ -195,6 +195,8 @@ export async function runCli(
           ...(stuckAfterMs !== undefined ? { stuckAfterMs } : {}),
         }),
       );
+    } else if (command === 'ui-model') {
+      print(io, await core.runtimeUiModel());
     } else if (command === 'tap') {
       const testId = flag(args, '--test-id');
       const ref = flag(args, '--ref');
@@ -311,7 +313,7 @@ export async function runCli(
     } else if (command === 'session' && subcommand === 'start') {
       print(io, core.startSession());
     } else if (command === 'session' && subcommand === 'stop') {
-      print(io, core.stopSession(positional));
+      print(io, await core.stopSession(positional));
     } else if (command === 'session' && subcommand === 'get') {
       if (!positional) throw new Error('session get requires SESSION_ID');
       print(io, core.getSession(positional));
