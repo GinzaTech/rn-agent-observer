@@ -1,0 +1,18 @@
+node_modules
+dist
+coverage
+.pnpm
+pnpm-lock.yaml
+
+# Observer runtime artifacts (screenshots/sqlite/traces are not source)
+.artifacts
+**/.artifacts
+artifacts
+
+# Native demo build tree
+apps/demo-expo/android
+apps/demo-expo/ios
+release
+
+# Legacy unformatted plan document
+RN_AGENT_OBSERVER_PLAN.md

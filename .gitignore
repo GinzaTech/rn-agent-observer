@@ -1,0 +1,55 @@
+# ---- Dependencies (pnpm) ----
+node_modules/
+.pnpm/
+.npm/
+.cache/
+
+# ---- Build outputs ----
+dist/
+coverage/
+*.tsbuildinfo
+
+# ---- Observer runtime artifacts (root + any workspace app) ----
+# Contents ignored, not the dirs, so .gitkeep exceptions keep working.
+.artifacts/**
+!/.artifacts/.gitkeep
+artifacts/**
+!/artifacts/.gitkeep
+**/.artifacts/**
+
+# Observer state/binary files (defensive — normally under .artifacts)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.perfetto-trace
+*.cpuprofile
+
+# ---- Expo / React Native (demo app) ----
+.expo/
+apps/demo-expo/android/
+apps/demo-expo/ios/
+*.apk
+*.aab
+
+# ---- Secrets / environment ----
+.env
+.env.*
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ---- Release bundles ----
+release/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---- IDE / agent local state ----
+.idea/
+.opencode/
+*.tmp
