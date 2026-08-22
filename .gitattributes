@@ -1,0 +1,20 @@
+# Normalize line endings: everything LF in the repo and on checkout.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never normalize
+*.png binary
+*.jpg binary
+*.webp binary
+*.mp4 binary
+*.sqlite binary
+*.perfetto-trace binary
+*.cpuprofile binary
+*.zip binary
+*.jar binary
+*.apk binary
+*.keystore binary
