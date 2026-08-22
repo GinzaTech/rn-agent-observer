@@ -58,6 +58,41 @@ pnpm mcp:start
 
 Server dùng stdio. Cấu hình client và danh sách 41 tool nằm trong [docs/protocol.md](docs/protocol.md).
 
+## Tích hợp cho AI agent
+
+Có 3 cách để agent (OpenCode/Claude Code/Cursor/Codex...) dùng observer:
+
+**1. MCP server (khuyến nghị — tool có cấu trúc)**
+
+```json
+{
+  "mcpServers": {
+    "rn-agent-observer": {
+      "command": "node",
+      "args": [
+        "C:\\abs\\rn-agent-observer\\packages\\mcp-server\\dist\\server.js"
+      ],
+      "env": {
+        "RN_OBSERVER_PROJECT_ROOT": "C:\\path\\to\\expo-app",
+        "RN_OBSERVER_DEVICE_ID": "emulator-5554"
+      }
+    }
+  }
+}
+```
+
+**2. Cài như skill (dạy agent workflow debug bằng lệnh)**
+
+```powershell
+npx skills add GinzaTech/rn-agent-observer
+```
+
+Skill nằm tại `skills/rn-agent-observer/SKILL.md` — dạy agent vòng `observe -> reproduce -> diagnose -> fix -> compare`, cách đọc metric trung thực và xử lý lỗi thường gặp. Sau khi cài, chỉ cần nói "debug app X đang lag" agent sẽ tự biết dùng `rn-observe`.
+
+**3. AGENTS.md (nếu agent làm việc ngay trong repo này)** — đã có sẵn ở root, agent tự đọc.
+
+Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP cung cấp _tool gọi trực tiếp_.
+
 ## Tài liệu
 
 - [Hướng dẫn sử dụng chi tiết](docs/usage.md)
@@ -155,6 +190,41 @@ The server speaks stdio. Client configuration and the full list of 41 tools are 
 - [Test blueprint](docs/test-blueprint.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Changelog](CHANGELOG.md)
+
+## AI agent integration
+
+Three ways for agents (OpenCode/Claude Code/Cursor/Codex...) to use the observer:
+
+**1. MCP server (recommended — structured tools)**
+
+```json
+{
+  "mcpServers": {
+    "rn-agent-observer": {
+      "command": "node",
+      "args": [
+        "C:\\abs\\rn-agent-observer\\packages\\mcp-server\\dist\\server.js"
+      ],
+      "env": {
+        "RN_OBSERVER_PROJECT_ROOT": "C:\\path\\to\\expo-app",
+        "RN_OBSERVER_DEVICE_ID": "emulator-5554"
+      }
+    }
+  }
+}
+```
+
+**2. Install as a skill (teaches the agent the debugging workflow via CLI)**
+
+```powershell
+npx skills add GinzaTech/rn-agent-observer
+```
+
+The skill lives at `skills/rn-agent-observer/SKILL.md` — it teaches the `observe -> reproduce -> diagnose -> fix -> compare` loop, how to read metrics honestly, and common failure recovery. After installing, just say "app X feels laggy" and the agent knows to reach for `rn-observe`.
+
+**3. AGENTS.md (when the agent works inside this repo)** — already present at the repo root; agents read it automatically.
+
+All three can be combined: the skill/AGENTS.md teach the _workflow_, MCP provides _directly callable tools_.
 
 ## Current boundary
 
