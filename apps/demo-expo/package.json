@@ -1,0 +1,25 @@
+{
+  "name": "@rn-agent-observer/demo-expo",
+  "version": "2.3.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "build": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@rn-agent-observer/rn-instrumentation": "workspace:*",
+    "expo": "~57.0.15",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.18",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
+  }
+}
