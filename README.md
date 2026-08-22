@@ -106,7 +106,7 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 - [Xử lý sự cố](docs/troubleshooting.md)
 - [Release 2.0.0](CHANGELOG.md)
 
-## Biên bản hiện tại
+## Phiên bản hiện tại
 
 - Android/Windows là target duy nhất của Observer 2.3.0.
 - ADB không có tín hiệu JS FPS đáng tin cậy; field được trả `available: false`, không đoán số.
