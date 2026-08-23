@@ -1,12 +1,13 @@
 import {
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   resolveContainedReadFile,
@@ -47,6 +48,12 @@ const temporaryDirectory = (): string => {
   return root;
 };
 
+/**
+ * On Windows CI the temp directory may use 8.3 short names (RUNNER~1) while
+ * fs.realpath resolves to the long name (runneradmin). Compare real paths.
+ */
+const realPath = (value: string): string => realpathSync(value);
+
 afterEach(() => {
   for (const root of roots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -65,9 +72,9 @@ describe('filesystem path authority', () => {
     writeFileSync(input, '{}');
     writeFileSync(outside, '{}');
 
-    expect(resolveContainedReadFile(projectRoot, 'inputs/budget.json')).toBe(
-      input,
-    );
+    expect(
+      realPath(resolveContainedReadFile(projectRoot, 'inputs/budget.json')),
+    ).toBe(realPath(input));
     expect(() =>
       resolveContainedReadFile(projectRoot, 'does-not-exist.json'),
     ).toThrow('existing regular file');
@@ -108,7 +115,12 @@ describe('filesystem path authority', () => {
       'baselines/initial.json',
     );
 
-    expect(output).toBe(join(artifactRoot, 'baselines', 'initial.json'));
+    expect(join(realPath(dirname(output)), basename(output))).toBe(
+      join(
+        realPath(dirname(join(artifactRoot, 'baselines', 'initial.json'))),
+        'initial.json',
+      ),
+    );
     writeFileSync(output, 'existing');
     expect(() =>
       resolveNewArtifactOutputFile(

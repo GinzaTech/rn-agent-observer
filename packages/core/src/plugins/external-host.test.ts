@@ -3,10 +3,11 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -157,7 +158,7 @@ describe('external plugin process host', () => {
     const contained = join(root, 'plugins', 'fixture');
     mkdirSync(contained, { recursive: true });
     expect(resolveContainedPluginCwd(root, 'plugins/fixture')).toBe(
-      resolve(contained),
+      realpathSync(contained),
     );
 
     const outside = temporaryProject();
@@ -185,7 +186,7 @@ describe('external plugin process host', () => {
     const second = await host.executeAction({ mode: 'echo', value: 2 });
     expect(first).toMatchObject({
       requestId: 3,
-      cwd: resolve(root),
+      cwd: realpathSync(root),
       environment: { allowed: 'visible', secret: null },
       params: { value: 1 },
     });
