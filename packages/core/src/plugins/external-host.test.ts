@@ -11,7 +11,7 @@ const realPath = (value: string): string => realpathSync.native(value);
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ExternalPluginHost,
   ExternalPluginHostError,
@@ -195,7 +195,12 @@ describe('external plugin process host', () => {
     expect(second).toMatchObject({ requestId: 4, params: { value: 2 } });
 
     await host.executeAction({ mode: 'stderr' });
-    expect(host.stderr.truncated).toBe(true);
+    // On POSIX the stderr chunk can be pumped after the stdout response,
+    // so wait briefly for the pipe to drain instead of asserting instantly.
+    await vi.waitFor(() => expect(host.stderr.truncated).toBe(true), {
+      timeout: 5_000,
+      interval: 25,
+    });
     expect(host.stderr.text).toContain('REDACTED');
     expect(host.stderr.text).not.toContain('super-secret');
     expect(host.stderr.text).not.toContain('abc.def.ghi');

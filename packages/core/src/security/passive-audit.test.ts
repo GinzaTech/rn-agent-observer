@@ -55,11 +55,13 @@ describe('passive project security audit', () => {
 
   it('rejects explicit paths outside project scope', () => {
     const root = fixture();
+    const outsidePath =
+      process.platform === 'win32' ? '..\\outside.log' : '../outside.log';
 
     expect(() =>
       runPassiveSecurityAudit({
         projectRoot: root,
-        textPaths: ['..\\outside.log'],
+        textPaths: [outsidePath],
       }),
     ).toThrow(/within project root/u);
   });
