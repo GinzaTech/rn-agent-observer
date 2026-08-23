@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { diagnoseEvidence } from '../diagnosis/rules.js';
 import {
   appDataFromLogs,
+  invalidTelemetryFromLogs,
   networkRequestsFromLogs,
   summarizeNetwork,
 } from './network.js';
@@ -214,5 +215,83 @@ describe('network evidence', () => {
         timestamp: '2026-08-22T00:00:01.000Z',
       },
     ]);
+  });
+
+  it('accepts versioned telemetry while keeping legacy output compatible', () => {
+    const logs = [
+      {
+        level: 'info' as const,
+        source: 'ReactNativeJS',
+        timestamp: '2026-08-22T00:00:00.000Z',
+        message:
+          'RN_AGENT_OBSERVER_NETWORK {"id":"versioned","method":"GET","url":"/health","status":200,"durationMs":10,"timestamp":"2026-08-22T00:00:00.000Z","source":"rn-instrumentation","telemetryVersion":1}',
+      },
+    ];
+
+    expect(networkRequestsFromLogs(logs)).toEqual([
+      {
+        id: 'versioned',
+        method: 'GET',
+        url: '/health',
+        status: 200,
+        durationMs: 10,
+        timestamp: '2026-08-22T00:00:00.000Z',
+        source: 'rn-instrumentation',
+      },
+    ]);
+    expect(invalidTelemetryFromLogs(logs)).toEqual([]);
+  });
+
+  it('rejects invalid telemetry and exposes validation failures without raw data', () => {
+    const logs = [
+      {
+        level: 'info' as const,
+        source: 'ReactNativeJS',
+        timestamp: '2026-08-22T00:00:00.000Z',
+        message:
+          'RN_AGENT_OBSERVER_NETWORK {"id":"bad","method":"GET","url":"/health","durationMs":"fast","timestamp":"2026-08-22T00:00:00.000Z","source":"rn-instrumentation","telemetryVersion":1,"secret":"do-not-expose"}',
+      },
+      {
+        level: 'info' as const,
+        source: 'ReactNativeJS',
+        timestamp: '2026-08-22T00:00:01.000Z',
+        message:
+          'RN_AGENT_OBSERVER_ROUTE {"route":"Home","telemetryVersion":2}',
+      },
+      {
+        level: 'info' as const,
+        source: 'ReactNativeJS',
+        timestamp: '2026-08-22T00:00:02.000Z',
+        message: 'RN_AGENT_OBSERVER_NETWORK {not-json do-not-expose}',
+      },
+    ];
+
+    expect(networkRequestsFromLogs(logs)).toEqual([]);
+    expect(invalidTelemetryFromLogs(logs)).toMatchObject([
+      { kind: 'network', reason: 'schema-validation' },
+      { kind: 'route', reason: 'schema-validation' },
+      { kind: 'network', reason: 'malformed-json' },
+    ]);
+    expect(JSON.stringify(invalidTelemetryFromLogs(logs))).not.toContain(
+      'do-not-expose',
+    );
+  });
+
+  it('surfaces app-data privacy metadata when instrumentation provides it', () => {
+    const events = appDataFromLogs([
+      {
+        level: 'info',
+        source: 'ReactNativeJS',
+        timestamp: '2026-08-22T00:00:00.000Z',
+        message:
+          'RN_AGENT_OBSERVER_APP_DATA {"namespace":"screen","data":{"route":"Home","token":"[REDACTED]"},"timestamp":"2026-08-22T00:00:00.000Z","privacy":{"policy":"default-safe-allowlist","redacted":true,"truncated":false},"telemetryVersion":1}',
+      },
+    ]);
+
+    expect(events[0]?.privacy).toEqual({
+      policy: 'default-safe-allowlist',
+      redacted: true,
+      truncated: false,
+    });
   });
 });

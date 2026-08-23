@@ -17,6 +17,7 @@ import {
   parseAdbDevices,
   parseFrameTimes,
   parseLogcat,
+  parsePermissionChangeExitStatus,
   parseProcNetDev,
   parseResumedActivity,
   parseRuntimePermissions,
@@ -28,6 +29,14 @@ import {
 interface UiDump {
   hierarchy?: { node?: unknown };
 }
+
+/**
+ * `adb shell` receives a command string, even when the host process gets an
+ * argv array. Quote every remote argument so URI query delimiters and user
+ * input cannot be reinterpreted by Android's shell.
+ */
+const shellQuote = (value: string): string =>
+  `'${value.replaceAll("'", "'\\''")}'`;
 
 export class AdbClient {
   constructor(
@@ -63,7 +72,7 @@ export class AdbClient {
   }
 
   async shell(args: readonly string[], timeoutMs?: number): Promise<string> {
-    return this.text(['shell', ...args], timeoutMs);
+    return this.text(['shell', args.map(shellQuote).join(' ')], timeoutMs);
   }
 
   async listDevices(): Promise<Device[]> {
@@ -336,6 +345,7 @@ export class AdbClient {
       'android.intent.action.VIEW',
       '-d',
       uri,
+      '-p',
       appId,
     ]);
   }
@@ -354,6 +364,21 @@ export class AdbClient {
   ): Promise<void> {
     const client = await this.selected();
     await client.shell(['pm', granted ? 'grant' : 'revoke', appId, permission]);
+  }
+
+  async permissionChangeExitStatus(
+    appId: string,
+    processId: number,
+  ): Promise<ReturnType<typeof parsePermissionChangeExitStatus>> {
+    if (!Number.isInteger(processId) || processId <= 0) {
+      return 'unavailable';
+    }
+    const client = await this.selected();
+    return parsePermissionChangeExitStatus(
+      await client.shell(['dumpsys', 'activity', 'exit-info', appId]),
+      appId,
+      processId,
+    );
   }
 
   async deviceNetworkSample(): Promise<DeviceNetworkSample> {

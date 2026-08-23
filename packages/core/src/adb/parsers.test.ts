@@ -5,6 +5,7 @@ import {
   parseAdbDevices,
   parseFrameTimes,
   parseLogcat,
+  parsePermissionChangeExitStatus,
   parseProcNetDev,
   parseResumedActivity,
   parseRuntimePermissions,
@@ -131,5 +132,41 @@ describe('ADB parsers', () => {
       { name: 'android.permission.CAMERA', granted: true },
       { name: 'android.permission.ACCESS_FINE_LOCATION', granted: false },
     ]);
+  });
+
+  it('accepts only a matching Android permission-change exit', () => {
+    const exitInfo = `
+ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)
+  package: dev.rnagentobserver.demo
+    Historical Process Exit for uid=10229
+        ApplicationExitInfo #0:
+          timestamp=2026-08-23 09:36:07.808 pid=5692 realUid=10229
+          process=dev.rnagentobserver.demo reason=8 (PERMISSION CHANGE) subreason=0 (UNKNOWN)
+`;
+
+    expect(
+      parsePermissionChangeExitStatus(
+        exitInfo,
+        'dev.rnagentobserver.demo',
+        5692,
+      ),
+    ).toBe('permission-change');
+    expect(
+      parsePermissionChangeExitStatus(
+        exitInfo.replace('pid=5692', 'pid=5693'),
+        'dev.rnagentobserver.demo',
+        5692,
+      ),
+    ).toBe('unavailable');
+    expect(
+      parsePermissionChangeExitStatus(
+        exitInfo.replace('PERMISSION CHANGE', 'CRASH'),
+        'dev.rnagentobserver.demo',
+        5692,
+      ),
+    ).toBe('unexpected');
+    expect(
+      parsePermissionChangeExitStatus(exitInfo, 'dev.other.demo', 5692),
+    ).toBe('unavailable');
   });
 });

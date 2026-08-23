@@ -237,6 +237,44 @@ export interface PermissionState {
   granted: boolean;
 }
 
+export type PermissionChangeExitStatus =
+  'permission-change' | 'unexpected' | 'unavailable';
+
+/**
+ * Extracts only the safe exit classification required to distinguish Android's
+ * expected runtime-permission process termination from a crash or ANR. Raw
+ * dumpsys descriptions are deliberately never returned or persisted.
+ */
+export function parsePermissionChangeExitStatus(
+  output: string,
+  expectedPackage: string,
+  expectedPid: number,
+): PermissionChangeExitStatus {
+  if (
+    !/^[A-Za-z0-9._]+$/u.test(expectedPackage) ||
+    !Number.isInteger(expectedPid) ||
+    expectedPid <= 0
+  ) {
+    return 'unavailable';
+  }
+  const packageMatch = output.match(/^\s*package:\s*(\S+)\s*$/mu);
+  if (packageMatch?.[1] !== expectedPackage) return 'unavailable';
+
+  const entries = output.split(/^\s*ApplicationExitInfo\s+#\d+:\s*$/mu);
+  for (const entry of entries.slice(1)) {
+    const pid = Number(entry.match(/\bpid=(\d+)\b/u)?.[1]);
+    const process = entry.match(/\bprocess=([^\s]+)/u)?.[1];
+    const reason = entry.match(/\breason=(\d+)\s+\(([^)]+)\)/u);
+    if (pid !== expectedPid || process !== expectedPackage || !reason) {
+      continue;
+    }
+    return reason[1] === '8' && reason[2]?.trim() === 'PERMISSION CHANGE'
+      ? 'permission-change'
+      : 'unexpected';
+  }
+  return 'unavailable';
+}
+
 /**
  * Parses runtime permission lines from `dumpsys package` output.
  * Only lines carrying an explicit `granted=` flag are runtime permissions.

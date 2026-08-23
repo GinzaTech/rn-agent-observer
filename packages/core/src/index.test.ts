@@ -1,15 +1,36 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   utimesSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ObserverCore, ObserverError } from './index.js';
+
+function createDirectoryLink(target: string, path: string): boolean {
+  try {
+    symlinkSync(
+      target,
+      path,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    return true;
+  } catch (error) {
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? (error as { readonly code?: unknown }).code
+        : undefined;
+    if (code === 'EPERM' || code === 'EACCES') return false;
+    throw error;
+  }
+}
 
 describe('ObserverCore', () => {
   it('reports a normalized project root', () => {
@@ -60,7 +81,16 @@ describe('ObserverCore', () => {
         testId: 'save-profile',
       });
       core.sessions.event(session.id, 'type_text', { length: 12 });
+      core.sessions.event(session.id, 'deep_link', {
+        appId: 'dev.example.app',
+        uri: 'demo://alice:correct-horse@store.example/products/42?token=private-token#private-fragment',
+      });
       const stopped = await core.stopSession();
+      expect(
+        stopped.artifacts.some(
+          (artifact) => artifact.kind === 'evidence-graph',
+        ),
+      ).toBe(true);
       const replayArtifact = stopped.artifacts.find(
         (artifact) =>
           artifact.kind === 'summary' &&
@@ -69,13 +99,91 @@ describe('ObserverCore', () => {
       expect(replayArtifact).toBeDefined();
       const replay = JSON.parse(
         readFileSync(replayArtifact?.path ?? '', 'utf8'),
-      ) as { steps: Array<{ action: string; testId?: string }> };
+      ) as {
+        steps: Array<{
+          action: string;
+          testId?: string;
+          uri?: string;
+          redactedComponents?: string[];
+        }>;
+      };
       expect(replay.steps).toEqual([
         { action: 'tap', testId: 'open-store' },
         { action: 'tap', testId: 'save-profile' },
+        {
+          action: 'deep-link',
+          uri: 'demo://store.example/products/42',
+          redactedComponents: ['credentials', 'query', 'fragment'],
+        },
       ]);
+      expect(JSON.stringify(replay)).not.toContain('alice');
+      expect(JSON.stringify(replay)).not.toContain('correct-horse');
+      expect(JSON.stringify(replay)).not.toContain('private-token');
+      expect(JSON.stringify(replay)).not.toContain('private-fragment');
     } finally {
       core.sessions.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns only redacted deep-link evidence to callers and replay reports', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rn-observer-deep-link-'));
+    const core = new ObserverCore({
+      projectRoot: root,
+      appId: 'dev.example.app',
+      deviceId: 'emulator-5554',
+      captureRuntimeUiOnStop: false,
+      onWarning: () => {},
+    });
+    const raw =
+      'demo://alice:correct-horse@store.example/products/42?token=private-token#private-fragment';
+    const opened = vi.spyOn(core.adb, 'deepLink').mockResolvedValue(undefined);
+    try {
+      core.config.security.mode = 'authorized-active';
+      core.config.security.allowedActions = ['read', 'app-state'];
+      core.config.security.allowedAppIds = ['dev.example.app'];
+      core.config.target.deviceId = 'emulator-5554';
+      const session = core.startSession();
+
+      const result = await core.deepLink(raw);
+      expect(opened).toHaveBeenCalledWith('dev.example.app', raw);
+      expect(result).toEqual({
+        appId: 'dev.example.app',
+        uri: 'demo://store.example/products/42',
+        redactedComponents: ['credentials', 'query', 'fragment'],
+      });
+      expect(JSON.stringify(result)).not.toContain('private-token');
+      expect(JSON.stringify(core.getSession(session.id))).not.toContain(
+        'private-token',
+      );
+
+      const scriptPath = join(root, 'caller-provided-replay.json');
+      writeFileSync(
+        scriptPath,
+        JSON.stringify({ steps: [{ action: 'deep-link', uri: raw }] }),
+        'utf8',
+      );
+      const report = await core.runReplay(scriptPath);
+      expect(report.results[0]?.summary).toBe(
+        'opened deep link demo://store.example/products/42',
+      );
+      expect(JSON.stringify(report)).not.toContain('private-token');
+      expect(JSON.stringify(report)).not.toContain('private-fragment');
+
+      opened.mockRejectedValueOnce(new Error(raw));
+      let failure: unknown;
+      try {
+        await core.deepLink(raw);
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toMatchObject({ code: 'DEEP_LINK_FAILED' });
+      expect((failure as Error).message).toBe(
+        'Could not open deep link demo://store.example/products/42',
+      );
+      expect((failure as Error).message).not.toContain('private-token');
+    } finally {
+      core.close();
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -116,6 +224,82 @@ describe('ObserverCore', () => {
     } finally {
       core.sessions.close();
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('uses artifacts.retentionDays when cleanup has no explicit age', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rn-observer-retention-'));
+    writeFileSync(
+      join(root, '.rn-observer.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        target: {},
+        packs: ['smoke'],
+        artifacts: { retentionDays: 1 },
+      }),
+      'utf8',
+    );
+    const core = new ObserverCore({
+      projectRoot: root,
+      onWarning: () => {},
+      captureRuntimeUiOnStop: false,
+    });
+    try {
+      const completed = core.startSession();
+      await core.stopSession();
+      const completedPath = join(root, '.artifacts', 'sessions', completed.id);
+      const old = new Date(Date.now() - 2 * 24 * 60 * 60 * 1_000);
+      utimesSync(completedPath, old, old);
+
+      const result = core.cleanupArtifacts({ dryRun: true });
+      expect(result.olderThanDays).toBe(1);
+      expect(result.sessionsRemoved).toBe(1);
+      expect(existsSync(completedPath)).toBe(true);
+    } finally {
+      core.sessions.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to open session storage after the artifact root becomes an escaping link', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rn-observer-artifact-root-link-'));
+    const outside = mkdtempSync(
+      join(tmpdir(), 'rn-observer-artifact-outside-'),
+    );
+    const artifactRoot = join(root, '.artifacts');
+    mkdirSync(artifactRoot);
+    const core = new ObserverCore({ projectRoot: root, onWarning: () => {} });
+    try {
+      rmSync(artifactRoot, { recursive: true, force: true });
+      if (!createDirectoryLink(outside, artifactRoot)) return;
+
+      expect(() => core.startSession()).toThrow(/after resolving symlinks/i);
+      expect(existsSync(join(outside, 'sessions'))).toBe(false);
+    } finally {
+      core.close();
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('skips symlinked session entries during artifact cleanup', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rn-observer-cleanup-link-'));
+    const outside = mkdtempSync(join(tmpdir(), 'rn-observer-cleanup-outside-'));
+    const sessionsDirectory = join(root, '.artifacts', 'sessions');
+    mkdirSync(sessionsDirectory, { recursive: true });
+    const sessionLink = join(sessionsDirectory, 'escaped-session');
+    const core = new ObserverCore({ projectRoot: root, onWarning: () => {} });
+    try {
+      if (!createDirectoryLink(outside, sessionLink)) return;
+
+      const result = core.cleanupArtifacts({ olderThanDays: 0 });
+      expect(result.sessionsRemoved).toBe(0);
+      expect(existsSync(sessionLink)).toBe(true);
+      expect(existsSync(outside)).toBe(true);
+    } finally {
+      core.close();
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
     }
   });
 });

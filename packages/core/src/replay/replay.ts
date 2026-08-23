@@ -1,3 +1,5 @@
+import type { DeepLinkRedactedComponent } from '../privacy/deep-link.js';
+
 export type ReplayStep =
   | {
       action: 'tap';
@@ -17,7 +19,19 @@ export type ReplayStep =
     }
   | { action: 'type-text'; text: string }
   | { action: 'back' }
-  | { action: 'deep-link'; uri: string }
+  | {
+      action: 'deep-link';
+      /**
+       * A route-level URI. Session-generated scripts remove credentials,
+       * query, and fragments before persisting this value.
+       */
+      uri: string;
+      /**
+       * Components removed from a session-generated URI. Replay must never
+       * reconstruct these values; it opens only the retained route-level URI.
+       */
+      redactedComponents?: readonly DeepLinkRedactedComponent[];
+    }
   | { action: 'reload'; fast?: boolean }
   | { action: 'assert'; testId?: string; text?: string; visible?: boolean }
   | { action: 'wait'; ms: number }

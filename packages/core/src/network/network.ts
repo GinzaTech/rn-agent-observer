@@ -1,9 +1,19 @@
-import type {
-  LogEntry,
-  NetworkRequest,
-  NetworkSummary,
-  ReactRenderStat,
-  UiInteractionEvent,
+import {
+  AppDataTelemetryPayloadSchema,
+  JsTaskTelemetryPayloadSchema,
+  NetworkTelemetryPayloadSchema,
+  RenderTelemetryPayloadSchema,
+  RouteTelemetryPayloadSchema,
+  UiElementTelemetryPayloadSchema,
+  UiInteractionTelemetryPayloadSchema,
+  type AppDataPrivacy,
+  type JsTaskTelemetryPayload,
+  type LogEntry,
+  type NetworkRequest,
+  type NetworkSummary,
+  type ReactRenderStat,
+  type RouteTelemetryPayload,
+  type UiInteractionEvent,
 } from '@rn-agent-observer/schemas';
 
 const NETWORK_PREFIX = 'RN_AGENT_OBSERVER_NETWORK ';
@@ -31,6 +41,7 @@ export interface AppDataEvent {
   namespace: string;
   data: unknown;
   timestamp: string;
+  privacy?: AppDataPrivacy;
 }
 
 /**
@@ -41,17 +52,21 @@ export interface AppDataEvent {
 export function appDataFromLogs(logs: LogEntry[]): AppDataEvent[] {
   const latest = new Map<string, AppDataEvent>();
   for (const entry of logs) {
-    const payload = parsePayload<{
-      namespace: string;
-      data: unknown;
-      timestamp?: string;
-    }>(entry.message, APP_DATA_PREFIX);
-    if (!payload?.namespace) continue;
-    latest.set(payload.namespace, {
+    const payload = validPayload(
+      parsePayload(
+        entry.message,
+        APP_DATA_PREFIX,
+        AppDataTelemetryPayloadSchema,
+      ),
+    );
+    if (!payload) continue;
+    const event: AppDataEvent = {
       namespace: payload.namespace,
       data: payload.data,
       timestamp: payload.timestamp ?? entry.timestamp,
-    });
+    };
+    if (payload.privacy) event.privacy = payload.privacy;
+    latest.set(payload.namespace, event);
   }
   return [...latest.values()].sort((a, b) =>
     a.namespace.localeCompare(b.namespace),
@@ -108,35 +123,192 @@ export interface JsTaskEvent {
   source: string;
 }
 
-function parsePayload<T>(message: string, prefix: string): T | null {
+export type TelemetryKind =
+  | 'network'
+  | 'render'
+  | 'route'
+  | 'js-task'
+  | 'app-data'
+  | 'ui-element'
+  | 'ui-interaction';
+
+export interface InvalidTelemetryEvent {
+  kind: TelemetryKind;
+  timestamp: string;
+  source: string;
+  reason: 'malformed-json' | 'schema-validation';
+  details: string;
+}
+
+interface RuntimeSchema<T> {
+  safeParse(
+    value: unknown,
+  ):
+    { success: true; data: T } | { success: false; error: { message: string } };
+}
+
+type PayloadParseResult<T> =
+  | { status: 'not-present' }
+  | { status: 'valid'; data: T }
+  | {
+      status: 'invalid';
+      reason: InvalidTelemetryEvent['reason'];
+      details: string;
+    };
+
+function parsePayload<T>(
+  message: string,
+  prefix: string,
+  schema: RuntimeSchema<T>,
+): PayloadParseResult<T> {
   const index = message.indexOf(prefix);
-  if (index < 0) return null;
+  if (index < 0) return { status: 'not-present' };
+  let candidate: unknown;
   try {
-    return JSON.parse(message.slice(index + prefix.length)) as T;
+    candidate = JSON.parse(message.slice(index + prefix.length));
   } catch {
-    return null;
+    return {
+      status: 'invalid',
+      reason: 'malformed-json',
+      details: 'Telemetry payload is not valid JSON',
+    };
   }
+  const result = schema.safeParse(candidate);
+  if (!result.success) {
+    return {
+      status: 'invalid',
+      reason: 'schema-validation',
+      details: result.error.message.slice(0, 1000),
+    };
+  }
+  return { status: 'valid', data: result.data };
+}
+
+function validPayload<T>(result: PayloadParseResult<T>): T | null {
+  return result.status === 'valid' ? result.data : null;
+}
+
+const TELEMETRY_DEFINITIONS: readonly {
+  kind: TelemetryKind;
+  prefix: string;
+  schema: RuntimeSchema<unknown>;
+}[] = [
+  {
+    kind: 'network',
+    prefix: NETWORK_PREFIX,
+    schema: NetworkTelemetryPayloadSchema,
+  },
+  {
+    kind: 'render',
+    prefix: RENDER_PREFIX,
+    schema: RenderTelemetryPayloadSchema,
+  },
+  { kind: 'route', prefix: ROUTE_PREFIX, schema: RouteTelemetryPayloadSchema },
+  {
+    kind: 'js-task',
+    prefix: JS_TASK_PREFIX,
+    schema: JsTaskTelemetryPayloadSchema,
+  },
+  {
+    kind: 'app-data',
+    prefix: APP_DATA_PREFIX,
+    schema: AppDataTelemetryPayloadSchema,
+  },
+  {
+    kind: 'ui-element',
+    prefix: UI_ELEMENT_PREFIX,
+    schema: UiElementTelemetryPayloadSchema,
+  },
+  {
+    kind: 'ui-interaction',
+    prefix: UI_INTERACTION_PREFIX,
+    schema: UiInteractionTelemetryPayloadSchema,
+  },
+];
+
+/**
+ * Reports observer-prefixed log lines that were rejected instead of silently
+ * treating malformed or incompatible telemetry as evidence. Raw payloads are
+ * intentionally omitted because they may contain sensitive data.
+ */
+export function invalidTelemetryFromLogs(
+  logs: LogEntry[],
+): InvalidTelemetryEvent[] {
+  const invalid: InvalidTelemetryEvent[] = [];
+  for (const entry of logs) {
+    for (const definition of TELEMETRY_DEFINITIONS) {
+      const result = parsePayload(
+        entry.message,
+        definition.prefix,
+        definition.schema,
+      );
+      if (result.status !== 'invalid') continue;
+      invalid.push({
+        kind: definition.kind,
+        timestamp: entry.timestamp,
+        source: entry.source,
+        reason: result.reason,
+        details: result.details,
+      });
+      break;
+    }
+  }
+  return invalid;
 }
 
 export function networkRequestsFromLogs(logs: LogEntry[]): NetworkRequest[] {
   return logs
-    .map((entry) => parsePayload<NetworkRequest>(entry.message, NETWORK_PREFIX))
-    .filter((request): request is NetworkRequest => request !== null);
+    .map((entry) =>
+      validPayload(
+        parsePayload(
+          entry.message,
+          NETWORK_PREFIX,
+          NetworkTelemetryPayloadSchema,
+        ),
+      ),
+    )
+    .filter(
+      (request): request is NonNullable<typeof request> => request !== null,
+    )
+    .map((request) => {
+      const output = { ...request };
+      delete output.telemetryVersion;
+      return output;
+    });
 }
 
 export function renderStatsFromLogs(logs: LogEntry[]): ReactRenderStat[] {
   return logs
-    .map((entry) => parsePayload<ReactRenderStat>(entry.message, RENDER_PREFIX))
-    .filter((stat): stat is ReactRenderStat => stat !== null);
+    .map((entry) =>
+      validPayload(
+        parsePayload(
+          entry.message,
+          RENDER_PREFIX,
+          RenderTelemetryPayloadSchema,
+        ),
+      ),
+    )
+    .filter((stat): stat is NonNullable<typeof stat> => stat !== null)
+    .map((stat) => {
+      const output = { ...stat };
+      delete output.telemetryVersion;
+      return output;
+    });
 }
 
 export function routeFromLogs(logs: LogEntry[]): string | null {
   return (
     logs
       .map((entry) =>
-        parsePayload<{ route: string }>(entry.message, ROUTE_PREFIX),
+        validPayload(
+          parsePayload(
+            entry.message,
+            ROUTE_PREFIX,
+            RouteTelemetryPayloadSchema,
+          ),
+        ),
       )
-      .filter((value): value is { route: string } => value !== null)
+      .filter((value): value is RouteTelemetryPayload => value !== null)
       .at(-1)?.route ?? null
   );
 }
@@ -144,17 +316,14 @@ export function routeFromLogs(logs: LogEntry[]): string | null {
 export function uiElementsFromLogs(logs: LogEntry[]): UiElementTelemetry[] {
   const latest = new Map<string, UiElementTelemetry>();
   for (const entry of logs) {
-    const payload = parsePayload<Partial<UiElementTelemetry>>(
-      entry.message,
-      UI_ELEMENT_PREFIX,
+    const payload = validPayload(
+      parsePayload(
+        entry.message,
+        UI_ELEMENT_PREFIX,
+        UiElementTelemetryPayloadSchema,
+      ),
     );
-    if (
-      !payload?.elementId ||
-      !payload.componentName ||
-      typeof payload.mounted !== 'boolean'
-    ) {
-      continue;
-    }
+    if (!payload) continue;
     latest.set(payload.elementId, {
       elementId: payload.elementId,
       testId: payload.testId ?? null,
@@ -174,18 +343,14 @@ export function uiElementsFromLogs(logs: LogEntry[]): UiElementTelemetry[] {
 export function uiInteractionsFromLogs(logs: LogEntry[]): UiInteractionEvent[] {
   const events: UiInteractionEvent[] = [];
   for (const entry of logs) {
-    const payload = parsePayload<Partial<UiInteractionEvent>>(
-      entry.message,
-      UI_INTERACTION_PREFIX,
+    const payload = validPayload(
+      parsePayload(
+        entry.message,
+        UI_INTERACTION_PREFIX,
+        UiInteractionTelemetryPayloadSchema,
+      ),
     );
-    if (
-      !payload?.interactionId ||
-      !payload.elementId ||
-      !payload.phase ||
-      !['start', 'success', 'error'].includes(payload.phase)
-    ) {
-      continue;
-    }
+    if (!payload) continue;
     events.push({
       interactionId: payload.interactionId,
       elementId: payload.elementId,
@@ -202,8 +367,21 @@ export function uiInteractionsFromLogs(logs: LogEntry[]): UiInteractionEvent[] {
 
 export function jsTasksFromLogs(logs: LogEntry[]): JsTaskEvent[] {
   return logs
-    .map((entry) => parsePayload<JsTaskEvent>(entry.message, JS_TASK_PREFIX))
-    .filter((event): event is JsTaskEvent => event !== null);
+    .map((entry) =>
+      validPayload(
+        parsePayload(
+          entry.message,
+          JS_TASK_PREFIX,
+          JsTaskTelemetryPayloadSchema,
+        ),
+      ),
+    )
+    .filter((event): event is JsTaskTelemetryPayload => event !== null)
+    .map((event) => {
+      const output = { ...event };
+      delete output.telemetryVersion;
+      return output;
+    });
 }
 
 function percentile(sorted: number[], value: number): number | null {

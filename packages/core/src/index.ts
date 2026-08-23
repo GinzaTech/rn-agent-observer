@@ -1,21 +1,32 @@
 import {
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import {
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+  win32,
+} from 'node:path';
 import { PNG } from 'pngjs';
 import {
   ObserverStatusSchema,
   UITreeSchema,
   type AppState,
   type Artifact,
+  type AssuranceFinding,
   type DeviceNetworkDelta,
   type DevToolsExport,
   type Diagnosis,
+  type EvidenceGraph,
   type LogEntry,
   type NetworkRequest,
   type NetworkSummary,
@@ -32,9 +43,25 @@ import {
 } from '@rn-agent-observer/schemas';
 import { AdbClient } from './adb/adb-client.js';
 import { flattenUiTree } from './adb/parsers.js';
+import {
+  analyzePassiveAccessibility,
+  type PassiveAccessibilityResult,
+} from './accessibility/passive-audit.js';
 import { ArtifactManager } from './artifacts/artifact-manager.js';
 import { comparePngFiles } from './comparison/compare.js';
+import {
+  analyzeActionCoverage,
+  type ActionCoverageResult,
+} from './coverage/action-coverage.js';
 import { resolveAppId } from './config.js';
+import {
+  authorizePersistentPermissionChange,
+  authorizeObserverAction,
+  loadObserverConfig,
+  resolveArtifactRoot,
+  type ObserverAction,
+  type ObserverProjectConfig,
+} from './config/observer-config.js';
 import { collectDevToolsExport } from './devtools/devtools-exporter.js';
 import { collectMetroNetwork } from './devtools/metro-network.js';
 import {
@@ -48,6 +75,7 @@ import {
   type DiagnosisThresholds,
 } from './diagnosis/rules.js';
 import { ObserverError, asObserverError } from './errors.js';
+import { buildEvidenceGraph } from './evidence/graph.js';
 import {
   networkRequestsFromLogs,
   appDataFromLogs,
@@ -65,6 +93,11 @@ import {
   markFrameMetricsStale,
 } from './performance/freshness.js';
 import {
+  redactDeepLinkEventData,
+  redactDeepLinkUri,
+  type RedactedDeepLinkUri,
+} from './privacy/deep-link.js';
+import {
   buildSnapshot,
   snapshotDiff,
   stabilizeSnapshotRefs,
@@ -80,7 +113,29 @@ import {
 } from './replay/replay.js';
 import { expoRouterSitemap, hasAppDir } from './routes/sitemap.js';
 import { ScreenRecorder } from './recording/screen-recorder.js';
-import { SessionStore } from './session/session-store.js';
+import {
+  analyzePassiveResilience,
+  type PassiveResilienceResult,
+} from './resilience/passive-analysis.js';
+import {
+  runMalformedDeepLinkScenario,
+  runPermissionTransitionScenario,
+  type ActiveSecurityScenarioResult,
+  type MalformedDeepLinkScenario,
+  type PermissionTransitionScenario,
+} from './security/active-scenario.js';
+import { createObserverActiveSecurityExecutor } from './security/observer-active-executor.js';
+import {
+  SessionStore,
+  type SessionListEntry,
+  type StoredArtifact,
+} from './session/session-store.js';
+import {
+  exportSessionShareBundle as writeSessionShareBundle,
+  readAndVerifySessionShareBundle,
+  type ExportSessionShareBundleResult,
+  type VerifySessionShareBundleResult,
+} from './session/share-bundle.js';
 import {
   analyzePixels,
   analyzeScreen,
@@ -94,10 +149,15 @@ import { scanSourceUi } from './ui/source-model.js';
 export * from './adb/parsers.js';
 export * from './diagnosis/rules.js';
 export * from './errors.js';
+export * from './evidence/graph.js';
+export * from './filesystem/path-authority.js';
+export * from './coverage/action-coverage.js';
 export * from './network/network.js';
+export * from './privacy/deep-link.js';
 export * from './refs/snapshot.js';
 export * from './replay/replay.js';
 export * from './routes/sitemap.js';
+export * from './session/share-bundle.js';
 export * from './ui/understanding.js';
 export * from './ui/runtime-model.js';
 export * from './ui/source-model.js';
@@ -118,6 +178,14 @@ export const OBSERVER_VERSION = readObserverVersion();
 export const IMPLEMENTED_COMMANDS = [
   'help',
   'status',
+  'doctor',
+  'init',
+  'suite',
+  'run',
+  'ci',
+  'security',
+  'dashboard',
+  'open',
   'devices',
   'device-info',
   'launch',
@@ -138,8 +206,13 @@ export const IMPLEMENTED_COMMANDS = [
   'permissions',
   'assert',
   'a11y-audit',
+  'resilience',
   'logs',
   'performance',
+  'coverage',
+  'bundle',
+  'plugin',
+  'target',
   'render-stats',
   'app-data',
   'routes',
@@ -148,6 +221,7 @@ export const IMPLEMENTED_COMMANDS = [
   'trace',
   'record',
   'replay',
+  'artifacts',
   'session',
   'diagnose',
   'compare',
@@ -183,8 +257,38 @@ export interface AppReloadOptions {
   metroUrl?: string;
 }
 
+/**
+ * A caller must state that it intends to leave the requested Android runtime
+ * permission changed. Bounded active-security scenarios do not use this API:
+ * they have their own authorization, observation, and restoration path.
+ */
+export interface PersistentPermissionChangeConfirmation {
+  readonly confirmed: true;
+}
+
+export interface PersistentPermissionChangeResult {
+  readonly appId: string;
+  readonly permission: string;
+  readonly granted: boolean;
+  readonly previouslyGranted: boolean;
+  readonly verified: true;
+  readonly persistent: true;
+}
+
+/**
+ * Deep-link invocation evidence returned to callers. The original input is
+ * used only to launch the app; this result never echoes credentials, query,
+ * or fragment values.
+ */
+export interface DeepLinkResult extends RedactedDeepLinkUri {
+  readonly appId: string;
+}
+
 export class ObserverCore {
   readonly projectRoot: string;
+  readonly config: ObserverProjectConfig;
+  readonly configPath: string;
+  readonly configExists: boolean;
   readonly adb: AdbClient;
   readonly artifacts: ArtifactManager;
   private sessionStore: SessionStore | undefined;
@@ -202,9 +306,19 @@ export class ObserverCore {
         process.env.RN_OBSERVER_PROJECT_ROOT ??
         process.cwd(),
     );
-    const deviceId = options.deviceId ?? process.env.RN_OBSERVER_DEVICE_ID;
+    const loadedConfig = loadObserverConfig(this.projectRoot);
+    this.config = loadedConfig.config;
+    this.configPath = loadedConfig.path;
+    this.configExists = loadedConfig.exists;
+    const deviceId =
+      options.deviceId ??
+      process.env.RN_OBSERVER_DEVICE_ID ??
+      loadedConfig.config.target.deviceId;
     this.adb = new AdbClient(deviceId, options.adbExecutable);
-    this.explicitAppId = options.appId;
+    this.explicitAppId =
+      options.appId ??
+      process.env.RN_OBSERVER_APP_ID ??
+      loadedConfig.config.target.appId;
     this.onWarning =
       options.onWarning ??
       ((warning) =>
@@ -215,13 +329,15 @@ export class ObserverCore {
     this.captureRuntimeUiOnStop = options.captureRuntimeUiOnStop ?? true;
     this.artifacts = new ArtifactManager(
       this.projectRoot,
-      options.artifactRoot,
+      options.artifactRoot ??
+        resolveArtifactRoot(this.projectRoot, loadedConfig.config),
     );
     this.activeSessionId =
       options.sessionId ?? process.env.RN_OBSERVER_SESSION_ID;
   }
 
   get sessions(): SessionStore {
+    this.artifacts.ensureSafeRoot();
     this.sessionStore ??= new SessionStore(this.artifacts.root);
     return this.sessionStore;
   }
@@ -236,8 +352,49 @@ export class ObserverCore {
     return this.screenRecorder;
   }
 
+  close(): void {
+    this.sessionStore?.close();
+    this.sessionStore = undefined;
+  }
+
   get appId(): string {
     return resolveAppId(this.projectRoot, this.explicitAppId);
+  }
+
+  /**
+   * Fails closed before an operation can change the configured app or device.
+   * Read-only evidence collection deliberately does not use this boundary.
+   */
+  assertActionAuthorized(action: ObserverAction): void {
+    const decision = authorizeObserverAction(
+      this.config,
+      action,
+      this.appId,
+      this.adb.deviceId,
+    );
+    if (decision.allowed) return;
+    throw new ObserverError(
+      'ACTION_NOT_AUTHORIZED',
+      `Refused ${action}: ${decision.reason}`,
+      true,
+      'Use an owned development app and explicitly configure security.mode=authorized-active, its app ID, and the required action risk.',
+    );
+  }
+
+  private assertPersistentPermissionChangeAuthorized(permission: string): void {
+    const decision = authorizePersistentPermissionChange(
+      this.config,
+      permission,
+      this.appId,
+      this.adb.deviceId,
+    );
+    if (decision.allowed) return;
+    throw new ObserverError(
+      'ACTION_NOT_AUTHORIZED',
+      `Refused persistent permission change: ${decision.reason}`,
+      true,
+      'Enable only the exact owned app, ADB device, persistent-permission risk, and runtime permission in project policy.',
+    );
   }
 
   getStatus() {
@@ -264,6 +421,7 @@ export class ObserverCore {
     launched: true;
     evidenceRecorded: boolean;
   }> {
+    this.assertActionAuthorized('launch');
     await this.adb.launch(this.appId);
     const result = {
       appId: this.appId,
@@ -281,6 +439,7 @@ export class ObserverCore {
     fallbackReason?: string;
     evidenceRecorded: boolean;
   }> {
+    this.assertActionAuthorized('reload');
     if (options.fast) {
       try {
         await reloadViaMetro(options.metroUrl, this.appId, this.artifacts.root);
@@ -337,6 +496,62 @@ export class ObserverCore {
     }
   }
 
+  /**
+   * Resolves a caller-provided relative artifact path without allowing it to
+   * escape the configured artifact root. This is kept in core so CLI and MCP
+   * share the same boundary rather than each implementing their own check.
+   */
+  private artifactRelativePath(relativePath: string, label: string): string {
+    if (
+      !relativePath ||
+      isAbsolute(relativePath) ||
+      win32.isAbsolute(relativePath)
+    ) {
+      throw new ObserverError(
+        'ARTIFACT_PATH_INVALID',
+        `${label} must be a non-empty relative path inside the artifact root`,
+        true,
+      );
+    }
+    const root = resolve(this.artifacts.root);
+    const candidate = resolve(root, relativePath);
+    const fromRoot = relative(root, candidate);
+    if (
+      fromRoot.length === 0 ||
+      fromRoot === '..' ||
+      fromRoot.startsWith(`..${sep}`) ||
+      isAbsolute(fromRoot) ||
+      win32.isAbsolute(fromRoot)
+    ) {
+      throw new ObserverError(
+        'ARTIFACT_PATH_INVALID',
+        `${label} must remain inside the artifact root`,
+        true,
+      );
+    }
+    return candidate;
+  }
+
+  /** Creates a contained directory path and rejects pre-existing symlink parents. */
+  private newArtifactOutputPath(relativePath: string, label: string): string {
+    const outputPath = this.artifactRelativePath(relativePath, label);
+    const root = resolve(this.artifacts.root);
+    mkdirSync(dirname(outputPath), { recursive: true });
+    const directory = relative(root, dirname(outputPath));
+    let current = root;
+    for (const segment of directory.split(/[\\/]/u).filter(Boolean)) {
+      current = join(current, segment);
+      if (lstatSync(current).isSymbolicLink()) {
+        throw new ObserverError(
+          'ARTIFACT_PATH_UNSAFE',
+          `${label} has a symbolic-link parent and was refused`,
+          true,
+        );
+      }
+    }
+    return outputPath;
+  }
+
   async screenshot(): Promise<ScreenshotResult> {
     const buffer = await this.adb.screenshot();
     const image = PNG.sync.read(buffer);
@@ -377,6 +592,7 @@ export class ObserverCore {
   }
 
   async tap(target: { x: number; y: number } | { testId: string }) {
+    this.assertActionAuthorized('tap');
     await this.adb.tap(target);
     this.record('tap', target);
     return { performed: true as const, target };
@@ -387,6 +603,7 @@ export class ObserverCore {
     end: { x: number; y: number },
     durationMs = 500,
   ) {
+    this.assertActionAuthorized('swipe');
     await this.adb.swipe(start, end, durationMs);
     const result = { performed: true as const, start, end, durationMs };
     this.record('swipe', result);
@@ -394,12 +611,14 @@ export class ObserverCore {
   }
 
   async typeText(text: string) {
+    this.assertActionAuthorized('type-text');
     await this.adb.typeText(text);
     this.record('type_text', { length: text.length });
     return { performed: true as const, characters: text.length };
   }
 
   async back() {
+    this.assertActionAuthorized('back');
     await this.adb.back();
     this.record('back', {});
     return { performed: true as const };
@@ -495,12 +714,14 @@ export class ObserverCore {
   }
 
   async startTrace(durationMs = 10_000): Promise<Trace> {
+    this.assertActionAuthorized('trace-start');
     const trace = await this.traces.start(durationMs, this.activeSessionId);
     this.record('trace_started', trace);
     return trace;
   }
 
   async stopTrace(traceId: string): Promise<Trace> {
+    this.assertActionAuthorized('trace-stop');
     const completed = await this.traces.stop(traceId);
     this.sessions.artifact(completed.sessionId, completed.artifact);
     if (completed.sessionId) {
@@ -516,6 +737,7 @@ export class ObserverCore {
   }
 
   async startRecording(durationMs = 10_000): Promise<Trace> {
+    this.assertActionAuthorized('record-start');
     const recording = await this.recordings.start(
       durationMs,
       this.activeSessionId,
@@ -525,6 +747,7 @@ export class ObserverCore {
   }
 
   async stopRecording(recordingId: string): Promise<Trace> {
+    this.assertActionAuthorized('record-stop');
     const completed = await this.recordings.stop(recordingId);
     this.sessions.artifact(completed.sessionId, completed.artifact);
     if (completed.sessionId) {
@@ -876,6 +1099,7 @@ export class ObserverCore {
     target: { ref: string; label: string; kind: string };
     diff?: SnapshotDiff;
   }> {
+    this.assertActionAuthorized('press');
     const { snapshot: before, interactiveOnly } = this.loadLastSnapshot();
     const element = before.elements.find((item) => item.ref === ref);
     if (!element) {
@@ -929,9 +1153,20 @@ export class ObserverCore {
     return result;
   }
 
-  async deepLink(uri: string): Promise<{ appId: string; uri: string }> {
-    await this.adb.deepLink(this.appId, uri);
-    const result = { appId: this.appId, uri };
+  async deepLink(uri: string): Promise<DeepLinkResult> {
+    this.assertActionAuthorized('deep-link');
+    const appId = this.appId;
+    const redacted = redactDeepLinkUri(uri);
+    try {
+      await this.adb.deepLink(appId, uri);
+    } catch {
+      throw new ObserverError(
+        'DEEP_LINK_FAILED',
+        `Could not open deep link ${redacted.uri}`,
+        true,
+      );
+    }
+    const result: DeepLinkResult = { appId, ...redacted };
     this.record('deep_link', result);
     return result;
   }
@@ -948,11 +1183,127 @@ export class ObserverCore {
   async setPermission(
     permission: string,
     granted: boolean,
-  ): Promise<{ appId: string; permission: string; granted: boolean }> {
-    await this.adb.setPermission(this.appId, permission, granted);
-    const result = { appId: this.appId, permission, granted };
+    confirmation: PersistentPermissionChangeConfirmation,
+  ): Promise<PersistentPermissionChangeResult> {
+    if (confirmation?.confirmed !== true) {
+      throw new ObserverError(
+        'PERSISTENT_PERMISSION_CONFIRMATION_REQUIRED',
+        'Persistent permission changes require an explicit per-run confirmation.',
+        true,
+        'Pass the persistent permission confirmation only after reviewing the exact app, device, and permission.',
+      );
+    }
+    if (typeof permission !== 'string' || permission.trim().length === 0) {
+      throw new ObserverError(
+        'INVALID_ARGUMENT',
+        'Permission must be a non-empty Android runtime permission name.',
+        true,
+      );
+    }
+    if (typeof granted !== 'boolean') {
+      throw new ObserverError(
+        'INVALID_ARGUMENT',
+        'Permission grant state must be a boolean.',
+        true,
+      );
+    }
+    const normalizedPermission = permission.trim();
+    this.assertPersistentPermissionChangeAuthorized(normalizedPermission);
+    const appId = this.appId;
+    const declaredPermissions = await this.adb.runtimePermissions(appId);
+    const previous = declaredPermissions.find(
+      (candidate) => candidate.name === normalizedPermission,
+    );
+    if (!previous) {
+      throw new ObserverError(
+        'PERMISSION_NOT_DECLARED',
+        'Configured persistent permission is not a runtime permission of the target app.',
+        true,
+        'Use list_permissions to select an exact runtime permission declared by the configured app.',
+      );
+    }
+
+    await this.adb.setPermission(appId, normalizedPermission, granted);
+    const observed = (await this.adb.runtimePermissions(appId)).find(
+      (candidate) => candidate.name === normalizedPermission,
+    );
+    if (!observed || observed.granted !== granted) {
+      throw new ObserverError(
+        'PERMISSION_STATE_NOT_VERIFIED',
+        'Persistent permission state did not match the requested change after ADB completed.',
+        true,
+        'Inspect list_permissions before continuing; this operation intentionally does not restore or relaunch the app.',
+      );
+    }
+    const result: PersistentPermissionChangeResult = {
+      appId,
+      permission: normalizedPermission,
+      granted,
+      previouslyGranted: previous.granted,
+      verified: true,
+      persistent: true,
+    };
     this.record('permission_changed', result);
     return result;
+  }
+
+  private persistActiveSecurityScenario(result: ActiveSecurityScenarioResult): {
+    result: ActiveSecurityScenarioResult;
+    artifact: Artifact;
+  } {
+    const artifact = this.artifacts.write(
+      'security-report',
+      JSON.stringify(result, null, 2),
+      {
+        ...(this.activeSessionId ? { sessionId: this.activeSessionId } : {}),
+        extension: '.json',
+        mimeType: 'application/json',
+        name: `active-security-${result.scenarioId}.json`,
+      },
+    );
+    this.sessions.artifact(this.activeSessionId, artifact);
+    this.record('security_active_scenario', {
+      scenarioId: result.scenarioId,
+      kind: result.kind,
+      outcome: result.outcome,
+      authorization: result.authorization,
+      probeCount: result.probes.length,
+      findingOutcomes: result.findings.reduce<Record<string, number>>(
+        (counts, finding) => {
+          counts[finding.outcome] = (counts[finding.outcome] ?? 0) + 1;
+          return counts;
+        },
+        {},
+      ),
+      artifactId: artifact.id,
+    });
+    return { result, artifact };
+  }
+
+  async runMalformedDeepLinkSecurityScenario(
+    scenario: MalformedDeepLinkScenario,
+    signal?: AbortSignal,
+  ): Promise<{ result: ActiveSecurityScenarioResult; artifact: Artifact }> {
+    this.assertActionAuthorized('security-active-deep-link');
+    const result = await runMalformedDeepLinkScenario(
+      scenario,
+      createObserverActiveSecurityExecutor(this),
+      signal,
+    );
+    return this.persistActiveSecurityScenario(result);
+  }
+
+  async runPermissionTransitionSecurityScenario(
+    scenario: PermissionTransitionScenario,
+    signal?: AbortSignal,
+  ): Promise<{ result: ActiveSecurityScenarioResult; artifact: Artifact }> {
+    this.assertActionAuthorized('security-active-permission');
+    const result = await runPermissionTransitionScenario(
+      scenario,
+      createObserverActiveSecurityExecutor(this),
+      signal,
+    );
+    return this.persistActiveSecurityScenario(result);
   }
 
   async assertElement(input: {
@@ -1036,6 +1387,117 @@ export class ObserverCore {
     return result;
   }
 
+  async accessibilityAudit(): Promise<PassiveAccessibilityResult> {
+    let tree: UITree | undefined;
+    try {
+      tree = await this.getUiTree();
+    } catch {
+      const result = analyzePassiveAccessibility(undefined, {
+        availability: {
+          status: 'UNAVAILABLE',
+          reason: 'UI tree collection failed',
+        },
+      });
+      this.record('a11y_audit', {
+        analyzer: result.analyzer,
+        outcome: result.outcome,
+        counts: result.counts,
+      });
+      return result;
+    }
+    const device = await this.adb.deviceInfo().catch(() => undefined);
+    const result = analyzePassiveAccessibility(tree, {
+      densityDpi: device?.densityDpi ?? null,
+    });
+    this.record('a11y_audit', {
+      analyzer: result.analyzer,
+      outcome: result.outcome,
+      counts: result.counts,
+    });
+    return result;
+  }
+
+  async resilienceReadiness(): Promise<PassiveResilienceResult> {
+    const capturedAt = new Date().toISOString();
+    const [appStateResult, screenResult, logsResult] = await Promise.allSettled(
+      [
+        this.getAppState(),
+        this.understandScreen(),
+        this.getLogs({ limit: 500 }),
+      ],
+    );
+    const unavailable = [
+      ...(appStateResult.status === 'rejected' ? ['app-state'] : []),
+      ...(screenResult.status === 'rejected' ? ['screen'] : []),
+      ...(logsResult.status === 'rejected' ? ['logs'] : []),
+    ];
+    const screen =
+      screenResult.status === 'fulfilled'
+        ? {
+            state: screenResult.value.state,
+            timestamp: screenResult.value.timestamp,
+            issueCodes: screenResult.value.issues.map((issue) => issue.code),
+          }
+        : undefined;
+    const result = analyzePassiveResilience({
+      scenarioId: 'current-readiness',
+      scenarioKind: 'passive-readiness',
+      checkpoints: {
+        recovery: {
+          capturedAt,
+          availability:
+            unavailable.length === 0
+              ? { status: 'AVAILABLE' }
+              : {
+                  status: 'DEGRADED',
+                  reason: `Unavailable evidence: ${unavailable.join(', ')}`,
+                },
+          ...(appStateResult.status === 'fulfilled'
+            ? { appState: appStateResult.value }
+            : {}),
+          ...(screen ? { screen } : {}),
+          ...(logsResult.status === 'fulfilled'
+            ? { logs: logsResult.value }
+            : {}),
+        },
+      },
+      expectations: [
+        {
+          id: 'process-running',
+          title: 'App process is running at the recovery checkpoint',
+          type: 'process-running',
+          phase: 'recovery',
+          expected: true,
+        },
+        {
+          id: 'foreground',
+          title: 'App is foreground at the recovery checkpoint',
+          type: 'foreground',
+          phase: 'recovery',
+          expected: true,
+        },
+        {
+          id: 'loading',
+          title: 'Recovery checkpoint is not explicitly stuck loading',
+          type: 'no-stuck-loading',
+          phase: 'recovery',
+        },
+        {
+          id: 'runtime-errors',
+          title: 'Recovery checkpoint has no observed runtime errors',
+          type: 'no-runtime-errors',
+          phase: 'recovery',
+        },
+      ],
+    });
+    this.record('resilience_readiness', {
+      analyzer: result.analyzer,
+      outcome: result.outcome,
+      evaluationCount: result.evaluations.length,
+    });
+    return result;
+  }
+
   async getAppData(): Promise<AppDataEvent[]> {
     const events = appDataFromLogs(await this.getLogs({ limit: 2000 }));
     this.record('app_data', { namespaces: events.map((e) => e.namespace) });
@@ -1057,6 +1519,7 @@ export class ObserverCore {
   }
 
   async runReplay(scriptPath: string): Promise<ReplayReport> {
+    this.assertActionAuthorized('replay-run');
     let script: ReplayScript;
     try {
       script = JSON.parse(readFileSync(scriptPath, 'utf8')) as ReplayScript;
@@ -1117,8 +1580,8 @@ export class ObserverCore {
         return 'pressed back';
       },
       deepLink: async (step) => {
-        await this.deepLink(step.uri);
-        return `opened deep link ${step.uri}`;
+        const result = await this.deepLink(step.uri);
+        return `opened deep link ${result.uri}`;
       },
       reload: async (step) => {
         const result = await this.appReload({
@@ -1267,7 +1730,26 @@ export class ObserverCore {
     const session = this.sessions.start(this.projectRoot);
     this.activeSessionId = session.id;
     this.warnedWithoutSession = false;
-    return session;
+    let resolvedAppId: string | undefined;
+    try {
+      resolvedAppId = this.appId;
+    } catch {
+      resolvedAppId = undefined;
+    }
+    this.sessions.event(session.id, 'session_context', {
+      schemaVersion: '1.0',
+      observerVersion: OBSERVER_VERSION,
+      configSchemaVersion: this.config.schemaVersion,
+      target: {
+        platform: 'android',
+        mode: this.config.target.mode,
+        ...(resolvedAppId ? { appId: resolvedAppId } : {}),
+        ...(this.adb.deviceId ? { deviceId: this.adb.deviceId } : {}),
+      },
+      packs: this.config.packs,
+      securityMode: this.config.security.mode,
+    });
+    return this.sessions.get(session.id);
   }
 
   async stopSession(sessionId = this.activeSessionId): Promise<Session> {
@@ -1327,6 +1809,7 @@ export class ObserverCore {
       },
     );
     this.sessions.artifact(sessionId, summary);
+    this.exportEvidenceGraph(sessionId);
     this.activeSessionId =
       priorActiveSessionId && priorActiveSessionId !== sessionId
         ? priorActiveSessionId
@@ -1336,6 +1819,152 @@ export class ObserverCore {
 
   getSession(sessionId: string): Session {
     return this.sessions.get(sessionId);
+  }
+
+  listSessions(
+    options: { limit?: number; offset?: number } = {},
+  ): SessionListEntry[] {
+    return this.sessions.list(options);
+  }
+
+  getArtifact(artifactId: string): StoredArtifact {
+    return this.sessions.getArtifact(artifactId);
+  }
+
+  /**
+   * Builds a portable, metadata-first evidence bundle for one persisted
+   * session. Sharing is opt-in at project level and outputs stay inside the
+   * configured artifact root; the bundle writer never overwrites a file.
+   */
+  exportSessionShareBundle(
+    sessionId: string,
+    options: {
+      relativePath?: string;
+      includeTextArtifacts?: boolean;
+    } = {},
+  ): { bundle: ExportSessionShareBundleResult; artifact: Artifact } {
+    if (!this.config.artifacts.allowShare) {
+      throw new ObserverError(
+        'SHARING_DISABLED',
+        'Session sharing is disabled by this project configuration',
+        true,
+        'Set artifacts.allowShare to true only after reviewing the evidence you intend to share',
+      );
+    }
+    const relativePath = options.relativePath ?? `shares/${sessionId}.rnobs`;
+    if (!relativePath.toLowerCase().endsWith('.rnobs')) {
+      throw new ObserverError(
+        'BUNDLE_EXTENSION_INVALID',
+        'Session share bundles must use the .rnobs extension',
+        true,
+      );
+    }
+    const session = this.sessions.get(sessionId);
+    const outputPath = this.newArtifactOutputPath(
+      relativePath,
+      'session share output',
+    );
+    const bundle = writeSessionShareBundle(session, {
+      artifactRoot: this.artifacts.root,
+      outputPath,
+      ...(options.includeTextArtifacts === undefined
+        ? {}
+        : { includeTextArtifacts: options.includeTextArtifacts }),
+    });
+    const artifact: Artifact = {
+      id: randomUUID(),
+      kind: 'share-bundle',
+      path: bundle.path,
+      mimeType:
+        'application/vnd.rn-agent-observer.session-evidence-bundle+json',
+      createdAt: new Date().toISOString(),
+    };
+    this.sessions.artifact(sessionId, artifact);
+    this.sessions.event(sessionId, 'session_share_bundle', {
+      artifactId: artifact.id,
+      outcome: bundle.outcome,
+      sha256: bundle.sha256,
+      bytes: bundle.bytes,
+      entryCount: bundle.entryCount,
+      embeddedTextCount: bundle.embeddedTextCount,
+      excludedCount: bundle.excludedCount,
+    });
+    return { bundle, artifact };
+  }
+
+  /**
+   * Verifies a local bundle without extracting it. The MCP surface uses this
+   * contained variant so a connected client cannot read arbitrary host paths.
+   */
+  verifySessionShareBundle(
+    relativePath: string,
+    expectedSha256?: string,
+  ): VerifySessionShareBundleResult {
+    const path = this.artifactRelativePath(
+      relativePath,
+      'session share bundle input',
+    );
+    return readAndVerifySessionShareBundle(path, {
+      ...(expectedSha256 === undefined ? {} : { expectedSha256 }),
+    });
+  }
+
+  /** Persists an evidence-safe route/action coverage report for the current run. */
+  analyzeRouteActionCoverage(input: unknown): {
+    result: ActionCoverageResult;
+    artifact: Artifact;
+  } {
+    const result = analyzeActionCoverage(input);
+    const artifact = this.artifacts.write(
+      'coverage-report',
+      JSON.stringify(result, null, 2),
+      {
+        ...(this.activeSessionId ? { sessionId: this.activeSessionId } : {}),
+        extension: '.json',
+        mimeType: 'application/json',
+        name: 'route-action-coverage.json',
+      },
+    );
+    this.sessions.artifact(this.activeSessionId, artifact);
+    this.record('coverage_analysis', {
+      outcome: result.outcome,
+      routeCount: result.counts.routes.total,
+      actionCount: result.counts.actions.total,
+      observableCount: result.counts.overall.observable,
+      coveredCount: result.counts.overall.covered,
+      evidenceCount: result.observations.usableEvidence,
+      artifactId: artifact.id,
+    });
+    return { result, artifact };
+  }
+
+  getEvidenceGraph(
+    sessionId: string,
+    findings: readonly AssuranceFinding[] = [],
+  ): EvidenceGraph {
+    return buildEvidenceGraph({
+      session: this.sessions.get(sessionId),
+      findings,
+    });
+  }
+
+  exportEvidenceGraph(
+    sessionId: string,
+    findings: readonly AssuranceFinding[] = [],
+  ): { graph: EvidenceGraph; artifact: Artifact } {
+    const graph = this.getEvidenceGraph(sessionId, findings);
+    const artifact = this.artifacts.write(
+      'evidence-graph',
+      JSON.stringify(graph, null, 2),
+      {
+        sessionId,
+        extension: '.json',
+        mimeType: 'application/json',
+        name: 'evidence-graph.json',
+      },
+    );
+    this.sessions.artifact(sessionId, artifact);
+    return { graph, artifact };
   }
 
   async diagnose(
@@ -1486,8 +2115,17 @@ export class ObserverCore {
         continue;
       }
       if (event.type === 'deep_link') {
-        const data = event.data as { uri?: string } | null;
-        if (data?.uri) steps.push({ action: 'deep-link', uri: data.uri });
+        const data = event.data as { uri?: unknown } | null;
+        if (typeof data?.uri === 'string') {
+          const redacted = redactDeepLinkEventData(event.data);
+          steps.push({
+            action: 'deep-link',
+            uri: redacted.uri,
+            redactedComponents: redacted.redactedComponents,
+          });
+        } else {
+          skipped.add('deep_link(unstructured)');
+        }
         continue;
       }
       if (event.type === 'reload') {
@@ -1542,7 +2180,11 @@ export class ObserverCore {
     artifactsRemoved: number;
     bytesFreed: number;
   } {
-    const olderThanDays = Math.max(0, options.olderThanDays ?? 14);
+    this.artifacts.ensureSafeRoot();
+    const olderThanDays = Math.max(
+      0,
+      options.olderThanDays ?? this.config.artifacts.retentionDays,
+    );
     const dryRun = options.dryRun ?? false;
     const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1_000;
     const sessionsDirectory = join(this.artifacts.root, 'sessions');
@@ -1551,22 +2193,33 @@ export class ObserverCore {
     let bytesFreed = 0;
     const entries = (() => {
       try {
+        const information = lstatSync(sessionsDirectory);
+        if (information.isSymbolicLink() || !information.isDirectory()) {
+          throw new ObserverError(
+            'ARTIFACT_PATH_UNSAFE',
+            'Refused cleanup because the artifact sessions directory is unsafe',
+            true,
+          );
+        }
         return readdirSync(sessionsDirectory);
-      } catch {
+      } catch (error) {
+        if (error instanceof ObserverError) throw error;
         return [];
       }
     })();
     for (const entry of entries) {
       const sessionPath = join(sessionsDirectory, entry);
-      if (this.sessions.status(entry) === 'active') continue;
       let stat;
       try {
-        stat = statSync(sessionPath);
+        stat = lstatSync(sessionPath);
       } catch {
         continue;
       }
+      if (stat.isSymbolicLink() || !stat.isDirectory()) continue;
+      if (this.sessions.status(entry) === 'active') continue;
       if (stat.mtimeMs < cutoff) {
         const directory = this.directoryStats(sessionPath);
+        if (!directory.safe) continue;
         if (!dryRun) {
           rmSync(sessionPath, { recursive: true, force: true });
           this.sessions.deleteSession(entry);
@@ -1585,15 +2238,21 @@ export class ObserverCore {
     };
   }
 
-  private directoryStats(path: string): { bytes: number; files: number } {
+  private directoryStats(path: string): {
+    bytes: number;
+    files: number;
+    safe: boolean;
+  } {
     let bytes = 0;
     let files = 0;
     try {
       for (const entry of readdirSync(path)) {
         const full = join(path, entry);
-        const stat = statSync(full);
+        const stat = lstatSync(full);
+        if (stat.isSymbolicLink()) return { bytes: 0, files: 0, safe: false };
         if (stat.isDirectory()) {
           const nested = this.directoryStats(full);
+          if (!nested.safe) return nested;
           bytes += nested.bytes;
           files += nested.files;
         } else {
@@ -1604,8 +2263,144 @@ export class ObserverCore {
     } catch {
       // unreadable entries contribute 0
     }
-    return { bytes, files };
+    return { bytes, files, safe: true };
   }
 }
 
 export { ObserverError, asObserverError };
+export {
+  type SessionListEntry,
+  type StoredArtifact,
+} from './session/session-store.js';
+export {
+  MAX_PERFORMANCE_SAMPLES,
+  MAX_PERFORMANCE_BASELINE_BYTES,
+  MIN_PERFORMANCE_SAMPLES,
+  analyzePerformanceSamples,
+  createPerformanceBaseline,
+  loadPerformanceBaseline,
+  runPerformanceExperiment,
+  writePerformanceBaseline,
+  type AnalyzePerformanceSamplesOptions,
+  type PerformanceExperimentProgress,
+  type RunPerformanceExperimentOptions,
+} from './performance/experiment.js';
+export {
+  DEFAULT_PERFORMANCE_BUDGETS,
+  loadPerformanceBudgets,
+  runObserverPerformanceExperiment,
+  type ObserverPerformanceExperimentOptions,
+} from './performance/observer-experiment.js';
+export * from './performance/android-startup.js';
+export * from './performance/memory-growth.js';
+export {
+  OBSERVER_CONFIG_FILENAME,
+  OBSERVER_CONFIG_SCHEMA_URL,
+  OBSERVER_CONFIG_VERSION,
+  OBSERVER_ACTION_RISKS,
+  QUALITY_PACKS,
+  authorizePersistentPermissionChange,
+  authorizeObserverAction,
+  authorizeSecurityAction,
+  defaultObserverConfig,
+  initObserverConfig,
+  loadObserverConfig,
+  parseObserverConfig,
+  resolveArtifactRoot,
+  type ActionRisk,
+  type LoadedObserverConfig,
+  type ObserverConfigInitResult,
+  type ObserverAction,
+  type ObserverMode,
+  type ObserverProjectConfig,
+  type QualityPack,
+  type SecurityActionDecision,
+  type SecurityMode,
+} from './config/observer-config.js';
+export {
+  defaultDoctorProbes,
+  parseAdbDevices,
+  runDoctor,
+  type CommandProbeResult,
+  type DoctorCapabilities,
+  type DoctorCheck,
+  type DoctorCheckStatus,
+  type DoctorOptions,
+  type DoctorOverallStatus,
+  type DoctorProbes,
+  type DoctorReport,
+  type MetroProbeResult,
+} from './doctor/doctor.js';
+export {
+  analyzeAndroidManifest,
+  analyzeNetworkSecurityConfig,
+  type AndroidManifestAnalysisOptions,
+  type NetworkSecurityConfigAnalysisOptions,
+} from './security/android-manifest.js';
+export {
+  MAX_SECRET_SCAN_BYTES,
+  scanSecrets,
+  type SecretKind,
+  type SecretMatch,
+  type SecretScanOptions,
+  type SecretScanResult,
+} from './security/secret-scanner.js';
+export {
+  MAX_PASSIVE_AUDIT_BYTES,
+  MAX_PASSIVE_AUDIT_FILES,
+  runPassiveSecurityAudit,
+  type PassiveSecurityAuditOptions,
+  type PassiveSecurityAuditResult,
+} from './security/passive-audit.js';
+export {
+  securityOutcome,
+  type SecurityAnalysisResult,
+} from './security/types.js';
+export {
+  renderSuiteReport,
+  writeSuiteReports,
+  type RenderedSuiteReport,
+  type WrittenSuiteReport,
+} from './suite/reporters.js';
+export {
+  MAX_SUITE_FILE_BYTES,
+  loadSuiteDefinition,
+  parseSuiteDefinition,
+  type LoadedSuiteDefinition,
+  type SuiteFileFormat,
+} from './suite/loader.js';
+export { observerSuiteCapabilities } from './suite/capabilities.js';
+export {
+  OBSERVER_SUITE_COMMANDS,
+  createObserverSuiteExecutor,
+  type ObserverSuiteCommand,
+  type ObserverSuiteCommandDescriptor,
+} from './suite/observer-executor.js';
+export {
+  BUILTIN_SUITES,
+  getBuiltinSuite,
+  listBuiltinSuites,
+  type BuiltinSuiteName,
+} from './suite/presets.js';
+export {
+  runSuite,
+  type RunSuiteOptions,
+  type SuiteAuthorization,
+  type SuiteCommandContext,
+  type SuiteCommandExecutor,
+  type SuiteCommandResult,
+  type SuiteRunProgress,
+} from './suite/runner.js';
+export {
+  runObserverSuiteWorkflow,
+  type ObserverSuiteWorkflowResult,
+  type RunObserverSuiteWorkflowOptions,
+} from './suite/workflow.js';
+export * from './accessibility/index.js';
+export * from './resilience/index.js';
+export * from './plugins/index.js';
+export * from './targets/index.js';
+export * from './security/active-scenario.js';
+export * from './security/observer-active-executor.js';
+export * from './security/supply-chain.js';
+export * from './dashboard/index.js';
