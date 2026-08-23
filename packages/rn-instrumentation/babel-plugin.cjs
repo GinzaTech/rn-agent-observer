@@ -5,8 +5,16 @@
 const { createHash } = require('node:crypto');
 const path = require('node:path');
 
+// Normalize both sides to POSIX separators so identity is deterministic
+// across Windows and POSIX hosts (Windows filenames use backslashes).
+const toPosix = (value) => value.replaceAll('\\', '/');
+
+function relativeSourcePath(filename, projectRoot) {
+  return path.posix.relative(toPosix(projectRoot ?? '.'), toPosix(filename));
+}
+
 function generatedTestId(filename, projectRoot, line, column) {
-  const relative = path.relative(projectRoot, filename).replaceAll('\\', '/');
+  const relative = relativeSourcePath(filename, projectRoot);
   const hash = createHash('sha1')
     .update(`${relative}:${line}:${column}`)
     .digest('hex')
@@ -15,7 +23,7 @@ function generatedTestId(filename, projectRoot, line, column) {
 }
 
 function sourceIdentity(filename, projectRoot, line, column) {
-  const relative = path.relative(projectRoot, filename).replaceAll('\\', '/');
+  const relative = relativeSourcePath(filename, projectRoot);
   return `${relative}:${line}:${column}`;
 }
 
