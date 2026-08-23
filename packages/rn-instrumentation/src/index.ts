@@ -34,6 +34,69 @@ const SAFE_BODY_KEYS = new Set([
   'type',
 ]);
 
+/** Current on-device telemetry contract written into every observer log. */
+export const TELEMETRY_VERSION = 1 as const;
+
+/** Hard upper bound for one serialized app-data payload. */
+export const MAX_APP_DATA_PAYLOAD_CHARACTERS = 8192;
+
+/**
+ * React Native defines `__DEV__` at bundle time. Treat a missing flag as
+ * disabled rather than assuming development: this package may accidentally be
+ * imported by a production, SSR, or non-RN bundle and telemetry must fail
+ * closed there.
+ */
+export function isDevelopmentInstrumentationEnabled(): boolean {
+  return (
+    (globalThis as typeof globalThis & { readonly __DEV__?: unknown })
+      .__DEV__ === true
+  );
+}
+
+/**
+ * Conservative keys that are useful for UI/debug state and do not normally
+ * carry identity, credentials, or arbitrary user content. Matching is
+ * case-insensitive. Unknown keys are retained only as redaction markers.
+ */
+export const DEFAULT_SAFE_APP_DATA_KEYS = [
+  'active',
+  'attempt',
+  'attempts',
+  'count',
+  'enabled',
+  'errorCode',
+  'feature',
+  'flag',
+  'flags',
+  'index',
+  'isLoading',
+  'itemCount',
+  'itemsCount',
+  'length',
+  'loading',
+  'mode',
+  'ok',
+  'page',
+  'ready',
+  'route',
+  'rowArrayLength',
+  'screen',
+  'selected',
+  'status',
+  'step',
+  'tick',
+  'type',
+  'version',
+  'visible',
+] as const;
+
+export interface AppDataPrivacyPolicy {
+  /** Keys whose scalar values are safe to emit. Sensitive key names still win. */
+  safeKeys: readonly string[];
+  /** May lower, but never raise, the global 8 KiB serialized payload cap. */
+  maxPayloadCharacters?: number;
+}
+
 export interface InstrumentationConfig {
   enabled: boolean;
   captureNetworkBodies: boolean;
@@ -151,8 +214,13 @@ function requestUrl(input: Parameters<typeof fetch>[0]): string {
       : input.url;
 }
 
-function emit(prefix: string, payload: unknown): void {
-  console.info(`${prefix} ${JSON.stringify(payload)}`);
+function serializeTelemetryPayload(payload: object): string {
+  return JSON.stringify({ ...payload, telemetryVersion: TELEMETRY_VERSION });
+}
+
+function emit(prefix: string, payload: object): void {
+  if (!isDevelopmentInstrumentationEnabled()) return;
+  console.info(`${prefix} ${serializeTelemetryPayload(payload)}`);
 }
 
 function safeUiLabel(value: string | undefined): string | undefined {
@@ -176,7 +244,11 @@ function networkEventId(): string {
 export function installNetworkObserver(
   config = createInstrumentationConfig(true),
 ): () => void {
-  if (!config.enabled || typeof globalThis.fetch !== 'function')
+  if (
+    !isDevelopmentInstrumentationEnabled() ||
+    !config.enabled ||
+    typeof globalThis.fetch !== 'function'
+  )
     return () => {};
   if (config.captureNetworkBodies) {
     console.warn(
@@ -251,6 +323,7 @@ export function installNetworkObserver(
 }
 
 export function reportRoute(route: string): void {
+  if (!isDevelopmentInstrumentationEnabled()) return;
   emit('RN_AGENT_OBSERVER_ROUTE', {
     route,
     timestamp: new Date().toISOString(),
@@ -262,6 +335,7 @@ export function reportRoute(route: string): void {
  * input values. Call on mount/update and once with mounted=false on cleanup.
  */
 export function reportUiElement(element: ObservedUiElement): void {
+  if (!isDevelopmentInstrumentationEnabled()) return;
   emit('RN_AGENT_OBSERVER_UI_ELEMENT', {
     ...element,
     ...(element.label ? { label: safeUiLabel(element.label) } : {}),
@@ -285,6 +359,7 @@ export function observeInteraction<TArgs extends unknown[], TResult>(
   element: ObservedInteraction,
   handler: (...args: TArgs) => TResult,
 ): (...args: TArgs) => TResult {
+  if (!isDevelopmentInstrumentationEnabled()) return handler;
   return (...args: TArgs): TResult => {
     const id = interactionId();
     const started = performance.now();
@@ -349,20 +424,236 @@ export function observeInteraction<TArgs extends unknown[], TResult>(
   };
 }
 
+const APP_DATA_REDACTED = '[REDACTED]';
+const APP_DATA_TOO_LARGE = '[REDACTED_PAYLOAD_TOO_LARGE]';
+const MAX_APP_DATA_DEPTH = 5;
+const MAX_APP_DATA_ARRAY_ITEMS = 50;
+const MAX_APP_DATA_OBJECT_KEYS = 50;
+const MAX_APP_DATA_STRING_CHARACTERS = 160;
+const MIN_APP_DATA_PAYLOAD_CHARACTERS = 512;
+
+interface AppDataRedactionState {
+  redacted: boolean;
+  truncated: boolean;
+}
+
+function isSensitiveAppDataKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return (
+    normalized.includes('password') ||
+    normalized.includes('passcode') ||
+    normalized.includes('secret') ||
+    normalized.includes('token') ||
+    normalized.includes('authorization') ||
+    normalized.includes('credential') ||
+    normalized.includes('cookie') ||
+    normalized.includes('session') ||
+    normalized.includes('privatekey') ||
+    normalized.includes('apikey') ||
+    normalized.includes('email') ||
+    normalized.includes('phone') ||
+    normalized.includes('address') ||
+    normalized.includes('fullname') ||
+    normalized.includes('firstname') ||
+    normalized.includes('lastname') ||
+    normalized.includes('username') ||
+    normalized === 'pin' ||
+    normalized === 'key'
+  );
+}
+
+function redactSafeAppDataText(
+  value: string,
+  state: AppDataRedactionState,
+): string {
+  const redacted = redactUrl(value)
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[REDACTED_EMAIL]')
+    .replace(
+      /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+      APP_DATA_REDACTED,
+    )
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED]');
+  if (redacted !== value) state.redacted = true;
+  if (redacted.length > MAX_APP_DATA_STRING_CHARACTERS) {
+    state.truncated = true;
+  }
+  return redacted.slice(0, MAX_APP_DATA_STRING_CHARACTERS);
+}
+
+function sanitizedAppDataValue(
+  value: unknown,
+  safeKeys: ReadonlySet<string>,
+  state: AppDataRedactionState,
+  seen: Set<object>,
+  depth: number,
+  scalarIsAllowed: boolean,
+): unknown {
+  if (depth > MAX_APP_DATA_DEPTH) {
+    state.redacted = true;
+    state.truncated = true;
+    return APP_DATA_REDACTED;
+  }
+  if (value === null) return scalarIsAllowed ? null : APP_DATA_REDACTED;
+  if (typeof value === 'string') {
+    if (!scalarIsAllowed) {
+      state.redacted = true;
+      return APP_DATA_REDACTED;
+    }
+    return redactSafeAppDataText(value, state);
+  }
+  if (typeof value === 'number') {
+    if (!scalarIsAllowed || !Number.isFinite(value)) {
+      state.redacted = true;
+      return APP_DATA_REDACTED;
+    }
+    return value;
+  }
+  if (typeof value === 'boolean') {
+    if (!scalarIsAllowed) {
+      state.redacted = true;
+      return APP_DATA_REDACTED;
+    }
+    return value;
+  }
+  if (typeof value !== 'object') {
+    state.redacted = true;
+    return APP_DATA_REDACTED;
+  }
+  if (seen.has(value)) {
+    state.redacted = true;
+    state.truncated = true;
+    return APP_DATA_REDACTED;
+  }
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (!scalarIsAllowed) {
+        state.redacted = true;
+        return APP_DATA_REDACTED;
+      }
+      if (value.length > MAX_APP_DATA_ARRAY_ITEMS) state.truncated = true;
+      return value
+        .slice(0, MAX_APP_DATA_ARRAY_ITEMS)
+        .map((item) =>
+          sanitizedAppDataValue(item, safeKeys, state, seen, depth + 1, true),
+        );
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      state.redacted = true;
+      return APP_DATA_REDACTED;
+    }
+    const entries = Object.entries(value);
+    if (entries.length > MAX_APP_DATA_OBJECT_KEYS) state.truncated = true;
+    const output: [string, unknown][] = [];
+    for (const [index, [key, item]] of entries
+      .slice(0, MAX_APP_DATA_OBJECT_KEYS)
+      .entries()) {
+      const safe =
+        safeKeys.has(key.toLowerCase()) && !isSensitiveAppDataKey(key);
+      if (!safe) state.redacted = true;
+      const outputKey = /^[a-zA-Z_][a-zA-Z0-9_.-]{0,63}$/.test(key)
+        ? key
+        : `[REDACTED_FIELD_${index + 1}]`;
+      if (outputKey !== key) {
+        state.redacted = true;
+        if (key.length > 64) state.truncated = true;
+      }
+      output.push([
+        outputKey,
+        safe
+          ? sanitizedAppDataValue(item, safeKeys, state, seen, depth + 1, true)
+          : APP_DATA_REDACTED,
+      ]);
+    }
+    return Object.fromEntries(output);
+  } catch {
+    state.redacted = true;
+    return APP_DATA_REDACTED;
+  } finally {
+    seen.delete(value);
+  }
+}
+
+function appDataPayloadLimit(policy: AppDataPrivacyPolicy | undefined): number {
+  const requested = policy?.maxPayloadCharacters;
+  if (requested === undefined || !Number.isFinite(requested)) {
+    return MAX_APP_DATA_PAYLOAD_CHARACTERS;
+  }
+  return Math.max(
+    MIN_APP_DATA_PAYLOAD_CHARACTERS,
+    Math.min(MAX_APP_DATA_PAYLOAD_CHARACTERS, Math.floor(requested)),
+  );
+}
+
+function safeAppDataNamespace(namespace: string): string {
+  const safe = namespace
+    .trim()
+    .replace(/[^a-zA-Z0-9_.-]/g, '-')
+    .slice(0, 80);
+  return safe || 'unknown';
+}
+
 /**
  * Publishes an app-owned state snapshot (Redux store, navigation state,
- * MMKV storage, feature flags, ...). The observer surfaces the latest
- * snapshot per namespace through the app-data evidence channel.
+ * feature flags, ...). Values are fail-closed: the built-in allowlist keeps a
+ * useful set of operational fields while unknown and sensitive fields are
+ * replaced with redaction markers. Pass an explicit policy to allow other
+ * app-owned fields that are known to be safe. Credentials and common PII key
+ * names cannot be allowlisted.
  */
-export function reportAppData(namespace: string, data: unknown): void {
-  emit('RN_AGENT_OBSERVER_APP_DATA', {
-    namespace,
-    data,
+export function reportAppData(
+  namespace: string,
+  data: unknown,
+  policy?: AppDataPrivacyPolicy,
+): void {
+  if (!isDevelopmentInstrumentationEnabled()) return;
+  const state: AppDataRedactionState = {
+    redacted: false,
+    truncated: false,
+  };
+  const safeKeys = new Set(
+    (policy?.safeKeys ?? DEFAULT_SAFE_APP_DATA_KEYS).map((key) =>
+      key.toLowerCase(),
+    ),
+  );
+  const base = {
+    namespace: safeAppDataNamespace(namespace),
     timestamp: new Date().toISOString(),
+  };
+  let safeData = sanitizedAppDataValue(
+    data,
+    safeKeys,
+    state,
+    new Set(),
+    0,
+    false,
+  );
+  let privacy = {
+    policy: policy
+      ? ('explicit-safe-allowlist' as const)
+      : ('default-safe-allowlist' as const),
+    redacted: state.redacted,
+    truncated: state.truncated,
+  };
+  const limit = appDataPayloadLimit(policy);
+  if (
+    serializeTelemetryPayload({ ...base, data: safeData, privacy }).length >
+    limit
+  ) {
+    safeData = APP_DATA_TOO_LARGE;
+    privacy = { ...privacy, redacted: true, truncated: true };
+  }
+  emit('RN_AGENT_OBSERVER_APP_DATA', {
+    ...base,
+    data: safeData,
+    privacy,
   });
 }
 
 export function reportJsTask(durationMs: number, label = 'anonymous'): void {
+  if (!isDevelopmentInstrumentationEnabled()) return;
   emit('RN_AGENT_OBSERVER_JS_TASK', {
     durationMs,
     label,
@@ -382,6 +673,7 @@ export function reportNetworkRequest(input: {
   responseBodyPreview?: string;
   error?: string;
 }): void {
+  if (!isDevelopmentInstrumentationEnabled()) return;
   emit('RN_AGENT_OBSERVER_NETWORK', {
     id: networkEventId(),
     ...input,
@@ -406,6 +698,9 @@ export function reportNetworkRequest(input: {
 }
 
 export function createRenderTracker(componentName: string) {
+  if (!isDevelopmentInstrumentationEnabled()) {
+    return (): void => undefined;
+  }
   let renderCount = 0;
   let commitCount = 0;
   return (

@@ -54,4 +54,20 @@ describe('interaction Babel instrumentation', () => {
     expect(result?.code).toContain("testId: ready ? 'ready' : 'waiting'");
     expect(result?.code).toContain('elementId: "App.tsx:1:11"');
   });
+
+  it('does not alter a production transform when explicitly disabled', () => {
+    const result = transformSync(
+      `const x = <Pressable onPress={save}>Save</Pressable>;`,
+      {
+        filename: 'C:\\app\\App.tsx',
+        parserOpts: { plugins: ['jsx', 'typescript'] },
+        plugins: [[plugin, { projectRoot: 'C:\\app', enabled: false }]],
+        configFile: false,
+        babelrc: false,
+      },
+    );
+    expect(result?.code).not.toContain('observeInteraction');
+    expect(result?.code).not.toContain('rnobs-');
+    expect(result?.code).toContain('onPress={save}');
+  });
 });

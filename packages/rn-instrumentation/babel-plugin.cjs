@@ -25,10 +25,12 @@ module.exports = function rnAgentObserverBabelPlugin({ types: t }) {
     visitor: {
       Program: {
         enter(programPath, state) {
+          state.rnObserverDisabled = state.opts.enabled === false;
           state.rnObserverWrapped = false;
           state.rnObserverProgram = programPath;
         },
         exit(programPath, state) {
+          if (state.rnObserverDisabled) return;
           if (!state.rnObserverWrapped) return;
           const existing = programPath.node.body.find(
             (node) =>
@@ -66,6 +68,7 @@ module.exports = function rnAgentObserverBabelPlugin({ types: t }) {
         },
       },
       JSXOpeningElement(openingPath, state) {
+        if (state.rnObserverDisabled) return;
         const attributes = openingPath.get('attributes');
         const onPressPath = attributes.find(
           (candidate) =>

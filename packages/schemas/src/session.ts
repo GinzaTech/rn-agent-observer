@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ArtifactSchema } from './artifact.js';
 
 export const SessionSchema = z.object({
+  schemaVersion: z.literal('1.0').optional(),
   id: z.string().min(1),
   projectRoot: z.string().min(1),
   startedAt: z.iso.datetime(),
@@ -12,6 +13,7 @@ export const SessionSchema = z.object({
   timeline: z
     .array(
       z.object({
+        schemaVersion: z.literal('1.0').optional(),
         id: z.number().int().positive(),
         type: z.string().min(1),
         timestamp: z.iso.datetime(),
