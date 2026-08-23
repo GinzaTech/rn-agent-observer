@@ -2,6 +2,39 @@
 
 ## Unreleased — screen understanding cho Codex/agent
 
+### Community và public distribution
+
+- Năm package `schemas`, `core`, `rn-instrumentation`, `cli` và `mcp-server` đã bỏ
+  `private`, thêm metadata npm public/provenance, README riêng và dependency nội bộ
+  vẫn giữ `workspace:*` khi phát triển. Root và demo Expo tiếp tục private.
+- MCP package thêm executable `rn-observer-mcp`; hướng dẫn release chuyển từ bundle
+  bàn giao cố định 2.0.0 sang npm/version-neutral và phân biệt rõ static CI với
+  Android runtime verification trên device.
+- Thêm `pnpm pack:check` để pack/inspect cả năm tarball, CI quality gate
+  Windows/Linux/macOS, workflow publish npm được bảo vệ và Android export ghi rõ
+  không phải device runtime.
+- Thêm CONTRIBUTING, SECURITY, GOVERNANCE, Code of Conduct, issue/RFC/PR templates và
+  Dependabot cho dependency/action updates.
+
+### Security hardening và bounded active testing
+
+- Instrumentation và SecurityLab đều development-only; SecurityLab cần flag build
+  explicit. CI prebuild/inspect cả manifest release-default lẫn opt-in: default không
+  có CAMERA/deep link, opt-in chỉ có filter
+  `rnobs-security-demo://security/lab` hẹp.
+- Deep-link evidence/replay/report redact credential, query và fragment; active
+  permission recovery chỉ relaunch sau khi PID + Android exit-info xác nhận đúng
+  `PERMISSION CHANGE`, rồi quan sát lại bounded.
+- Active action giờ pin exact `target.deviceId`: serial ADB từ env/option khác config
+  bị từ chối trước khi mutation dispatch. Read-only evidence không bị ảnh hưởng.
+- MCP path input chỉ đọc regular file nằm vật lý trong project; baseline output chỉ
+  tạo file mới dưới artifact root, không overwrite. Artifact root/session writer và
+  cleanup chặn traversal, symlink/junction escape; cleanup mặc định tôn trọng
+  `artifacts.retentionDays`.
+- Demo AVD owned đã chạy bounded duplicate-query deep link và CAMERA grant/revoke +
+  cleanup; evidence này chỉ áp dụng fixture/probe đó, không phải pentest hay chứng
+  nhận security cho target khác.
+
 ### Source-correlated runtime UI model
 
 - Thêm CLI `ui-model` và MCP `runtime_ui_model` (tool 45). Core parse `.tsx/.jsx` bằng TypeScript AST để lấy actionable component, explicit/generated testID, conditional/disabled state và `file:line:column`.
@@ -16,7 +49,7 @@
 - `pnpm check` pass lint, Prettier, TypeScript build và **77 tests**; MCP server initialization + Expo Android export có Babel plugin đều pass.
 - Unit/integration test bao phủ TypeScript AST source ownership, generated testID Babel transform, explicit testID preservation, source/native/telemetry correlation, flattened view honesty, sync handler success/error privacy và app-interaction → replay.
 - Static scan trên Vshop đọc được 115 source actions, 22 conditional và chỉ 1 explicit testID; đây là evidence rằng Vshop cần bật plugin hoặc bổ sung testID trước khi agent map source/runtime đáng tin cậy.
-- Runtime/device case của `ui-model` cuối phiên là **NOT VERIFIED**: device `45218ba` mất kết nối và command trả `ADB_COMMAND_FAILED`; session `796d71cf-ed96-4e31-ae4d-8260c4751beb` đã stop, timeline ghi `runtime_ui_capture_failed` thay vì bỏ evidence.
+- Runtime/device verification của `ui-model` đã hoàn tất trên emulator-5554 (Android x86_64, demo app pid 10385, session `aa0d2067-8c0e-4222-b2de-cb3d10acb961`): source-correlation đúng (`App.tsx:527:11` cho `open-PerformanceLab`), 8 app interaction events start/success có duration qua Babel plugin, 18 source actions vs 5 native, issues `source-action-without-testid`/`native-action-without-source` hoạt động, `session stop` ingest + capture model cuối thành công (32 events/13 artifacts, gồm `runtime_ui_model` và `app_interaction`). Case NOT VERIFIED trước đó đã đóng.
 
 ### Agent biết màn hình đang hiển thị gì
 

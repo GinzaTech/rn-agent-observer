@@ -2,7 +2,7 @@
 
 Tài liệu này là **bộ tham chiếu chuẩn (golden test battery)** để test mọi app React Native/Expo bằng RN Agent Observer, đồng thời regression-test chính observer. Mọi phiên làm việc debug/metrics trên app mới đều quy về và ghi nhận theo ID case trong tài liệu này.
 
-- Phiên bản blueprint: **1.4.0** (áp dụng observer 2.4.0, Android + Windows)
+- Phiên bản blueprint: **1.8.0** (áp dụng observer 2.4.0, Android + Windows)
 - App tham chiếu vàng (golden AUT): `apps/demo-expo` (`dev.rnagentobserver.demo`)
 - App ngoài repo tham chiếu chế độ read-only: Vshop (`com.android.vshop`)
 - Thiết bị xác minh gần nhất: `45218ba` — Xiaomi 23013PC75G, Android 15, 1080×2400, 120Hz
@@ -89,18 +89,19 @@ App được test bằng bộ này **nên** đáp ứng các yêu cầu sau đ�
 
 ### 3.1 Yêu cầu với mọi AUT
 
-| #    | Yêu cầu                                                   | Phục vụ        |
-| ---- | --------------------------------------------------------- | -------------- |
-| F-01 | Mọi phần tử tương tác chính có `testID` ổn định, duy nhất | INT, E2E       |
-| F-02 | `app.json` khai báo `expo.android.package`                | APP            |
-| F-03 | Development build (không Expo Go) khi cần instrumentation | INS, NET, REN  |
-| F-04 | Cài `@rn-agent-observer/rn-instrumentation` ở dev build   | INS, NET, REN  |
-| F-05 | Bọc app trong `<Profiler id="App" onRender={tracker}>`    | REN            |
-| F-06 | Gọi `reportRoute(route)` khi đổi màn                      | OBS            |
-| F-07 | Có màn danh sách dài (≥300 dòng) có thể scroll            | SCR, INT, PERF |
-| F-08 | Có nút kích hoạt tác vụ JS tốn thời gian đo được          | PERF, DIA      |
-| F-09 | Có fixture network tĩnh (không phụ thuộc Internet)        | NET            |
-| F-10 | Có fixture visual toggle (BASELINE/REGRESSED)             | VIS            |
+| #    | Yêu cầu                                                   | Phục vụ          |
+| ---- | --------------------------------------------------------- | ---------------- |
+| F-01 | Mọi phần tử tương tác chính có `testID` ổn định, duy nhất | INT, E2E         |
+| F-02 | `app.json` khai báo `expo.android.package`                | APP              |
+| F-03 | Development build (không Expo Go) khi cần instrumentation | INS, NET, REN    |
+| F-04 | Cài `@rn-agent-observer/rn-instrumentation` ở dev build   | INS, NET, REN    |
+| F-05 | Bọc app trong `<Profiler id="App" onRender={tracker}>`    | REN              |
+| F-06 | Gọi `reportRoute(route)` khi đổi màn                      | OBS              |
+| F-07 | Có màn danh sách dài (≥300 dòng) có thể scroll            | SCR, INT, PERF   |
+| F-08 | Có nút kích hoạt tác vụ JS tốn thời gian đo được          | PERF, DIA        |
+| F-09 | Có fixture network tĩnh (không phụ thuộc Internet)        | NET              |
+| F-10 | Có fixture visual toggle (BASELINE/REGRESSED)             | VIS              |
+| F-11 | SecurityLab dev-only, custom URI + CAMERA runtime fixture | SEC-010, INS-009 |
 
 ### 3.2 Snapshot instrumentation chuẩn
 
@@ -125,16 +126,17 @@ return (
 
 ### 3.3 Map testID chuẩn của golden AUT (demo-expo)
 
-| Lab            | testID                                              | Kỳ vọng deterministic                                            |
-| -------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
-| Home           | `open-{LabName}`                                    | Điều hướng 1 bước, route event đổi                               |
-| PerformanceLab | `trigger-js-block`, `last-block`                    | JS block ≈ 100ms (±20%)                                          |
-| NetworkLab     | `network-fast/500/2000/fail/body`, `network-result` | 0/500/2000ms + HTTP 503; token bị redact; body preview bị redact |
-| RenderLab      | `rerender-list`, `render-count`                     | 100 row re-render mỗi lần bấm                                    |
-| AnimationLab   | `animated-box`                                      | Native driver; tôn trọng Reduce Motion                           |
-| ErrorLab       | `console-error/handled-error/unhandled-error`       | 3 loại lỗi vào logcat                                            |
-| VisualLab      | `toggle-regression`, `visual-fixture`               | Toggle đổi màu/dịch chuyển/văn bản                               |
-| Chung          | `back-button`                                       | Về Home                                                          |
+| Lab            | testID                                                                               | Kỳ vọng deterministic                                                        |
+| -------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Home           | `open-{LabName}`                                                                     | Điều hướng 1 bước, route event đổi                                           |
+| PerformanceLab | `trigger-js-block`, `last-block`                                                     | JS block ≈ 100ms (±20%)                                                      |
+| NetworkLab     | `network-fast/500/2000/fail/body`, `network-result`                                  | 0/500/2000ms + HTTP 503; token bị redact; body preview bị redact             |
+| RenderLab      | `rerender-list`, `render-count`                                                      | 100 row re-render mỗi lần bấm                                                |
+| AnimationLab   | `animated-box`                                                                       | Native driver; tôn trọng Reduce Motion                                       |
+| ErrorLab       | `console-error/handled-error/unhandled-error`                                        | 3 loại lỗi vào logcat                                                        |
+| VisualLab      | `toggle-regression`, `visual-fixture`                                                | Toggle đổi màu/dịch chuyển/văn bản                                           |
+| SecurityLab    | `security-lab-screen`, `security-lab-deep-link-status`, `security-lab-camera-status` | Dev-only: malformed URI bị reject không lộ input; CAMERA state quan sát được |
+| Chung          | `back-button`                                                                        | Về Home                                                                      |
 
 ---
 
@@ -164,23 +166,23 @@ Kết quả bring-up ghi vào báo cáo chương 9 mục "Phạm vi".
 | SCR (8)        | 001–004     | tất cả | tất cả | 007         |
 | INT (15)       | 001,004,012 | tất cả | tất cả | 006,013–015 |
 | LOG (8)        | 001–002     | tất cả | tất cả | 007         |
-| PERF (12)      | 001–005     | tất cả | tất cả | 012         |
+| PERF (15)      | 001–005     | tất cả | tất cả | 012         |
 | NET (14)       | 001–003,007 | tất cả | tất cả | 013         |
 | REN (6)        | 001–002     | tất cả | tất cả | —           |
 | ANI (4)        | 001         | tất cả | tất cả | —           |
 | VIS (8)        | 001–002     | tất cả | tất cả | 005         |
-| SES (11)       | 001–004     | tất cả | tất cả | 008         |
+| SES (15)       | 001–004     | tất cả | tất cả | 008         |
 | TRC (7)        | 001–002     | tất cả | tất cả | 004         |
 | DIA (12)       | 001,011     | tất cả | tất cả | —           |
-| OBS (5)        | 001         | tất cả | tất cả | 005         |
-| INS (8)        | —           | tất cả | tất cả | —           |
+| OBS (7)        | 001         | tất cả | tất cả | 005         |
+| INS (9)        | —           | tất cả | tất cả | —           |
 | MCP (8)        | 001         | tất cả | tất cả | 008         |
-| CLI (6)        | 001–003     | tất cả | tất cả | —           |
-| SEC (6)        | 001,005     | tất cả | tất cả | —           |
+| CLI (7)        | 001–003     | tất cả | tất cả | —           |
+| SEC (10)       | 001,005,008 | tất cả | tất cả | —           |
 | STR (7)        | —           | —      | tất cả | tất cả      |
 | E2E (6)        | —           | 001    | tất cả | —           |
 
-Tổng: **~160 case** (tính cả biến thể).
+Tổng: **~170 case** (tính cả biến thể).
 
 ---
 
@@ -925,7 +927,11 @@ Tổng: **~160 case** (tính cả biến thể).
 #### MCP-001 — Handshake + đủ tools (T0)
 
 - **Chạy**: `pnpm mcp:check`; test in-memory (`server.test.ts`) hoặc client thật
-- **PASS**: khởi tạo OK; `listTools` trả đủ 31 tools (2.2.0), tên `verb_noun` chuẩn.
+- **PASS**: khởi tạo OK; `listTools` trả đúng inventory public hiện hành (66 tools
+  cho 2.4.0), tên `verb_noun` chuẩn và khớp bảng trong `docs/protocol.md`.
+- **Mirror 2.4**: security/passive-active, performance experiment/memory, coverage,
+  dashboard/graph và share bundle dùng tool names trong `docs/protocol.md`; plugin
+  manifest/target provider hiện là CLI surface, không được ghi nhầm thành MCP tool.
 
 #### MCP-002 — Input schema Zod (T1)
 
@@ -1334,6 +1340,115 @@ Tổng: **~160 case** (tính cả biến thể).
 
 - **PASS**: device/logcat unavailable lúc stop → timeline có `runtime_ui_capture_failed`, session vẫn complete và không tuyên bố runtime model verified.
 
+### 6.28 Assurance 2.4 — policy, evidence và extension
+
+> Host/unit/CI evidence không nâng thành Android runtime evidence. Mọi case dưới đây
+> thiếu fixture, policy, device, baseline hoặc evidence cần thiết phải là
+> `NOT_VERIFIED`, không phải PASS.
+
+#### SEC-008 — Policy guard fail-closed (T0/T1)
+
+- **Chạy**: `doctor` trên config mặc định, rồi thử suite/active step có risk
+  `app-state`, `device-state` hoặc `persistent-permission` mà không bật allowlist.
+- **PASS**: doctor nêu `read-only`; executor chặn trước mutation bằng authorization
+  denial có cấu trúc hoặc `NOT_VERIFIED` ở suite. Không có ADB action, implicit grant
+  hay tự nâng policy.
+
+#### SEC-009 — Passive security, SBOM và OSV (T1)
+
+- **Chạy**: `security audit --strict`, `security sbom --lockfile pnpm-lock.yaml`,
+  `security dependencies --lockfile pnpm-lock.yaml --strict` trên fixture contained.
+- **PASS**: audit chỉ đọc input bounded; SBOM là CycloneDX từ lockfile; OSV thiếu
+  trang/timeout/cancel là `NOT_VERIFIED`, không được kết luận “không có CVE”. Kết quả
+  static/MASVS-aligned không phải pentest hay certification.
+
+#### SEC-010 — Active security bounded (T2)
+
+- **Tiền điều kiện**: app owned, Android development build, session, policy
+  `authorized-active` với app/risk allowlist hẹp và `target.deviceId` khớp exact
+  serial ADB đang chọn.
+- **Chạy**: deep-link chỉ với 1–6 malformed-query probe đã khai báo; permission chỉ
+  với 1–4 grant/revoke cho runtime permission không có semantics account/credential.
+- **PASS**: evidence baseline/probe/allowed screen/error limit đầy đủ; permission
+  restore original state bằng cleanup riêng. Restore fail là `FAIL`, cleanup/evidence
+  thiếu là `NOT_VERIFIED`; PASS không phải dynamic pentest rộng.
+
+#### SEC-011 — Persistent permission setup (T1)
+
+- **Tiền điều kiện**: exact owned development fixture, `target.deviceId` pin đúng
+  serial, `authorized-active`, risk `persistent-permission`,
+  `allowPersistentPermissionChanges: true` và permission allowlist hẹp.
+- **Chạy**: thử `permissions grant/revoke --perm NAME` không có confirmation, sai
+  permission allowlist, permission không declared, state sau ADB không khớp và call
+  đúng `--confirm-persistent-permission` (tương tự literal confirmation ở MCP/suite).
+- **PASS**: mọi denial xảy ra trước ADB; call được phép chỉ PASS khi runtime state
+  trước/sau được đọc và state cuối đúng. Không auto-restore/relaunch; active bounded
+  permission scenario vẫn dùng `device-state` và cleanup riêng.
+
+#### PERF-014 — Repeated experiment, baseline và cold start (T2)
+
+- **Chạy**: `performance experiment --scenario home-idle --idle --samples 5`; với
+  startup dùng `--startup` và policy `app-state` đã cho phép.
+- **PASS**: report giữ warmup/measurement, median/p95/budget và chỉ compare baseline
+  cùng scenario + target fingerprint. Startup chỉ nhận sample `LaunchState=COLD`;
+  không gọi đó là time-to-interactive/full-display.
+
+#### PERF-015 — Memory-growth là process-PSS signal (T2)
+
+- **Chạy**:
+  `performance memory --scenario feed-loop --replay replay.json --cycles 5 --max-growth-mb <budget>`
+  với policy `app-state` rõ ràng.
+- **PASS**: mỗi cycle có replay + PSS sample; report dùng median đầu/cuối và slope.
+  Growth là regression signal, không phải JS heap hay bằng chứng leak; sample/cancel
+  bất toàn là `NOT_VERIFIED`.
+
+#### SES-014 — Share bundle portable (T1/T2)
+
+- **Chạy**: chỉ sau review session và `artifacts.allowShare: true`, chạy
+  `session share <id> --output shares/review.rnobs`, rồi
+  `bundle verify <path> --sha256 <hash>`.
+- **PASS**: output mới, contained, không overwrite; metadata-first, không binary/
+  timeline/path thô. Text chỉ opt-in + bounded + secret-scan; entry excluded/unknown
+  làm outcome `NOT_VERIFIED`; verifier không extract bundle.
+
+#### OBS-007 — Coverage route/action semantic (T1)
+
+- **Chạy**: `coverage analyze INPUT.json --strict` với target fingerprint, inventory
+  route/action semantic, checkpoint/interaction explicit và threshold.
+- **PASS**: coverage-report đã lược dữ liệu nhạy cảm được persist; route/action `null`, source path,
+  visible text, tọa độ, screenshot/base64 không được suy diễn thành evidence. Thiếu
+  threshold/evidence hoặc fingerprint/inventory merge không compatible là
+  `NOT_VERIFIED`.
+
+#### SES-015 — Evidence graph và dashboard local (T1)
+
+- **Chạy**: `session graph <id>` rồi
+  `dashboard build --limit 20 --output dashboard/latest.html`; chỉ dùng `open` trên
+  loopback khi cần xem local.
+- **PASS**: graph/dashboard artifact tồn tại, aggregate không chứa raw timeline,
+  source/project/artifact path, finding text, secret hay binary; trend thiếu session
+  compatible trả `INSUFFICIENT_DATA`/`NOT_VERIFIED`, không vẽ trend giả.
+
+#### CLI-007 — Plugin manifest và target provider (T1/T2)
+
+- **Chạy**: `plugin check MANIFEST.json`, `target support --manifest MANIFEST.json`,
+  rồi chỉ khi được ủy quyền `target collect` với platform/operation/grant/capability
+  explicit.
+- **PASS**: support inspection không spawn provider; collect kiểm handshake,
+  identity, bounded evidence/payload và process cleanup. Manifest hợp lệ hay trạng
+  thái `extension-ready` không chứng minh iOS/web/Windows built-in runtime hoặc
+  device provider đã PASS.
+
+#### INS-009 — SecurityLab development fixture (T2)
+
+- **Chuẩn bị**: build demo với `RN_OBSERVER_SECURITY_LAB=1`; release/default config
+  phải không có custom scheme, `VIEW` intent filter hoặc CAMERA permission.
+- **Chạy**: mở `open-SecurityLab`; thử canonical URI và malformed query; refresh
+  `security-lab-camera-status` sau permission transition.
+- **PASS**: URI raw/query không hiển thị hay persist; state chỉ là fixed accepted/
+  rejected reason; app không mở camera hay request tự động. Xem
+  `apps/demo-expo/SECURITY_LAB.md`; thiếu owned dev build/device là `NOT_VERIFIED`.
+
 ## 7. Ma trận traceability Lab ↔ Case
 
 | Lab / nguồn    | Case tiêu biểu                                                                                                    |
@@ -1345,6 +1460,7 @@ Tổng: **~160 case** (tính cả biến thể).
 | AnimationLab   | ANI-001..004, PERF-011                                                                                            |
 | ErrorLab       | LOG-005/006, DIA-006/008, E2E-005                                                                                 |
 | VisualLab      | VIS-002..004, E2E-003                                                                                             |
+| SecurityLab    | SEC-010, INS-009                                                                                                  |
 | Unit test repo | parsers, session, compare, network/diagnosis, source/runtime UI, Babel instrumentation, cli, mcp, schemas, redact |
 | Vshop          | NET-001, NET-015, APP-008, SEC-006, E2E-006                                                                       |
 | Metro/CDP      | DTL-001..009, NET-016..019, APP-009                                                                               |
@@ -1383,11 +1499,11 @@ Get-ChildItem -Recurse .artifacts | Select-String 'demo-secret'   # SEC-001 (r�
 
 ### T1 — Thêm vào T0
 
-- Toàn bộ INT, LOG, NET (gồm percentile NET-006), REN, ANI, VIS-002..007, SES-002..010, TRC-001..005, DIA-002..010, OBS-002..004, INS (trong AUT), MCP mirror các case T0, CLI-004..006, SEC-002..004.
+- Toàn bộ INT, LOG, NET (gồm percentile NET-006), REN, ANI, VIS-002..007, SES-002..010, TRC-001..005, DIA-002..010, OBS-002..004/007, INS (trong AUT), MCP mirror các case T0, CLI-004..007, SEC-002..009, SES-014/015.
 
 ### T2 — Thêm vào T1
 
-- STR-001..004, E2E-001..006, NET-010/012, VIS-008, DIA-011/012, PERF đủ, TRC-006, SES-011, INS-008, bring-up đầy đủ nếu app mới.
+- STR-001..004, E2E-001..006, NET-010/012, VIS-008, DIA-011/012, PERF đủ (gồm PERF-014/015), TRC-006, SES-011, INS-008/009, SEC-010, bring-up đầy đủ nếu app mới.
 
 ### T3 — Chọn lọc theo nghi ngờ
 
@@ -1400,7 +1516,7 @@ Get-ChildItem -Recurse .artifacts | Select-String 'demo-secret'   # SEC-001 (r�
 
 ### Phạm vi
 - Tier: <T0/T1/T2/T3>; Bring-up: <BU-x hoàn tất / N/A>
-- Fixture đáp ứng: F-01..F-10 (liệt kê thiếu → case N/A)
+- Fixture đáp ứng: F-01..F-11 (liệt kê thiếu → case N/A)
 
 ### Kết quả
 | Case    | Kết quả | Evidence (artifact path / metric) |
@@ -1433,16 +1549,20 @@ Quy tắc: mỗi dòng FAIL phải kèm hypothesis nguyên nhân và case tái h
 
 - Thêm case: ID mới ở cuối domain (không tái sử dụng ID đã xóa); cập nhật chương 5; note trong mục "Lịch sử" dưới đây.
 - Sửa ngưỡng: chỉ khi có bằng chứng đo lặp lại trên ≥2 device; ghi device vào PR.
-- Khi observer thêm tool/feature mới (VD devtools-export, device-level network): thêm domain mới hoặc case mới + map CLI↔MCP + cập nhật số lượng tools ở MCP-001.
+- Khi observer thêm tool/feature mới: thêm domain/case hoặc reference tương ứng,
+  cập nhật map CLI↔MCP và inventory `docs/protocol.md`; MCP contract test phải bảo
+  vệ exact set thay vì chỉ một ngưỡng số lượng.
 
 ### Lịch sử
 
-| Phiên bản | Ngày       | Thay đổi                                                                                                                                                                                                                                 |
-| --------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.0.0     | 2026-08-21 | Bản đầu (observer 2.0.0)                                                                                                                                                                                                                 |
-| 1.1.0     | 2026-08-21 | Observer 2.1.0: domain DTL (7 case), APP-008/NET-015/NET-016/OBS-006, MCP 27 tools, map CLI↔MCP thêm 3 hàng, fixture `network-body`                                                                                                      |
-| 1.2.0     | 2026-08-22 | Observer 2.2.0: NET-017..019 (metro-network), APP-009 (reload --fast), REC-001..005 (screenrecord), DTL-008/009 (profile/song song), MCP 31 tools, fixture `network-real`                                                                |
-| 1.3.0     | 2026-08-22 | Observer 2.3.0: domain SNP (4), RPL (3), ASM (5) — tổng hợp từ agent-device/Expo MCP/agent-devtools; MCP 41 tools; fixture `dump-state`                                                                                                  |
-| 1.4.0     | 2026-08-22 | Observer 2.4.0: DIA-013 (confidence + thresholds), ENV-008 (CDP queue), PERF-013 (freshness), RPL-004 (auto replay), SES-012/013 (cleanup/warning), SEC-007 (allowlist), ASM-006 (touch-target); known limitations RN 0.86; MCP 43 tools |
-| 1.5.0     | 2026-08-22 | Unreleased: domain UIU (6 case) cho structured screen understanding, loading-stuck persistence, blank/error/empty detection, agent repair loop và text-field privacy; MCP 44 tools                                                       |
-| 1.6.0     | 2026-08-22 | Unreleased: domain UIM (6 case) cho TypeScript AST source ownership, native viewability/canPress, Babel interaction recording, physical replay và capture-failure honesty; MCP 45 tools                                                  |
+| Phiên bản | Ngày       | Thay đổi                                                                                                                                                                                                                                      |
+| --------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0     | 2026-08-21 | Bản đầu (observer 2.0.0)                                                                                                                                                                                                                      |
+| 1.1.0     | 2026-08-21 | Observer 2.1.0: domain DTL (7 case), APP-008/NET-015/NET-016/OBS-006, MCP 27 tools, map CLI↔MCP thêm 3 hàng, fixture `network-body`                                                                                                           |
+| 1.2.0     | 2026-08-22 | Observer 2.2.0: NET-017..019 (metro-network), APP-009 (reload --fast), REC-001..005 (screenrecord), DTL-008/009 (profile/song song), MCP 31 tools, fixture `network-real`                                                                     |
+| 1.3.0     | 2026-08-22 | Observer 2.3.0: domain SNP (4), RPL (3), ASM (5) — tổng hợp từ agent-device/Expo MCP/agent-devtools; MCP 41 tools; fixture `dump-state`                                                                                                       |
+| 1.4.0     | 2026-08-22 | Observer 2.4.0: DIA-013 (confidence + thresholds), ENV-008 (CDP queue), PERF-013 (freshness), RPL-004 (auto replay), SES-012/013 (cleanup/warning), SEC-007 (allowlist), ASM-006 (touch-target); known limitations RN 0.86; MCP 43 tools      |
+| 1.5.0     | 2026-08-22 | Unreleased: domain UIU (6 case) cho structured screen understanding, loading-stuck persistence, blank/error/empty detection, agent repair loop và text-field privacy; MCP 44 tools                                                            |
+| 1.6.0     | 2026-08-22 | Unreleased: domain UIM (6 case) cho TypeScript AST source ownership, native viewability/canPress, Babel interaction recording, physical replay và capture-failure honesty; MCP 45 tools                                                       |
+| 1.7.0     | 2026-08-23 | Observer 2.4 assurance expansion: doctor/config + suite/CI/reporters, passive/active security, SBOM/OSV, repeated performance/memory, dashboard/evidence graph, share bundle, route/action coverage và external target-provider; MCP 66 tools |
+| 1.8.0     | 2026-08-23 | Bổ sung battery evidence-honest cho policy guard, passive/active security, experiment/memory, `.rnobs`, coverage, dashboard/graph, plugin/provider và SecurityLab opt-in; giữ runtime chưa chạy fixture là `NOT_VERIFIED`                     |

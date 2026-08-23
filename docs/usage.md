@@ -51,13 +51,26 @@ pnpm rn-observe device-info
 pnpm rn-observe status
 ```
 
-## 3. Mở và quan sát app
+### Lần đầu: tạo policy read-only
 
 ```powershell
-pnpm rn-observe launch
+pnpm rn-observe doctor
+pnpm rn-observe init --dry-run
+pnpm rn-observe init
+```
+
+Review output `init --dry-run` trước khi tạo `.rn-observer.json`. Policy mặc định là
+read-only; chỉ dùng `launch`, UI gesture, replay, deep link, permission, trace hoặc
+recording sau khi owner đã cấu hình `authorized-active` hẹp cho đúng development
+fixture ở mục 6h.
+
+## 3. Quan sát app đang chạy
+
+```powershell
 pnpm rn-observe observe
 ```
 
+Khởi động app owned/development fixture theo cách bình thường trước lệnh này.
 `observe` mặc định thu một snapshot gọn gồm screenshot artifact, số phần tử UI, route nếu có instrumentation, performance, network summary và lỗi gần đây. Ảnh nằm ở `<app>/.artifacts/sessions/standalone/screenshots` nếu chưa mở session.
 
 Thu riêng evidence đầy đủ:
@@ -131,6 +144,9 @@ Session capture đọc log từ `startedAt` với cửa sổ tối đa 20.000 d�
 TestID explicit vẫn được khuyến nghị vì source-hash thay đổi khi dòng code dịch chuyển. App không cài instrumentation vẫn có static source catalog + native tree, nhưng physical tap bên trong app không thể được gán chắc chắn về handler React.
 
 ## 4. Điều khiển UI
+
+Các lệnh ở mục này cần policy `authorized-active` hẹp cho đúng app owned/development
+fixture; read-only default sẽ trả `ACTION_NOT_AUTHORIZED`.
 
 Ưu tiên semantic target từ `ui-tree`:
 
@@ -319,7 +335,7 @@ Ví dụ script:
 ```powershell
 pnpm rn-observe deep-link --uri 'demo://detail/42'
 pnpm rn-observe permissions
-pnpm rn-observe permissions grant --perm android.permission.CAMERA
+pnpm rn-observe permissions grant --perm android.permission.CAMERA --confirm-persistent-permission
 pnpm rn-observe a11y-audit          # interactive element thiếu label/testID
 pnpm rn-observe app-data            # snapshot state mới nhất theo namespace
 pnpm rn-observe routes              # sitemap expo-router từ app/ của app đích
@@ -332,6 +348,105 @@ import { reportAppData } from '@rn-agent-observer/rn-instrumentation';
 reportAppData('redux-store', { cart: { items: 2 } });
 reportAppData('navigation', { route: 'Cart' });
 ```
+
+## 6h. Assurance, active-policy và evidence share (2.4.0)
+
+`init` tạo policy **read-only**. Sau khi policy guard được áp dụng, mọi lệnh làm
+thay đổi app/device (launch/reload, UI gesture, replay, deep link, permission,
+trace/recording) đều trả `ACTION_NOT_AUTHORIZED` cho tới khi owner chủ động cho phép
+đúng development fixture. Các lệnh quan sát như `doctor`, `observe`, screenshot,
+UI tree, logs và passive audit vẫn đọc được.
+
+Chỉ khi app thuộc quyền kiểm thử, pin đúng serial ADB trong `target.deviceId` rồi sửa
+phần `security` trong `<project-root>/.rn-observer.json` theo allowlist hẹp này:
+
+```json
+{
+  "target": {
+    "deviceId": "emulator-5554"
+  },
+  "security": {
+    "mode": "authorized-active",
+    "allowedActions": ["read", "app-state", "device-state"],
+    "allowedAppIds": ["dev.rnagentobserver.demo"],
+    "allowNetworkInterception": false,
+    "allowSensitiveBodyCapture": false
+  }
+}
+```
+
+Thay `emulator-5554` bằng đúng serial từ `adb devices -l`. Mọi action khác `read`
+fail-closed nếu serial CLI/env đang chọn thiếu hoặc khác `target.deviceId`.
+Không thêm app của người khác vào allowlist. `network-interception` và network body
+capture không tự được bật bởi config này. Chúng vẫn cần opt-in riêng, development
+fixture và review security. Chi tiết policy, bound và cleanup nằm trong
+[security-testing.md](security-testing.md).
+
+Passive security/supply-chain và quality suite có thể chạy không cần mutation:
+
+```powershell
+pnpm rn-observe security audit --strict
+pnpm rn-observe security sbom --lockfile pnpm-lock.yaml
+pnpm rn-observe security dependencies --lockfile pnpm-lock.yaml --strict
+pnpm rn-observe suite run security --reporter json,html,junit,sarif,github --strict
+pnpm rn-observe ci --suite smoke,security
+```
+
+Active security chỉ dùng với fixture owned đã bật policy. Caller phải khai báo mọi
+probe, expected screen state và error limit; ví dụ deep-link/permission đầy đủ nằm
+ở [security-testing.md](security-testing.md#bounded-active-security-scenarios). Kết
+quả `PASS` của scenario bounded không phải penetration-test hoặc chứng nhận security.
+
+`permissions grant|revoke` không chạy active-security scenario và không tự cleanup.
+Muốn để permission thay đổi sau lệnh, thêm riêng `persistent-permission`, switch và
+allowlist chính xác vào policy; `device-state` một mình không đủ:
+
+```json
+{
+  "security": {
+    "mode": "authorized-active",
+    "allowedActions": ["read", "persistent-permission"],
+    "allowedAppIds": ["dev.rnagentobserver.demo"],
+    "allowPersistentPermissionChanges": true,
+    "allowedPersistentPermissions": ["android.permission.CAMERA"],
+    "allowNetworkInterception": false,
+    "allowSensitiveBodyCapture": false
+  }
+}
+```
+
+Mỗi CLI invocation vẫn phải có `--confirm-persistent-permission`; core kiểm tra
+permission đã là runtime permission của đúng app trước mutation và state đúng sau
+mutation. Nó không tự restore/relaunch, nên chỉ dùng khi owner thật sự muốn state đó
+persist trên exact device đã pin.
+
+Lặp performance, dashboard local và coverage semantic:
+
+```powershell
+pnpm rn-observe performance experiment --scenario home-idle --idle --samples 5
+pnpm rn-observe performance experiment --scenario cold-start --startup --samples 5
+pnpm rn-observe performance memory --scenario feed-loop --replay .\scripts\feed-loop.json --cycles 10 --max-growth-mb 16
+pnpm rn-observe dashboard build --limit 20 --output dashboard\latest.html
+pnpm rn-observe open --limit 20
+pnpm rn-observe coverage analyze .\coverage\route-action.json --strict
+```
+
+Coverage input chỉ chứa inventory semantic, checkpoint/interaction explicit và target
+fingerprint; không đưa source path, screenshot/base64 hay raw telemetry vào file.
+Dashboard chỉ serve trên loopback, đã loại payload/path/secret nhưng vẫn nên giữ local
+trừ khi policy dự án cho phép chia sẻ.
+
+Để share session đã review, trước hết đặt `artifacts.allowShare: true` cho đúng
+project, rồi dùng `path`/`sha256` từ JSON output thay vì đoán path relative:
+
+```powershell
+$bundle = pnpm rn-observe session share $env:RN_OBSERVER_SESSION_ID --output shares/review.rnobs | ConvertFrom-Json
+pnpm rn-observe bundle verify $bundle.path --sha256 $bundle.sha256
+```
+
+Bundle mặc định metadata-first; binary không embed, text là opt-in và secret-scanned.
+Xem [plugin-development.md](plugin-development.md) trước khi dùng external target
+provider: iOS/web/Windows hiện chỉ extension-ready, chưa phải built-in runtime.
 
 ## 7. So sánh before/after
 
@@ -399,6 +514,12 @@ Các semantic ID chính:
 | AnimationLab   | `animated-box`                                                                                | Animation fixture, tôn trọng Reduce Motion                                                        |
 | ErrorLab       | `console-error`, `handled-error`, `unhandled-error`                                           | Log/error collection                                                                              |
 | VisualLab      | `toggle-regression`                                                                           | Pixel + UI structural diff                                                                        |
+| SecurityLab    | `security-lab-screen`, `security-lab-deep-link-status`, `security-lab-camera-status`          | Chỉ development fixture: deep-link malformed bị reject không lộ input; state CAMERA có thể kiểm   |
+
+SecurityLab không có trong release config. Xem
+[SECURITY_LAB.md](../apps/demo-expo/SECURITY_LAB.md) để build fixture với
+`RN_OBSERVER_SECURITY_LAB=1`, dùng mẫu active-policy hẹp và chạy bounded scenario
+trên đúng app/device owned. Không dùng lab này để test app không được ủy quyền.
 
 Luồng dogfood ngắn:
 
