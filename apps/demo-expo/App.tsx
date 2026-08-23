@@ -11,6 +11,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import {
   Profiler,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -21,12 +22,19 @@ import {
   AccessibilityInfo,
   Animated,
   FlatList,
+  Linking,
+  PermissionsAndroid,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {
+  inspectSecurityLabDeepLink,
+  type SecurityLabDeepLinkResult,
+} from './security-lab';
 
 type Route =
   | 'Home'
@@ -35,7 +43,13 @@ type Route =
   | 'RenderLab'
   | 'AnimationLab'
   | 'ErrorLab'
-  | 'VisualLab';
+  | 'VisualLab'
+  | 'SecurityLab';
+
+const SECURITY_LAB_ENABLED = typeof __DEV__ !== 'undefined' && __DEV__;
+const DEVELOPMENT_ROUTES: readonly Route[] = SECURITY_LAB_ENABLED
+  ? ['SecurityLab']
+  : [];
 
 const ROUTES: Route[] = [
   'PerformanceLab',
@@ -44,6 +58,7 @@ const ROUTES: Route[] = [
   'AnimationLab',
   'ErrorLab',
   'VisualLab',
+  ...DEVELOPMENT_ROUTES,
 ];
 
 function Button({
@@ -362,12 +377,142 @@ function VisualLab({ onBack }: { onBack: () => void }) {
   );
 }
 
+type CameraPermissionState =
+  'checking' | 'granted' | 'denied' | 'unavailable' | 'error';
+
+function SecurityLab({
+  onBack,
+  deepLink,
+}: {
+  onBack: () => void;
+  deepLink: SecurityLabDeepLinkResult;
+}) {
+  const [cameraPermission, setCameraPermission] =
+    useState<CameraPermissionState>('checking');
+
+  const refreshCameraPermission = useCallback(async () => {
+    if (Platform.OS !== 'android') {
+      setCameraPermission('unavailable');
+      return;
+    }
+    setCameraPermission('checking');
+    try {
+      const granted = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+      );
+      setCameraPermission(granted ? 'granted' : 'denied');
+    } catch {
+      setCameraPermission('error');
+    }
+  }, []);
+
+  const requestCameraPermission = useCallback(async () => {
+    if (Platform.OS !== 'android') {
+      setCameraPermission('unavailable');
+      return;
+    }
+    setCameraPermission('checking');
+    try {
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'SecurityLab camera permission',
+          message:
+            'Development fixture only. SecurityLab never opens a camera.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Deny',
+        },
+      );
+      setCameraPermission(
+        result === PermissionsAndroid.RESULTS.GRANTED ? 'granted' : 'denied',
+      );
+    } catch {
+      setCameraPermission('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCameraPermission();
+  }, [refreshCameraPermission]);
+
+  useEffect(() => {
+    reportAppData('security-lab', {
+      route: 'SecurityLab',
+      feature: 'deep-link',
+      status: deepLink.status,
+    });
+  }, [deepLink.status]);
+
+  useEffect(() => {
+    reportAppData('security-lab', {
+      route: 'SecurityLab',
+      feature: 'camera-permission',
+      status: cameraPermission,
+    });
+  }, [cameraPermission]);
+
+  return (
+    <Screen title="SecurityLab" onBack={onBack}>
+      <View testID="security-lab-screen" style={styles.securityLab}>
+        <Text testID="security-lab-deep-link-status" style={styles.fixtureText}>
+          Deep link: {deepLink.status.toUpperCase()}
+        </Text>
+        <Text testID="security-lab-deep-link-reason" style={styles.row}>
+          Reason: {deepLink.reason}
+        </Text>
+        <Text testID="security-lab-camera-status" style={styles.fixtureText}>
+          Camera permission: {cameraPermission}
+        </Text>
+        <Text style={styles.subtitle}>
+          Development fixture only. No URL input is shown and no camera is
+          opened.
+        </Text>
+        <Button
+          label="Refresh camera permission"
+          testID="security-lab-camera-refresh"
+          onPress={() => void refreshCameraPermission()}
+        />
+        <Button
+          label="Request camera permission"
+          testID="security-lab-camera-request"
+          onPress={() => void requestCameraPermission()}
+        />
+      </View>
+    </Screen>
+  );
+}
+
 export default function App() {
   const [route, setRoute] = useState<Route>('Home');
+  const [securityDeepLink, setSecurityDeepLink] =
+    useState<SecurityLabDeepLinkResult>(() => inspectSecurityLabDeepLink(null));
   const onRender = useMemo(() => createRenderTracker('DemoApp'), []);
+
+  const handleSecurityLabLink = useCallback((url: string | null) => {
+    const result = inspectSecurityLabDeepLink(url);
+    if (!result.handled) return;
+    setSecurityDeepLink(result);
+    setRoute('SecurityLab');
+  }, []);
 
   useEffect(() => installNetworkObserver(), []);
   useEffect(() => reportRoute(route), [route]);
+  useEffect(() => {
+    if (!SECURITY_LAB_ENABLED) return;
+    let active = true;
+    void Linking.getInitialURL()
+      .then((url) => {
+        if (active) handleSecurityLabLink(url);
+      })
+      .catch(() => undefined);
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleSecurityLabLink(url);
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, [handleSecurityLabLink]);
 
   const content =
     route === 'Home' ? (
@@ -397,8 +542,13 @@ export default function App() {
       <AnimationLab onBack={() => setRoute('Home')} />
     ) : route === 'ErrorLab' ? (
       <ErrorLab onBack={() => setRoute('Home')} />
-    ) : (
+    ) : route === 'VisualLab' ? (
       <VisualLab onBack={() => setRoute('Home')} />
+    ) : (
+      <SecurityLab
+        onBack={() => setRoute('Home')}
+        deepLink={securityDeepLink}
+      />
     );
 
   return (
@@ -417,6 +567,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   title: { color: '#f8fafc', fontSize: 28, fontWeight: '700', flexShrink: 1 },
   subtitle: { color: '#94a3b8', fontSize: 16, marginBottom: 12 },
+  securityLab: { gap: 12 },
   button: {
     backgroundColor: '#2563eb',
     paddingHorizontal: 18,

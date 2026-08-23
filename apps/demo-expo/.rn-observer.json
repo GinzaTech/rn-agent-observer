@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/GinzaTech/rn-agent-observer/main/schemas/rn-observer.schema.json",
+  "schemaVersion": 1,
+  "target": {
+    "platform": "android",
+    "mode": "enhanced",
+    "appId": "dev.rnagentobserver.demo",
+    "deviceId": "emulator-5554",
+    "metroUrl": "http://127.0.0.1:8081"
+  },
+  "packs": ["smoke"],
+  "budgets": {},
+  "artifacts": {
+    "root": ".artifacts",
+    "retentionDays": 14,
+    "classification": "sensitive",
+    "hash": true,
+    "allowShare": false
+  },
+  "security": {
+    "mode": "authorized-active",
+    "allowedActions": ["read", "app-state", "device-state"],
+    "allowedAppIds": ["dev.rnagentobserver.demo"],
+    "allowNetworkInterception": false,
+    "allowSensitiveBodyCapture": false,
+    "allowPersistentPermissionChanges": false,
+    "allowedPersistentPermissions": []
+  }
+}
