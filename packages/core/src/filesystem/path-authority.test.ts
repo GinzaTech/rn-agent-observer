@@ -49,10 +49,11 @@ const temporaryDirectory = (): string => {
 };
 
 /**
- * On Windows CI the temp directory may use 8.3 short names (RUNNER~1) while
- * fs.realpath resolves to the long name (runneradmin). Compare real paths.
+ * On Windows CI the temp directory uses 8.3 short names (RUNNER~1) while
+ * production code canonicalizes to the long name (runneradmin). Only
+ * realpathSync.native expands 8.3 components, so compare native paths.
  */
-const realPath = (value: string): string => realpathSync(value);
+const realPath = (value: string): string => realpathSync.native(value);
 
 afterEach(() => {
   for (const root of roots.splice(0)) {

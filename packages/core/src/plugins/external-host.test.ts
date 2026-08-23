@@ -6,6 +6,8 @@ import {
   realpathSync,
   rmSync,
 } from 'node:fs';
+/** realpathSync.native expands Windows 8.3 short names; plain realpath does not. */
+const realPath = (value: string): string => realpathSync.native(value);
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -158,7 +160,7 @@ describe('external plugin process host', () => {
     const contained = join(root, 'plugins', 'fixture');
     mkdirSync(contained, { recursive: true });
     expect(resolveContainedPluginCwd(root, 'plugins/fixture')).toBe(
-      realpathSync(contained),
+      realPath(contained),
     );
 
     const outside = temporaryProject();
@@ -186,7 +188,7 @@ describe('external plugin process host', () => {
     const second = await host.executeAction({ mode: 'echo', value: 2 });
     expect(first).toMatchObject({
       requestId: 3,
-      cwd: realpathSync(root),
+      cwd: realPath(root),
       environment: { allowed: 'visible', secret: null },
       params: { value: 1 },
     });
