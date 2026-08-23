@@ -1,0 +1,60 @@
+name: Design RFC
+description: Propose a material contract, architecture, platform, security, or governance change
+title: '[RFC]: '
+labels:
+  - rfc
+body:
+  - type: markdown
+    attributes:
+      value: Read `GOVERNANCE.md` before proposing a material design change.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and context
+    validations:
+      required: true
+
+  - type: textarea
+    id: goals
+    attributes:
+      label: Goals and non-goals
+    validations:
+      required: true
+
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed contract and architecture
+      description: Include data flow, versioning, availability semantics, and dependency boundaries.
+    validations:
+      required: true
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Privacy and security analysis
+    validations:
+      required: true
+
+  - type: textarea
+    id: migration
+    attributes:
+      label: Compatibility and migration
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: Define evidence that would prove the design works, including device/runtime coverage where needed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and unresolved questions
+    validations:
+      required: true

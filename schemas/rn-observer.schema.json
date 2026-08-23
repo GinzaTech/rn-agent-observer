@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/GinzaTech/rn-agent-observer/main/schemas/rn-observer.schema.json",
+  "title": "RN Agent Observer project configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "target",
+    "packs",
+    "budgets",
+    "artifacts",
+    "security"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "mode", "metroUrl"],
+      "properties": {
+        "platform": {
+          "const": "android"
+        },
+        "mode": {
+          "enum": ["zero-instrumentation", "enhanced"]
+        },
+        "appId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deviceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metroUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        }
+      }
+    },
+    "packs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "smoke",
+          "visual",
+          "performance",
+          "network",
+          "accessibility",
+          "security",
+          "resilience"
+        ]
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uiFpsMin": { "$ref": "#/$defs/positiveNumber" },
+        "jsBlockingMaxMs": { "$ref": "#/$defs/positiveNumber" },
+        "networkP95MaxMs": { "$ref": "#/$defs/positiveNumber" },
+        "memoryGrowthMaxMb": { "$ref": "#/$defs/positiveNumber" },
+        "coldStartMaxMs": { "$ref": "#/$defs/positiveNumber" },
+        "bundleMaxBytes": { "$ref": "#/$defs/positiveNumber" }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "retentionDays",
+        "classification",
+        "hash",
+        "allowShare"
+      ],
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A path that must resolve within the project root."
+        },
+        "retentionDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3650
+        },
+        "classification": {
+          "enum": ["sensitive", "internal"]
+        },
+        "hash": {
+          "const": true,
+          "description": "Integrity hashing is mandatory in schema version 1."
+        },
+        "allowShare": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "allowedActions",
+        "allowedAppIds",
+        "allowNetworkInterception",
+        "allowSensitiveBodyCapture"
+      ],
+      "properties": {
+        "mode": {
+          "enum": ["read-only", "authorized-active"]
+        },
+        "allowedActions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "read",
+              "app-state",
+              "device-state",
+              "persistent-permission",
+              "network-interception"
+            ]
+          }
+        },
+        "allowedAppIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allowNetworkInterception": {
+          "type": "boolean"
+        },
+        "allowSensitiveBodyCapture": {
+          "type": "boolean"
+        },
+        "allowPersistentPermissionChanges": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enables intentionally persistent Android runtime permission grant/revoke only with an exact allowlist."
+        },
+        "allowedPersistentPermissions": {
+          "type": "array",
+          "uniqueItems": true,
+          "default": [],
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Exact Android runtime permission names allowed for persistent changes."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "mode": { "const": "read-only" } },
+            "required": ["mode"]
+          },
+          "then": {
+            "properties": {
+              "allowedActions": {
+                "type": "array",
+                "items": { "const": "read" }
+              },
+              "allowNetworkInterception": { "const": false },
+              "allowSensitiveBodyCapture": { "const": false },
+              "allowPersistentPermissionChanges": { "const": false },
+              "allowedPersistentPermissions": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "mode": { "const": "authorized-active" } },
+            "required": ["mode"]
+          },
+          "then": {
+            "properties": {
+              "allowedAppIds": { "minItems": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "allowPersistentPermissionChanges": { "const": true }
+            },
+            "required": ["allowPersistentPermissionChanges"]
+          },
+          "then": {
+            "required": ["allowedPersistentPermissions"],
+            "properties": {
+              "allowedActions": {
+                "contains": { "const": "persistent-permission" }
+              },
+              "allowedPersistentPermissions": { "minItems": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "allowPersistentPermissionChanges": { "const": false }
+            },
+            "required": ["allowPersistentPermissionChanges"]
+          },
+          "then": {
+            "properties": {
+              "allowedPersistentPermissions": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "allowNetworkInterception": { "const": true }
+            },
+            "required": ["allowNetworkInterception"]
+          },
+          "then": {
+            "properties": {
+              "allowedActions": {
+                "contains": { "const": "network-interception" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "positiveNumber": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  }
+}

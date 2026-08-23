@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a reproducible defect in RN Agent Observer
+title: '[Bug]: '
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Never attach credentials, personal data,
+        production network bodies, or an unreviewed `.artifacts` directory.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - CLI
+        - MCP server
+        - Core evidence/runtime
+        - Schemas or public contract
+        - React Native instrumentation
+        - Demo fixture
+        - Packaging, release, or documentation
+        - Unsure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Observer version or commit
+      description: Use `rn-observe --version` for a release installation.
+      placeholder: 2.x.y or commit SHA
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include host OS, Node.js, pnpm, adb, Android, device/emulator, React Native, and Expo versions when relevant.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide deterministic steps, a small public fixture, or a failing test. State whether instrumentation and an evidence session were active.
+      placeholder: |
+        1. Set ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the exact structured error, availability state, or scoped metric instead of only a summary.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Paste only the smallest redacted log/output needed. Link a safe reproduction repository rather than uploading an entire artifact store.
+
+  - type: checkboxes
+    id: verification
+    attributes:
+      label: Verification scope
+      options:
+        - label: I checked for an existing issue and read the troubleshooting guide.
+          required: true
+        - label: I removed secrets, personal data, account data, and production payloads.
+          required: true
+        - label: I identified which claims are device-verified and which are `NOT VERIFIED` or not applicable.
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        For a security vulnerability, stop here and use the
+        [private security reporting flow](https://github.com/GinzaTech/rn-agent-observer/security/advisories/new).

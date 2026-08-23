@@ -7,6 +7,8 @@ node_modules/
 # ---- Build outputs ----
 dist/
 coverage/
+!packages/core/src/coverage/
+!packages/core/src/coverage/**
 *.tsbuildinfo
 
 # ---- Observer runtime artifacts (root + any workspace app) ----

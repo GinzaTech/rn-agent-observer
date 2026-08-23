@@ -1,8 +1,25 @@
 {
   "name": "@rn-agent-observer/cli",
   "version": "2.4.0",
-  "private": true,
+  "description": "Command-line interface for evidence-based React Native and Expo runtime observation.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GinzaTech/rn-agent-observer.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/GinzaTech/rn-agent-observer/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/GinzaTech/rn-agent-observer/issues"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "android",
+    "observability",
+    "testing",
+    "cli"
+  ],
   "type": "module",
   "bin": {
     "rn-observe": "./dist/index.js"
@@ -15,6 +32,11 @@
     "!dist/**/*.test.js",
     "!dist/**/*.test.d.ts"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": ">=22.12.0"
   },

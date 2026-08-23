@@ -1,8 +1,25 @@
 {
   "name": "@rn-agent-observer/rn-instrumentation",
   "version": "2.4.0",
-  "private": true,
+  "description": "Development-only React Native telemetry and interaction instrumentation for RN Agent Observer.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GinzaTech/rn-agent-observer.git",
+    "directory": "packages/rn-instrumentation"
+  },
+  "homepage": "https://github.com/GinzaTech/rn-agent-observer/tree/main/packages/rn-instrumentation#readme",
+  "bugs": {
+    "url": "https://github.com/GinzaTech/rn-agent-observer/issues"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "instrumentation",
+    "observability",
+    "telemetry",
+    "babel-plugin"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,6 +34,11 @@
     "!dist/**/*.test.js",
     "!dist/**/*.test.d.ts"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": ">=22.12.0"
   },
@@ -26,5 +48,8 @@
   },
   "devDependencies": {
     "@babel/core": "^7.0.0"
+  },
+  "peerDependencies": {
+    "@babel/core": ">=7"
   }
 }

@@ -1,9 +1,29 @@
 {
   "name": "@rn-agent-observer/mcp-server",
   "version": "2.4.0",
-  "private": true,
+  "description": "MCP stdio server exposing RN Agent Observer evidence and Android workflows to AI agents.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GinzaTech/rn-agent-observer.git",
+    "directory": "packages/mcp-server"
+  },
+  "homepage": "https://github.com/GinzaTech/rn-agent-observer/tree/main/packages/mcp-server#readme",
+  "bugs": {
+    "url": "https://github.com/GinzaTech/rn-agent-observer/issues"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "android",
+    "observability",
+    "mcp",
+    "ai-agent"
+  ],
   "type": "module",
+  "bin": {
+    "rn-observer-mcp": "./dist/server.js"
+  },
   "main": "./dist/server.js",
   "types": "./dist/server.d.ts",
   "files": [
@@ -12,6 +32,11 @@
     "!dist/**/*.test.js",
     "!dist/**/*.test.d.ts"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": ">=22.12.0"
   },

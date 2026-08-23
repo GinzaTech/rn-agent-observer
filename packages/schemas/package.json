@@ -1,8 +1,24 @@
 {
   "name": "@rn-agent-observer/schemas",
   "version": "2.4.0",
-  "private": true,
+  "description": "Shared Zod schemas and TypeScript contracts for RN Agent Observer.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GinzaTech/rn-agent-observer.git",
+    "directory": "packages/schemas"
+  },
+  "homepage": "https://github.com/GinzaTech/rn-agent-observer/tree/main/packages/schemas#readme",
+  "bugs": {
+    "url": "https://github.com/GinzaTech/rn-agent-observer/issues"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "zod",
+    "observability",
+    "testing"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,6 +29,11 @@
     "!dist/**/*.test.js",
     "!dist/**/*.test.d.ts"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
   "engines": {
     "node": ">=22.12.0"
   },

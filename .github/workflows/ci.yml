@@ -6,10 +6,22 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
-    name: Lint, format, build, test
-    runs-on: windows-latest
+    name: Quality gate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -25,12 +37,38 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Quality gate (lint + format + build + test)
+      - name: Quality gate (lint, format, build, unit tests)
         run: pnpm check
 
+  package-smoke:
+    name: Public package tarball smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.6.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build publishable entrypoints
+        run: pnpm build
+
+      - name: Pack and inspect all public packages
+        run: pnpm pack:check
+
   mcp:
-    name: MCP server health check
+    name: MCP server initialization (no device)
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -49,12 +87,13 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: MCP check
+      - name: Initialize MCP server
         run: pnpm mcp:check
 
   android-export:
-    name: Demo app Android export
+    name: Demo Android bundle export (no device runtime)
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -73,7 +112,21 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Expo export (Android bundle)
+      - name: Generate and inspect the default Android manifest
+        shell: pwsh
+        run: |
+          Remove-Item Env:RN_OBSERVER_SECURITY_LAB -ErrorAction SilentlyContinue
+          pnpm --filter @rn-agent-observer/demo-expo exec expo prebuild --no-install
+          node scripts/check-demo-security-manifest.mjs default
+
+      - name: Generate and inspect the SecurityLab opt-in manifest
+        shell: pwsh
+        run: |
+          $env:RN_OBSERVER_SECURITY_LAB = '1'
+          pnpm --filter @rn-agent-observer/demo-expo exec expo prebuild --no-install
+          node scripts/check-demo-security-manifest.mjs opt-in
+
+      - name: Export Android JavaScript bundle only
         run: pnpm --filter @rn-agent-observer/demo-expo exec expo export --platform android --output-dir export-android
         env:
           CI: true

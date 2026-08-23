@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/GinzaTech/rn-agent-observer/security/advisories/new
+    about: Report vulnerabilities privately; never disclose them in a public issue.
+  - name: Troubleshooting guide
+    url: https://github.com/GinzaTech/rn-agent-observer/blob/main/docs/troubleshooting.md
+    about: Check common setup, ADB, Metro, instrumentation, and MCP failures first.

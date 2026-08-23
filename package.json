@@ -2,7 +2,16 @@
   "name": "rn-agent-observer",
   "version": "2.4.0",
   "private": true,
+  "description": "Evidence-based local runtime observability for React Native and Expo agents.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GinzaTech/rn-agent-observer.git"
+  },
+  "homepage": "https://github.com/GinzaTech/rn-agent-observer#readme",
+  "bugs": {
+    "url": "https://github.com/GinzaTech/rn-agent-observer/issues"
+  },
   "type": "module",
   "packageManager": "pnpm@9.6.0",
   "engines": {
@@ -18,7 +27,8 @@
     "rn-observe": "node packages/cli/dist/index.js",
     "mcp:check": "node packages/mcp-server/dist/server.js --check",
     "mcp:start": "node packages/mcp-server/dist/server.js",
-    "release:check": "pnpm check && pnpm mcp:check && pnpm rn-observe --version"
+    "pack:check": "node scripts/check-release-packages.mjs",
+    "release:check": "pnpm check && pnpm mcp:check && pnpm rn-observe --version && pnpm pack:check"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
