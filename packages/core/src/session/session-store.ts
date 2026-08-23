@@ -4,6 +4,10 @@ import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
 import type { Artifact, Session } from '@rn-agent-observer/schemas';
 import { ObserverError } from '../errors.js';
+import {
+  isDeepLinkSessionEventType,
+  redactDeepLinkEventData,
+} from '../privacy/deep-link.js';
 
 interface SessionRow {
   id: string;
@@ -26,6 +30,22 @@ interface ArtifactRow {
   path: string;
   mime_type: string | null;
   created_at: string;
+}
+
+interface ArtifactLookupRow extends ArtifactRow {
+  session_id: string | null;
+}
+
+export interface SessionListEntry {
+  id: string;
+  projectRoot: string;
+  startedAt: string;
+  stoppedAt?: string;
+  status: Session['status'];
+}
+
+export interface StoredArtifact extends Artifact {
+  sessionId?: string;
 }
 
 export class SessionStore {
@@ -60,10 +80,12 @@ export class SessionStore {
         created_at TEXT NOT NULL
       );
     `);
+    this.redactPersistedDeepLinkEvents();
   }
 
   start(projectRoot: string): Session {
     const session: Session = {
+      schemaVersion: '1.0',
       id: randomUUID(),
       projectRoot,
       startedAt: new Date().toISOString(),
@@ -99,11 +121,19 @@ export class SessionStore {
   }
 
   event(sessionId: string, type: string, data: unknown): void {
+    const persistedData = isDeepLinkSessionEventType(type)
+      ? redactDeepLinkEventData(data)
+      : data;
     this.database
       .prepare(
         'INSERT INTO events (session_id, type, timestamp, data_json) VALUES (?, ?, ?, ?)',
       )
-      .run(sessionId, type, new Date().toISOString(), JSON.stringify(data));
+      .run(
+        sessionId,
+        type,
+        new Date().toISOString(),
+        JSON.stringify(persistedData),
+      );
   }
 
   artifact(sessionId: string | undefined, artifact: Artifact): void {
@@ -142,6 +172,7 @@ export class SessionStore {
       )
       .all(sessionId) as ArtifactRow[];
     return {
+      schemaVersion: '1.0',
       id: row.id,
       projectRoot: row.project_root,
       startedAt: row.started_at,
@@ -156,10 +187,13 @@ export class SessionStore {
         createdAt: artifact.created_at,
       })),
       timeline: events.map((event) => ({
+        schemaVersion: '1.0',
         id: event.id,
         type: event.type,
         timestamp: event.timestamp,
-        data: JSON.parse(event.data_json) as unknown,
+        data: isDeepLinkSessionEventType(event.type)
+          ? redactDeepLinkEventData(JSON.parse(event.data_json) as unknown)
+          : (JSON.parse(event.data_json) as unknown),
       })),
     };
   }
@@ -169,6 +203,46 @@ export class SessionStore {
       .prepare('SELECT status FROM sessions WHERE id = ?')
       .get(sessionId) as Pick<SessionRow, 'status'> | undefined;
     return row?.status;
+  }
+
+  list(options: { limit?: number; offset?: number } = {}): SessionListEntry[] {
+    const limit = Math.min(Math.max(1, options.limit ?? 20), 100);
+    const offset = Math.max(0, options.offset ?? 0);
+    const rows = this.database
+      .prepare(
+        'SELECT id, project_root, started_at, stopped_at, status FROM sessions ORDER BY started_at DESC LIMIT ? OFFSET ?',
+      )
+      .all(limit, offset) as SessionRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      projectRoot: row.project_root,
+      startedAt: row.started_at,
+      ...(row.stopped_at ? { stoppedAt: row.stopped_at } : {}),
+      status: row.status,
+    }));
+  }
+
+  getArtifact(artifactId: string): StoredArtifact {
+    const row = this.database
+      .prepare(
+        'SELECT id, session_id, kind, path, mime_type, created_at FROM artifacts WHERE id = ?',
+      )
+      .get(artifactId) as ArtifactLookupRow | undefined;
+    if (!row) {
+      throw new ObserverError(
+        'ARTIFACT_NOT_FOUND',
+        `Artifact ${artifactId} was not found`,
+        true,
+      );
+    }
+    return {
+      id: row.id,
+      kind: row.kind,
+      path: row.path,
+      ...(row.mime_type ? { mimeType: row.mime_type } : {}),
+      createdAt: row.created_at,
+      ...(row.session_id ? { sessionId: row.session_id } : {}),
+    };
   }
 
   deleteSession(sessionId: string): void {
@@ -185,5 +259,32 @@ export class SessionStore {
 
   close(): void {
     this.database.close();
+  }
+
+  /**
+   * Older observer versions wrote raw deep-link event data. Normalize it on
+   * open so later replay/export calls cannot re-emit that historical value.
+   */
+  private redactPersistedDeepLinkEvents(): void {
+    const events = this.database
+      .prepare(
+        'SELECT id, type, timestamp, data_json FROM events WHERE type IN (?, ?)',
+      )
+      .all('deep_link', 'deep-link') as EventRow[];
+    const update = this.database.prepare(
+      'UPDATE events SET data_json = ? WHERE id = ?',
+    );
+    this.database.transaction(() => {
+      for (const event of events) {
+        let data: unknown;
+        try {
+          data = JSON.parse(event.data_json) as unknown;
+        } catch {
+          data = undefined;
+        }
+        const redacted = JSON.stringify(redactDeepLinkEventData(data));
+        if (redacted !== event.data_json) update.run(redacted, event.id);
+      }
+    })();
   }
 }
