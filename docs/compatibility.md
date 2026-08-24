@@ -1,6 +1,7 @@
 # Compatibility and verification matrix
 
-Snapshot: **2026-08-24**, repository version **2.4.0**.
+Snapshot: **2026-08-24**, repository version **2.4.1**. Runtime rows retain the
+exact demo `2.4.0` fixture version where that is the build that actually ran.
 
 This document separates supported contracts from evidence collected on a specific
 host or target. A green host gate, TypeScript build, Expo export, emulator result,

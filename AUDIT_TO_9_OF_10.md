@@ -1,9 +1,12 @@
 # Đánh giá và nghiệm thu RN Agent Observer ở mốc 9/10
 
-> Snapshot: **2026-08-24**, workspace version **2.4.0**.
+> Snapshot: **2026-08-24**, workspace version **2.4.1**.
 >
-> Kết luận hiện tại: **9.1/10, đã nghiệm thu end-to-end trên Android vật lý và
-> ba API tier emulator**.
+> Kết luận hiện tại: **9.0/10 cho source/release readiness** sau coverage gate,
+> fuzz regression, CodeQL/dependency automation, npm consumer release và repository
+> protection. **Ecosystem maturity vẫn khoảng 8.6/10** vì mới có một maintainer,
+> chưa có adoption độc lập và chưa có broad OEM/device farm; các giới hạn này không
+> được nâng điểm bằng tài liệu.
 > Thiết bị: Xiaomi `23013PC75G` / `mondrian`, Android 15 API 35; serial và local
 > session ID được lược khỏi tài liệu public. Session đã hoàn tất.
 
@@ -14,16 +17,16 @@
 | Kiến trúc và khả năng mở rộng    |           9.2 | Core provider-neutral, schema versioned, CLI/MCP adapter mỏng, external provider fail-closed |
 | Tính trung thực của evidence     |           9.5 | Availability rõ; PID-pinned telemetry sống qua logcat rollover; không ghép UI app khác       |
 | Security, privacy và safety      |           9.1 | Active trust hai lớp, allowlist app/device/risk, redaction/HMAC, OSV strict hiện `PASS`      |
-| Chất lượng code và regression    |           9.2 | Strict TypeScript, zero-warning lint, test đa package, package-consumer smoke                |
-| Release và supply chain          |           9.2 | Frozen lock, 5 tarball smoke, SBOM/OSV, Android/Hermes export nằm trong `release:check`      |
-| Performance methodology          |           9.1 | Sampling/budget/baseline/compatibility có contract và fixture 100ms đã chạy trên device      |
+| Chất lượng code và regression    |           9.4 | Strict TS, 363 tests, bounded fuzz, coverage threshold, package-consumer smoke               |
+| Release và supply chain          |           9.5 | Trusted publish/provenance, frozen lock, package smoke, SBOM/OSV, CodeQL/dependency review   |
+| Performance methodology          |           8.8 | Contract tốt; JS FPS/TTI/heap và automatic Perfetto analysis vẫn chưa có                     |
 | Developer experience và tài liệu |           9.0 | CLI/MCP/docs/fixtures, compatibility matrix, Maestro integration example                     |
-| Community và ecosystem           |           8.9 | Apache-2.0, templates/provider SDK và runbook AVD tái lập; chưa có conformance farm          |
-| Platform/device coverage         |           8.9 | Physical API 35/arm64 + emulator API 24/30/36 x86_64; chưa có broad OEM matrix               |
+| Community và ecosystem           |           8.4 | Templates/roadmap/support rõ; bus factor 1 và chưa có adoption/contributor độc lập           |
+| Platform/device coverage         |           8.5 | Physical API 35/arm64 + emulator API 24/30/36 x86_64; Android-only, chưa broad OEM matrix    |
 
-Điểm tổng có trọng số: **9.1/10**. Điểm này bao gồm source/release gate và bốn exact
-runtime fixtures hiện tại; không suy rộng thành hỗ trợ mọi OEM/ABI hay production
-benchmark.
+Điểm source/release có trọng số: **9.0/10**. Điểm này bao gồm gate và bốn exact
+runtime fixtures hiện tại; ecosystem/adoption được báo riêng và không suy rộng thành
+hỗ trợ mọi OEM/ABI, production benchmark hay community validation.
 
 ## 2. So sánh với các nhóm dự án tương tự
 
@@ -69,8 +72,12 @@ evidence trong cùng session.
 - `uuid` transitively từ `xcode` được nâng 7.0.3 lên CommonJS-compatible 11.1.1.
 - Hook `.pnpmfile.cjs` áp hai pin trên cho cả pnpm 9.6 của repo và wrapper pnpm
   mới hơn; `pack:check` chặn release nếu lockfile tái xuất hiện bản dễ tổn thương.
-- Audit OSV strict ngày 2026-08-24: **673/673 components queried, 0 advisory,
+- Audit OSV strict ngày 2026-08-24: **654/654 components queried, 0 advisory,
   `PASS`**. SBOM và report nằm trong `.artifacts/sessions/standalone/`.
+- GitHub `main` bắt buộc PR, 11 status checks, linear history và conversation
+  resolution; admin cũng chịu rule, force-push/xóa nhánh bị tắt. npm environment
+  cần reviewer và admin không được bypass. Secret scanning/push protection,
+  Dependabot security updates và private vulnerability reporting đã bật.
 
 ### Release và reproducibility
 
@@ -115,15 +122,15 @@ git diff --check
 
 Trạng thái evidence gần nhất:
 
-| Gate                                   | Trạng thái                                    |
-| -------------------------------------- | --------------------------------------------- |
-| Frozen lockfile                        | `PASS`                                        |
-| Build                                  | `PASS`                                        |
-| Android/Hermes export                  | `PASS`, 2 files, 1 Hermes bundle              |
-| OSV dependency audit                   | `PASS`, 673 queried, 0 advisory               |
-| Full `release:check` sau thay đổi cuối | `PASS`, 352/352 tests + MCP/package/export    |
-| Physical Android positive flow         | `PASS`, exact target pinned, session complete |
-| Emulator API 24/30/36 positive flow    | `PASS`, ba AVD/session tạm đã cleanup         |
+| Gate                                   | Trạng thái                                              |
+| -------------------------------------- | ------------------------------------------------------- |
+| Frozen lockfile                        | `PASS`                                                  |
+| Build                                  | `PASS`                                                  |
+| Android/Hermes export                  | `PASS`, 2 files, 1 Hermes bundle                        |
+| OSV dependency audit                   | `PASS`, 654 queried, 0 advisory                         |
+| Full `release:check` sau thay đổi cuối | `PASS`, 363/363 tests + coverage/OSV/MCP/package/export |
+| Physical Android positive flow         | `PASS`, exact target pinned, session complete           |
+| Emulator API 24/30/36 positive flow    | `PASS`, ba AVD/session tạm đã cleanup                   |
 
 ## 5. Cấu hình demo và giới hạn an toàn
 

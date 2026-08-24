@@ -29,6 +29,14 @@ export function parseBounds(value: string | undefined) {
   const match = value?.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
   if (!match) return undefined;
   const [, x1 = '0', y1 = '0', x2 = '0', y2 = '0'] = match;
+  const coordinates = [x1, y1, x2, y2].map(Number);
+  if (
+    coordinates.some((coordinate) => !Number.isSafeInteger(coordinate)) ||
+    Number(x2) < Number(x1) ||
+    Number(y2) < Number(y1)
+  ) {
+    return undefined;
+  }
   return {
     x: Number(x1),
     y: Number(y1),
@@ -99,11 +107,15 @@ export function parseLogcat(output: string): LogEntry[] {
       if (!match) return null;
       const [, epoch = '0', priority = 'I', tag = 'android', message = ''] =
         match;
+      const timestampMs = Number(epoch) * 1000;
+      if (!Number.isFinite(timestampMs)) return null;
+      const timestamp = new Date(timestampMs);
+      if (Number.isNaN(timestamp.getTime())) return null;
       return {
         level: LOG_LEVELS[priority] ?? 'info',
         message,
         source: tag.trim(),
-        timestamp: new Date(Number(epoch) * 1000).toISOString(),
+        timestamp: timestamp.toISOString(),
       } satisfies LogEntry;
     })
     .filter((entry): entry is LogEntry => entry !== null);
@@ -149,7 +161,9 @@ export function parseFrameTimes(output: string): number[] {
 
 export function parseTotalPssMb(output: string): number | null {
   const match = output.match(/TOTAL\s+(\d+)/);
-  return match ? Number(match[1]) / 1024 : null;
+  if (!match) return null;
+  const value = Number(match[1]) / 1024;
+  return Number.isFinite(value) ? value : null;
 }
 
 export function parseTopCpuPercent(output: string): number | null {

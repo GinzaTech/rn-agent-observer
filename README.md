@@ -18,7 +18,17 @@ Bề mặt public hiện có CLI, 66 MCP tools, 6 MCP resources và 2 workflow p
 
 ## Cài đặt
 
-Đường dùng được kiểm chứng hiện tại là clone source:
+Người dùng CLI/MCP nên cài public release `2.4.1` hoặc mới hơn:
+
+```powershell
+pnpm add --save-dev @rn-agent-observer/cli @rn-agent-observer/mcp-server
+pnpm exec rn-observe --version
+pnpm exec rn-observer-mcp --check
+```
+
+Năm package public đã được publish đồng bộ ở `2.4.1` với npm provenance và đã qua
+clean-consumer install. Không cài `2.4.0`: đó là bản bootstrap namespace có
+dependency `workspace:*` không hợp lệ. Contributor phát triển từ source bằng:
 
 ```powershell
 git clone https://github.com/GinzaTech/rn-agent-observer.git
@@ -26,17 +36,6 @@ Set-Location .\rn-agent-observer
 corepack prepare pnpm@9.6.0 --activate
 pnpm install --frozen-lockfile
 pnpm release:check
-```
-
-Tại snapshot 2026-08-24, năm package scoped chưa được publish lên npm. Sau lần
-publish đầu, consumer có thể cài CLI/MCP bằng:
-
-```powershell
-pnpm add --save-dev @rn-agent-observer/cli
-pnpm exec rn-observe --version
-
-pnpm add --save-dev @rn-agent-observer/mcp-server
-pnpm exec rn-observer-mcp --check
 ```
 
 Xem [hướng dẫn cài đặt từng bước](docs/installation.md) cho source, device, MCP và
@@ -236,6 +235,7 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 - [Cài đặt và phát hành package](docs/release-installation.md)
 - [Xử lý sự cố](docs/troubleshooting.md)
 - [Changelog](CHANGELOG.md)
+- [Roadmap](ROADMAP.md) · [Hỗ trợ](SUPPORT.md) · [Maintainers](MAINTAINERS.md)
 - [Đóng góp](CONTRIBUTING.md) · [Bảo mật](SECURITY.md) · [Quản trị](GOVERNANCE.md)
 
 ## Phiên bản hiện tại
@@ -288,7 +288,18 @@ The public surface currently includes the CLI, 66 MCP tools, 6 MCP resources, an
 
 ## Installation
 
-The currently verified path is a source checkout:
+CLI/MCP users should install public release `2.4.1` or newer:
+
+```powershell
+pnpm add --save-dev @rn-agent-observer/cli @rn-agent-observer/mcp-server
+pnpm exec rn-observe --version
+pnpm exec rn-observer-mcp --check
+```
+
+All five public packages were published in lockstep with npm provenance and passed
+a clean-consumer install. Do not install `2.4.0`; it was a namespace bootstrap
+whose public dependencies retained invalid `workspace:*` ranges. Contributors can
+still use the source checkout:
 
 ```powershell
 git clone https://github.com/GinzaTech/rn-agent-observer.git
@@ -296,17 +307,6 @@ Set-Location .\rn-agent-observer
 corepack prepare pnpm@9.6.0 --activate
 pnpm install --frozen-lockfile
 pnpm release:check
-```
-
-As of the 2026-08-24 snapshot, the five scoped packages have not been published
-to npm. After the first publication, consumers can install CLI/MCP with:
-
-```powershell
-pnpm add --save-dev @rn-agent-observer/cli
-pnpm exec rn-observe --version
-
-pnpm add --save-dev @rn-agent-observer/mcp-server
-pnpm exec rn-observer-mcp --check
 ```
 
 See the [step-by-step installation guide](docs/installation.md) for source, device,
@@ -478,6 +478,7 @@ and progress/cancellation behavior are documented in
 - [Release installation and publication](docs/release-installation.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Changelog](CHANGELOG.md)
+- [Roadmap](ROADMAP.md) · [Support](SUPPORT.md) · [Maintainers](MAINTAINERS.md)
 - [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Governance](GOVERNANCE.md)
 
 ## AI agent integration

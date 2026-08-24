@@ -47,6 +47,14 @@ configured only when the organization has granted that team explicit repository
 write access; the project will not publish a placeholder owner that GitHub cannot
 enforce.
 
+The current maintainer and the bus-factor limitation are public in
+[MAINTAINERS.md](MAINTAINERS.md). `main` must require successful source, package,
+coverage/security and Android smoke checks. Until a second active reviewer exists,
+the repository may require a pull request with zero independent approvals rather
+than publishing an impossible one-approval policy. Material changes still require
+public review under this governance policy; automation cannot substitute for an
+independent human reviewer.
+
 Maintainers must recuse themselves from decisions involving a personal, financial,
 or employment conflict that could reasonably affect judgment.
 

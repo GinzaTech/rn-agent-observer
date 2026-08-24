@@ -168,10 +168,10 @@ npm org ls rn-agent-observer
 pnpm view @rn-agent-observer/cli version
 ```
 
-The final command is expected to return 404 only before the first publication. A
-missing scope is different from a missing package: create the npm organization and
-grant access instead of silently renaming all packages, because changing to another
-scope changes every public import, command example and internal dependency.
+For this established project the final command must return `2.4.1` or newer; a 404
+is now a release blocker. Only a brand-new scope bootstrap can legitimately return 404. A missing scope is different from a missing package: create the npm
+organization and grant access instead of silently renaming all packages, because
+changing scope changes every public import, command example and internal dependency.
 
 Enable npm 2FA. Every package is bound to the exact `GinzaTech/rn-agent-observer`
 repository, `.github/workflows/publish.yml`, and protected GitHub environment `npm`
@@ -289,9 +289,10 @@ Archive kiểm tra nằm trong
 
 Trước khi tạo tag release, scope `@rn-agent-observer` phải tồn tại trên npm và tài
 khoản/team publish phải có quyền ghi. Kiểm tra bằng `npm whoami`,
-`npm org ls rn-agent-observer` và `pnpm view @rn-agent-observer/cli version`; package
-có thể trả 404 trước lần publish đầu, nhưng scope không được thiếu. Không tự đổi sang
-scope khác vì sẽ đổi toàn bộ public import và dependency nội bộ.
+`npm org ls rn-agent-observer` và `pnpm view @rn-agent-observer/cli version`; với
+project hiện tại lệnh cuối phải trả `2.4.1` hoặc mới hơn, còn 404 là blocker. Chỉ
+bootstrap một scope hoàn toàn mới mới có thể chấp nhận package chưa tồn tại. Không
+tự đổi sang scope khác vì sẽ đổi toàn bộ public import và dependency nội bộ.
 
 Bật 2FA cho npm. Mỗi package phải bind đúng repository
 `GinzaTech/rn-agent-observer`, workflow `.github/workflows/publish.yml` và protected

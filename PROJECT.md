@@ -1,6 +1,6 @@
 # RN Agent Observer
 
-**VI** · [EN](#english) · Version 2.4.0 · Android target, cross-platform Node host
+**VI** · [EN](#english) · Version 2.4.1 · Android target, cross-platform Node host
 
 RN Agent Observer là cầu nối quan sát runtime cục bộ (local runtime observability bridge) cho ứng dụng React Native/Expo trên Android. Công cụ cho phép AI coding agent (OpenCode, Claude Code, Codex, Cursor...) hoặc lập trình viên **quan sát, chẩn đoán và xác minh** ứng dụng đang chạy mà không cần nhìn màn hình — mọi bằng chứng runtime (screenshot, UI tree, FPS, network, render, console, heap, trace, video) đều có cấu trúc, đo đếm được và so sánh trước/sau được.
 
@@ -353,26 +353,20 @@ Cấu hình client (Claude/OpenCode/Cursor...) — xem danh sách 66 tools trong
 | `/proc/net/dev` delta          | `device-network`                                   | Không            | Thấp cho app — device-level, chỉ tham khảo |
 | ADB JS FPS                     | —                                                  | —                | **Không có** — luôn `available: false`     |
 
-## So sánh với các dự án tương tự
+## So sánh với các nhóm dự án tương tự
 
-|                                    | RN Agent Observer                   | agent-device (Callstack)                         | Expo MCP                   | agent-devtools |
-| ---------------------------------- | ----------------------------------- | ------------------------------------------------ | -------------------------- | -------------- |
-| Nền tảng                           | Android + Windows                   | iOS/Android/HarmonyOS/TV/web/macOS/Linux + cloud | Android/iOS (Expo)         | Android/iOS    |
-| **Diagnosis rules deterministic**  | ✅ findings + confidence + evidence | ❌ evidence thô                                  | ❌                         | ❌             |
-| **Honest availability contract**   | ✅ Zod-enforced, mọi metric         | ❌                                               | ❌                         | ❌             |
-| **Compare pixel + structural**     | ✅ tích hợp vòng before/after       | 🟨 screenshot diff                               | ❌                         | ❌             |
-| **Redact tại nguồn**               | ✅ trước khi ra logcat              | 🟨                                               | ❌ (proxy qua server Expo) | ❌ (dump thô)  |
-| **Network không instrumentation**  | ✅ CDP Network domain               | 🟨                                               | ❌                         | ❌             |
-| **Test blueprint chuẩn cross-app** | ✅ ~190 case/4 tier                 | ❌ (docs thôi)                                   | ❌                         | ❌             |
-| **Session audit bền qua process**  | ✅ SQLite WAL timeline              | 🟨 session điều khiển                            | ❌                         | ❌             |
-| Ref snapshot + settle diff         | ✅                                  | ✅ (nguồn gốc)                                   | ❌                         | ❌             |
-| Replay script                      | ✅ JSON                             | ✅ .ad + Maestro + CI                            | ❌                         | ❌             |
-| App data channel                   | ✅ namespaced, latest-wins          | ❌                                               | ❌                         | ✅ (nguồn gốc) |
-| Router sitemap                     | ✅ filesystem, offline              | ❌                                               | ✅ (nguồn gốc)             | ❌             |
-| Offline 100%, không account        | ✅                                  | ✅                                               | ❌                         | ✅             |
-| Cộng đồng                          | Internal                            | 4.2k★, Callstack, Expensify/Shopify              | Expo chính thức            | 1★             |
+| Góc nhìn             | RN Agent Observer                                                     | E2E/device-control như Maestro, Detox, Appium  | React Native DevTools/profiler               | Cloud device farm                                 |
+| -------------------- | --------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------- | ------------------------------------------------- |
+| Vai trò chính        | Evidence/assurance cho agent                                          | Điều khiển và assertion flow                   | Debug component/JS/native chuyên sâu         | Chạy ma trận thiết bị song song                   |
+| Điểm mạnh            | Evidence schema, availability, session graph, redaction, before/after | Hệ sinh thái runner và automation trưởng thành | Props/stack/profile tương tác sâu            | Quy mô OEM/API và quản lý thiết bị                |
+| Khoảng trống         | Android built-in duy nhất, ít adoption, không thay profiler           | Thường cần lớp evidence/report riêng cho agent | Không phải audit trail/CI assurance tổng hợp | Chi phí, dữ liệu rời máy và ít source correlation |
+| Privacy mặc định     | Local-first, không account; artifact ở project                        | Tùy runner và hạ tầng                          | Local development                            | Cần review nhà cung cấp/retention                 |
+| Trạng thái cộng đồng | Public từ 2.4.1, hiện một maintainer                                  | Tùy dự án, thường trưởng thành hơn             | Được hệ sinh thái RN duy trì                 | Dịch vụ thương mại/managed                        |
 
-**Định vị**: Không cạnh tranh tầng device-control với agent-device — project này mạnh ở **evidence layer**: chuẩn hóa bằng chứng, chẩn đoán có căn cứ, so sánh trước/sau, và kỷ luật trung thực về giới hạn đo lường.
+**Định vị**: Observer bổ sung một **evidence layer** cho runner, DevTools và device
+farm; không tuyên bố thay thế toàn phần bất kỳ nhóm nào. So sánh capability phải
+được cập nhật từ exact version thay vì dùng số sao hoặc dấu thiếu tính năng dễ lỗi
+thời gian.
 
 ## Testing
 
@@ -383,7 +377,7 @@ pnpm --filter @rn-agent-observer/core test -- src/refs   # một file/pattern
 pnpm mcp:check                                # MCP health check
 ```
 
-- **Unit/integration**: gate 2026-08-24 pass 352/352 tests; xem breakdown và lịch sử trong `docs/testing.md`
+- **Unit/integration**: gate 2026-08-24 pass 363/363 tests, gồm bounded parser fuzz regression; xem breakdown, coverage threshold và lịch sử trong `docs/testing.md`
 - **Test blueprint** (`docs/test-blueprint.md`): bộ tham chiếu chuẩn ~190 case (21 domain, 4 tier T0–T3) để test observer trên bất kỳ app RN nào và regression chính observer — golden AUT là `apps/demo-expo`
 - **Runtime verification**: physical Android 15/arm64 và AVD API 24/30/36 x86_64 đã hoàn tất vòng demo 2.4.0 ngày 2026-08-24; đây là bốn exact fixtures, chưa phải broad OEM/device-farm matrix — xem `docs/android-device-matrix.md`
 - **Quy tắc**: không tuyên bố runtime Android hoạt động nếu chưa chạy trên device/emulator thật
@@ -412,7 +406,7 @@ pnpm mcp:check                                # MCP health check
 
 # English
 
-**EN** · [VI](#rn-agent-observer) · Version 2.4.0 · Android target, cross-platform Node host
+**EN** · [VI](#rn-agent-observer) · Version 2.4.1 · Android target, cross-platform Node host
 
 RN Agent Observer is a local runtime observability bridge for React Native/Expo apps on Android. It lets AI coding agents (OpenCode, Claude Code, Codex, Cursor...) or developers **observe, diagnose and verify** a running app without looking at the screen — every piece of runtime evidence (screenshot, UI tree, FPS, network, renders, console, heap, traces, video) is structured, measurable, and comparable before/after code changes.
 
@@ -747,26 +741,20 @@ Client config (Claude/OpenCode/Cursor...) — see all 66 tools in `docs/protocol
 | `/proc/net/dev` delta          | `device-network`                                   | Nothing          | Low per-app — device-level, reference only |
 | ADB JS FPS                     | —                                                  | —                | **None** — always `available: false`       |
 
-## Comparison With Similar Projects
+## Comparison With Similar Project Categories
 
-|                                     | RN Agent Observer                   | agent-device (Callstack)                         | Expo MCP                           | agent-devtools       |
-| ----------------------------------- | ----------------------------------- | ------------------------------------------------ | ---------------------------------- | -------------------- |
-| Platforms                           | Android + Windows                   | iOS/Android/HarmonyOS/TV/web/macOS/Linux + cloud | Android/iOS (Expo)                 | Android/iOS          |
-| **Deterministic diagnosis rules**   | ✅ findings + confidence + evidence | ❌ raw evidence                                  | ❌                                 | ❌                   |
-| **Honest availability contract**    | ✅ Zod-enforced on every metric     | ❌                                               | ❌                                 | ❌                   |
-| **Pixel + structural compare**      | ✅ integrated before/after loop     | 🟨 screenshot diff                               | ❌                                 | ❌                   |
-| **Source-side redaction**           | ✅ before events hit logcat         | 🟨                                               | ❌ (proxies through Expo's server) | ❌ (raw dumps)       |
-| **Network without instrumentation** | ✅ CDP Network domain               | 🟨                                               | ❌                                 | ❌                   |
-| **Cross-app test blueprint**        | ✅ ~190 cases/4 tiers               | ❌ (docs only)                                   | ❌                                 | ❌                   |
-| **Durable session audit**           | ✅ SQLite WAL timeline              | 🟨 control sessions                              | ❌                                 | ❌                   |
-| Ref snapshot + settle diff          | ✅                                  | ✅ (originated here)                             | ❌                                 | ❌                   |
-| Replay scripts                      | ✅ JSON                             | ✅ .ad + Maestro + CI                            | ❌                                 | ❌                   |
-| App data channel                    | ✅ namespaced, latest-wins          | ❌                                               | ❌                                 | ✅ (originated here) |
-| Router sitemap                      | ✅ filesystem-based, offline        | ❌                                               | ✅ (originated here)               | ❌                   |
-| 100% offline, no account            | ✅                                  | ✅                                               | ❌                                 | ✅                   |
-| Community                           | Internal                            | 4.2k★, Callstack, Expensify/Shopify              | Official Expo                      | 1★                   |
+| Perspective     | RN Agent Observer                                                      | E2E/device control such as Maestro, Detox, Appium  | React Native DevTools/profilers                | Cloud device farms                                |
+| --------------- | ---------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------- |
+| Primary role    | Agent-facing evidence and assurance                                    | Drive and assert application flows                 | Deep interactive component/JS/native debugging | Run a parallel device matrix                      |
+| Strength        | Evidence schemas, availability, session graph, redaction, before/after | Mature runners and automation ecosystems           | Deep props, stack and profiling workflows      | OEM/API scale and managed devices                 |
+| Gap             | Android-only built-in target, early adoption, not a full profiler      | Often needs a separate agent evidence/report layer | Not a combined CI assurance audit trail        | Cost, off-device data and less source correlation |
+| Default privacy | Local-first, no account; project-owned artifacts                       | Depends on runner and infrastructure               | Local development                              | Requires provider and retention review            |
+| Community state | Public since 2.4.1, currently one maintainer                           | Project-dependent and often more mature            | Maintained within the RN ecosystem             | Commercial or managed service                     |
 
-**Positioning**: This project does not compete with agent-device at the device-control layer — its strength is the **evidence layer**: standardized evidence, grounded diagnosis, before/after comparison, and honest discipline about measurement limits.
+**Positioning**: Observer complements runners, DevTools, and device farms with an
+**evidence layer**; it does not claim to replace any category. Capability comparison
+must be refreshed against exact versions instead of using time-sensitive star counts
+or unsupported negative claims.
 
 ## Testing
 
@@ -777,7 +765,7 @@ pnpm --filter @rn-agent-observer/core test -- src/refs   # single file/pattern
 pnpm mcp:check                                # MCP health check
 ```
 
-- **Unit/integration**: the 2026-08-24 gate passed 352/352 tests; see `docs/testing.md` for the package breakdown and historical records
+- **Unit/integration**: the 2026-08-24 gate passed 363/363 tests, including a bounded parser fuzz regression; see `docs/testing.md` for package breakdown, coverage thresholds, and historical records
 - **Test blueprint** (`docs/test-blueprint.md`): ~190 reference cases (21 domains, 4 tiers T0–T3) for testing the observer against any RN app and regression-testing the observer itself — golden AUT is `apps/demo-expo`
 - **Runtime verification**: a physical Android 15/arm64 fixture and API 24/30/36 x86_64 AVDs completed the demo 2.4.0 workflow on 2026-08-24; these are four exact fixtures, not yet a broad OEM/device-farm matrix — see `docs/android-device-matrix.md`
 - **Rule**: never claim Android runtime works without running on a real device/emulator

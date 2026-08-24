@@ -3,12 +3,14 @@ description: Report a reproducible defect in RN Agent Observer
 title: '[Bug]: '
 labels:
   - bug
+  - needs-triage
 body:
   - type: markdown
     attributes:
       value: |
         Thank you for reporting a bug. Never attach credentials, personal data,
-        production network bodies, or an unreviewed `.artifacts` directory.
+        production network bodies, SQLite stores, or an unreviewed `.artifacts`
+        directory. Report security vulnerabilities privately through SECURITY.md.
 
   - type: dropdown
     id: area
@@ -31,7 +33,7 @@ body:
     attributes:
       label: Observer version or commit
       description: Use `rn-observe --version` for a release installation.
-      placeholder: 2.x.y or commit SHA
+      placeholder: 2.4.1 or commit SHA
     validations:
       required: true
 
@@ -48,7 +50,7 @@ body:
     id: reproduction
     attributes:
       label: Minimal reproduction
-      description: Provide deterministic steps, a small public fixture, or a failing test. State whether instrumentation and an evidence session were active.
+      description: Provide deterministic steps, exact commands, a fake/owned public fixture, or a failing test. State whether instrumentation and an evidence session were active.
       placeholder: |
         1. Set ...
         2. Run ...
@@ -74,8 +76,8 @@ body:
   - type: textarea
     id: evidence
     attributes:
-      label: Redacted evidence
-      description: Paste only the smallest redacted log/output needed. Link a safe reproduction repository rather than uploading an entire artifact store.
+      label: Redacted evidence and limitations
+      description: Paste only the smallest redacted output. State source, timestamp, artifact kind, and anything not verified. Link a safe reproduction repository instead of uploading an artifact store.
 
   - type: checkboxes
     id: verification
@@ -84,9 +86,11 @@ body:
       options:
         - label: I checked for an existing issue and read the troubleshooting guide.
           required: true
-        - label: I removed secrets, personal data, account data, and production payloads.
+        - label: I removed secrets, personal data, account data, and production payloads and used an authorized fixture.
           required: true
         - label: I identified which claims are device-verified and which are `NOT VERIFIED` or not applicable.
+          required: true
+        - label: This is not an undisclosed security vulnerability.
           required: true
 
   - type: markdown

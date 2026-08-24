@@ -7,6 +7,8 @@ and design feedback are welcome.
 New contributors should first read the [installation guide](docs/installation.md)
 and [repository structure](docs/project-structure.md). They separate source,
 generated output, local device policy, and sensitive runtime evidence.
+The [roadmap](ROADMAP.md), [support guide](SUPPORT.md), and
+[maintainer path](MAINTAINERS.md) list contribution priorities and review limits.
 
 By submitting a contribution, you agree that it is licensed under the repository's
 [Apache License 2.0](LICENSE).

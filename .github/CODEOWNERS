@@ -1,0 +1,9 @@
+* @GinzaTech
+
+/.github/ @GinzaTech
+/packages/core/src/security/ @GinzaTech
+/packages/core/src/filesystem/ @GinzaTech
+/packages/core/src/session/ @GinzaTech
+/scripts/check-release-packages.mjs @GinzaTech
+/.pnpmfile.cjs @GinzaTech
+/SECURITY.md @GinzaTech

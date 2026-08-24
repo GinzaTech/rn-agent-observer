@@ -32,6 +32,11 @@ Include:
 - suggested remediation, if known;
 - whether you intend coordinated public disclosure.
 
+The project targets acknowledgement within three business days, initial scope and
+severity triage within seven days, and coordinated remediation or a status update
+within 90 days. These are best-effort targets rather than a paid support SLA; urgent
+active exploitation or credential exposure is prioritized immediately.
+
 Do not send real credentials, personal data, production network bodies, whole
 SQLite stores, or unredacted screenshots/logs. Share only the minimum redacted
 evidence needed to reproduce the issue. Maintainers will acknowledge a report as

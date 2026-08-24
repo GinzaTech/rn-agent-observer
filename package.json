@@ -20,6 +20,8 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
+    "coverage:check": "vitest run --coverage",
+    "fuzz:check": "vitest run packages/core/src/adb/parsers.fuzz.test.ts",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -27,14 +29,16 @@
     "rn-observe": "node packages/cli/dist/index.js",
     "mcp:check": "node packages/mcp-server/dist/server.js --check",
     "mcp:start": "node packages/mcp-server/dist/server.js",
+    "security:dependencies": "node packages/cli/dist/index.js security dependencies --lockfile pnpm-lock.yaml --strict",
     "pack:check": "node scripts/check-release-packages.mjs",
     "registry:check": "node scripts/check-published-packages.mjs",
     "android:export:check": "node scripts/check-demo-android-export.mjs",
-    "release:check": "pnpm check && pnpm mcp:check && pnpm rn-observe --version && pnpm pack:check && pnpm android:export:check"
+    "release:check": "pnpm check && pnpm coverage:check && pnpm security:dependencies && pnpm mcp:check && pnpm rn-observe --version && pnpm pack:check && pnpm android:export:check"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@types/node": "^22.15.0",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "^10.0.0",
     "prettier": "^3.9.0",
     "typescript": "~6.0.3",

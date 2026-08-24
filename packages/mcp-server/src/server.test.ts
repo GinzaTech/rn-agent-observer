@@ -79,65 +79,73 @@ const EXPECTED_TOOL_NAMES = [
 
 describe('MCP server', () => {
   it('completes an MCP handshake and calls observer_status', async () => {
+    const projectRoot = mkdtempSync(
+      join(tmpdir(), 'rn-observer-mcp-handshake-'),
+    );
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
-    const core = new ObserverCore({ projectRoot: '.' });
+    const core = new ObserverCore({ projectRoot });
     const server = createMcpServer(core);
     const client = new Client({ name: 'test-client', version: '0.1.0' });
 
-    await server.connect(serverTransport);
-    await client.connect(clientTransport);
+    try {
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
 
-    const tools = await client.listTools();
-    expect(tools.tools.map((tool) => tool.name).sort()).toEqual(
-      [...EXPECTED_TOOL_NAMES].sort(),
-    );
+      const tools = await client.listTools();
+      expect(tools.tools.map((tool) => tool.name).sort()).toEqual(
+        [...EXPECTED_TOOL_NAMES].sort(),
+      );
 
-    const resources = await client.listResources();
-    expect(resources.resources.map((resource) => resource.uri).sort()).toEqual([
-      'rnobs://capabilities',
-      'rnobs://dashboard',
-      'rnobs://suites',
-    ]);
-    const templates = await client.listResourceTemplates();
-    expect(
-      templates.resourceTemplates
-        .map((template) => template.uriTemplate)
-        .sort(),
-    ).toEqual([
-      'rnobs://artifacts/{artifactId}',
-      'rnobs://sessions/{sessionId}',
-      'rnobs://sessions/{sessionId}/graph',
-    ]);
-    const prompts = await client.listPrompts();
-    expect(prompts.prompts.map((prompt) => prompt.name).sort()).toEqual([
-      'inspect-current-screen',
-      'verify-fix',
-    ]);
-    const suites = await client.readResource({ uri: 'rnobs://suites' });
-    expect(suites.contents[0]).toMatchObject({
-      uri: 'rnobs://suites',
-      mimeType: 'application/json',
-    });
+      const resources = await client.listResources();
+      expect(
+        resources.resources.map((resource) => resource.uri).sort(),
+      ).toEqual([
+        'rnobs://capabilities',
+        'rnobs://dashboard',
+        'rnobs://suites',
+      ]);
+      const templates = await client.listResourceTemplates();
+      expect(
+        templates.resourceTemplates
+          .map((template) => template.uriTemplate)
+          .sort(),
+      ).toEqual([
+        'rnobs://artifacts/{artifactId}',
+        'rnobs://sessions/{sessionId}',
+        'rnobs://sessions/{sessionId}/graph',
+      ]);
+      const prompts = await client.listPrompts();
+      expect(prompts.prompts.map((prompt) => prompt.name).sort()).toEqual([
+        'inspect-current-screen',
+        'verify-fix',
+      ]);
+      const suites = await client.readResource({ uri: 'rnobs://suites' });
+      expect(suites.contents[0]).toMatchObject({
+        uri: 'rnobs://suites',
+        mimeType: 'application/json',
+      });
 
-    const result = await client.callTool({
-      name: 'observer_status',
-      arguments: {},
-    });
-    expect(result.structuredContent).toMatchObject({ phase: 'android-v1' });
+      const result = await client.callTool({
+        name: 'observer_status',
+        arguments: {},
+      });
+      expect(result.structuredContent).toMatchObject({ phase: 'android-v1' });
 
-    const blockedMutation = await client.callTool({
-      name: 'app_launch',
-      arguments: {},
-    });
-    expect(blockedMutation.isError).toBe(true);
-    expect(JSON.stringify(blockedMutation.structuredContent)).toContain(
-      'authorized-active',
-    );
-
-    await client.close();
-    await server.close();
-    core.close();
+      const blockedMutation = await client.callTool({
+        name: 'app_launch',
+        arguments: {},
+      });
+      expect(blockedMutation.isError).toBe(true);
+      expect(JSON.stringify(blockedMutation.structuredContent)).toContain(
+        'authorized-active',
+      );
+    } finally {
+      await client.close().catch(() => {});
+      await server.close().catch(() => {});
+      core.close();
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 
   it('fails closed before MCP dispatches active actions to a different device', async () => {

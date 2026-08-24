@@ -45,8 +45,8 @@ pnpm mcp:check
 
 ## Cập nhật package npm
 
-Các lệnh dưới đây chỉ áp dụng sau lần publish đầu và khi `pnpm view` trả được
-version:
+Public package bắt đầu dùng được từ `2.4.1`. Xác nhận registry trả version trước
+khi nâng:
 
 ```powershell
 pnpm view @rn-agent-observer/cli version

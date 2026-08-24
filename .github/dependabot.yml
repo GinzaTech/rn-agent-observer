@@ -5,20 +5,28 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 10
+      time: '09:00'
+      timezone: Asia/Bangkok
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
     groups:
-      development-tooling:
-        patterns:
-          - '*'
-        dependency-type: development
       production-dependencies:
         patterns:
           - '*'
         dependency-type: production
+      development-tooling:
+        patterns:
+          - '*'
+        dependency-type: development
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    labels:
+      - dependencies
+    groups:
+      github-actions:
+        patterns:
+          - '*'

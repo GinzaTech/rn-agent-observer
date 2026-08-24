@@ -1,5 +1,6 @@
 /* global process */
 import { spawn } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 const protocol = 'rn-agent-observer-plugin-jsonrpc-stdio-v1';
@@ -87,14 +88,16 @@ input.on('line', (line) => {
           : 1_500;
       const childCode = `
         const { writeFileSync } = require('node:fs');
-        writeFileSync(${JSON.stringify(readyPath)}, String(process.pid));
         setTimeout(() => writeFileSync(${JSON.stringify(markerPath)}, 'orphan'), ${JSON.stringify(markerDelayMs)});
         setInterval(() => {}, 1_000);
       `;
-      spawn(process.execPath, ['-e', childCode], {
+      const descendant = spawn(process.execPath, ['-e', childCode], {
         stdio: 'ignore',
         windowsHide: true,
       });
+      if (descendant.pid !== undefined) {
+        writeFileSync(readyPath, String(descendant.pid));
+      }
     }
     return;
   }
