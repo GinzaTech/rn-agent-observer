@@ -164,17 +164,17 @@ describe('passive resilience pack', () => {
               logs: [
                 {
                   level: 'error',
-                  source: 'ReactHost',
+                  source: 'unknown',
                   timestamp: RECOVERY,
                   message:
-                    'ReactNoCrashSoftException: onWindowFocusChange before context ready',
+                    'ReactHost: ReactNoCrashSoftException: onWindowFocusChange before context ready',
                 },
                 {
                   level: 'error',
-                  source: 'ReactHost',
+                  source: 'unknown',
                   timestamp: RECOVERY,
                   message:
-                    '  at com.facebook.react.runtime.ReactHostImpl.focus(Host.kt:1)',
+                    'ReactHost: \tat com.facebook.react.runtime.ReactHostImpl.focus(Host.kt:1)',
                 },
               ],
             }),

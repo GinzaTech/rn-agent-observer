@@ -24,7 +24,9 @@ export interface RuntimeErrorLogPartition {
 }
 
 const isStackContinuation = (message: string): boolean =>
-  /^\s*(?:at\s|Caused by:|Suppressed:|\.\.\.\s+\d+\s+more\b)/.test(message);
+  /^\s*(?:ReactHost(?:\{\d+\})?:\s*)?(?:at\s|Caused by:|Suppressed:|\.\.\.\s+\d+\s+more\b)/i.test(
+    message,
+  );
 
 /**
  * Logcat emits one row per Java stack line. Partition an ordered window so a

@@ -279,7 +279,7 @@ describe('screen understanding', () => {
   it('preserves ReactHost soft exceptions without counting them as app errors', () => {
     const softException = {
       level: 'error' as const,
-      source: 'ReactHost',
+      source: 'unknown',
       timestamp: NOW,
       message:
         'ReactHost: com.facebook.react.bridge.ReactNoCrashSoftException: onWindowFocusChange before context ready',
@@ -291,10 +291,10 @@ describe('screen understanding', () => {
           softException,
           {
             level: 'error',
-            source: 'ReactHost',
+            source: 'unknown',
             timestamp: NOW,
             message:
-              '  at com.facebook.react.runtime.ReactHostImpl.focus(Host.kt:1)',
+              'ReactHost: \tat com.facebook.react.runtime.ReactHostImpl.focus(Host.kt:1)',
           },
         ],
       }),

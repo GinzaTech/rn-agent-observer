@@ -12,10 +12,10 @@ describe('runtime error classification', () => {
     expect(
       isNonActionablePlatformLog({
         level: 'error',
-        source: 'ReactHost',
+        source: 'unknown',
         timestamp,
         message:
-          'ReactNoCrashSoftException: onWindowFocusChange before context ready',
+          'ReactHost: ReactNoCrashSoftException: onWindowFocusChange before context ready',
       }),
     ).toBe(true);
   });
@@ -68,30 +68,30 @@ describe('runtime error classification', () => {
     const entries = [
       {
         level: 'error' as const,
-        source: 'ReactHost',
+        source: 'unknown',
         timestamp,
         message:
-          'Unhandled SoftException: ReactNoCrashSoftException: onWindowFocusChange before context',
+          'ReactHost: Unhandled SoftException: ReactNoCrashSoftException: onWindowFocusChange before context',
       },
       {
         level: 'error' as const,
-        source: 'ReactHost',
+        source: 'unknown',
         timestamp,
         message:
-          '  at com.facebook.react.runtime.ReactHostImpl.focus(Host.kt:1)',
+          'ReactHost: \tat com.facebook.react.runtime.ReactHostImpl.focus(Host.kt:1)',
       },
       {
         level: 'error' as const,
-        source: 'ReactHost',
+        source: 'unknown',
         timestamp,
         message:
-          '  at android.app.Activity.onWindowFocusChanged(Activity.java:1)',
+          'ReactHost: \tat android.app.Activity.onWindowFocusChanged(Activity.java:1)',
       },
       {
         level: 'error' as const,
-        source: 'ReactHost',
+        source: 'unknown',
         timestamp,
-        message: 'BadTokenException while adding application window',
+        message: 'ReactHost: BadTokenException while adding application window',
       },
     ];
 
