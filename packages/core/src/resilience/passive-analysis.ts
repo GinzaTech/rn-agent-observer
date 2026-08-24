@@ -10,6 +10,7 @@ import type {
   ScreenState,
   UiIssue,
 } from '@rn-agent-observer/schemas';
+import { isNonActionablePlatformLog } from '../diagnosis/runtime-errors.js';
 
 export type ResiliencePhase = 'before' | 'fault' | 'recovery';
 
@@ -371,7 +372,9 @@ const evaluateAtCheckpoint = (
       return missingField(expectation.phase, 'log', evidence);
     }
     const errors = checkpoint.logs.filter(
-      (entry) => entry.level === 'error' || entry.level === 'fatal',
+      (entry) =>
+        (entry.level === 'error' || entry.level === 'fatal') &&
+        !isNonActionablePlatformLog(entry),
     );
     const fatal = errors.some((entry) => entry.level === 'fatal');
     result = {

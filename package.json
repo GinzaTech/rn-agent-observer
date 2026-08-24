@@ -28,6 +28,7 @@
     "mcp:check": "node packages/mcp-server/dist/server.js --check",
     "mcp:start": "node packages/mcp-server/dist/server.js",
     "pack:check": "node scripts/check-release-packages.mjs",
+    "registry:check": "node scripts/check-published-packages.mjs",
     "android:export:check": "node scripts/check-demo-android-export.mjs",
     "release:check": "pnpm check && pnpm mcp:check && pnpm rn-observe --version && pnpm pack:check && pnpm android:export:check"
   },

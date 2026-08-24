@@ -10,7 +10,10 @@ import type {
   UITree,
 } from '@rn-agent-observer/schemas';
 import { flattenUiTree } from '../adb/parsers.js';
+import { isNonActionablePlatformLog } from '../diagnosis/runtime-errors.js';
 import type { UiSnapshot } from '../refs/snapshot.js';
+
+export { isNonActionablePlatformLog } from '../diagnosis/runtime-errors.js';
 
 const REDACTED = '[REDACTED]';
 const GENERIC_LABELS = new Set([
@@ -83,7 +86,7 @@ export interface PixelStatistics {
 
 export interface AccessibilityIssue {
   className: string;
-  issue: 'unlabeled' | 'small-touch-target';
+  issue: 'unlabeled' | 'small-touch-target' | 'partially-observed-touch-target';
   bounds?: unknown;
 }
 
@@ -91,7 +94,13 @@ export interface AccessibilityAuditResult {
   totalInteractive: number;
   unlabeledCount: number;
   smallTouchTargets: number;
+  partiallyObservedTouchTargets: number;
   issues: AccessibilityIssue[];
+}
+
+export interface AccessibilityViewport {
+  width: number;
+  height: number;
 }
 
 export interface PriorUnderstandingState {
@@ -207,6 +216,7 @@ export function analyzePixels(input: {
 export function auditAccessibility(
   tree: UITree,
   densityDpi: number,
+  viewport?: AccessibilityViewport,
 ): AccessibilityAuditResult {
   const interactive = flattenUiTree(tree.roots).filter(
     (element) => (element.clickable ?? false) && element.visible !== false,
@@ -227,9 +237,22 @@ export function auditAccessibility(
       const widthDp = dp(element.bounds.width);
       const heightDp = dp(element.bounds.height);
       if (widthDp < 48 || heightDp < 48) {
+        const widthMayBeClipped =
+          widthDp < 48 &&
+          viewport !== undefined &&
+          (element.bounds.x <= 0 ||
+            element.bounds.x + element.bounds.width >= viewport.width);
+        const heightMayBeClipped =
+          heightDp < 48 &&
+          viewport !== undefined &&
+          (element.bounds.y <= 0 ||
+            element.bounds.y + element.bounds.height >= viewport.height);
         issues.push({
           className: element.className ?? element.type,
-          issue: 'small-touch-target',
+          issue:
+            widthMayBeClipped || heightMayBeClipped
+              ? 'partially-observed-touch-target'
+              : 'small-touch-target',
           bounds: {
             ...element.bounds,
             widthDp: Math.round(widthDp),
@@ -245,6 +268,9 @@ export function auditAccessibility(
       .length,
     smallTouchTargets: issues.filter(
       (issue) => issue.issue === 'small-touch-target',
+    ).length,
+    partiallyObservedTouchTargets: issues.filter(
+      (issue) => issue.issue === 'partially-observed-touch-target',
     ).length,
     issues,
   };
@@ -438,8 +464,14 @@ export function analyzeScreen(input: AnalyzeScreenInput): ScreenUnderstanding {
     const age = new Date(now).getTime() - new Date(entry.timestamp).getTime();
     return age >= 0 && age <= 60_000;
   });
-  if (recentErrors.length > 0) {
-    const labels = recentErrors
+  const recentPlatformWarnings = recentErrors.filter(
+    isNonActionablePlatformLog,
+  );
+  const recentActionableErrors = recentErrors.filter(
+    (entry) => !isNonActionablePlatformLog(entry),
+  );
+  if (recentActionableErrors.length > 0) {
+    const labels = recentActionableErrors
       .map((entry) => sanitizeUiText(entry.message.split(/\r?\n/)[0] ?? ''))
       .filter(Boolean)
       .slice(-5);
@@ -448,15 +480,33 @@ export function analyzeScreen(input: AnalyzeScreenInput): ScreenUnderstanding {
         'runtime-log-error',
         'warning',
         'Recent runtime errors observed',
-        `${recentErrors.length} error/fatal log entries were emitted in the last 60 seconds.`,
-        'Correlate timestamps with the current interaction; system/ReactHost soft errors are evidence, not proof of an app defect.',
+        `${recentActionableErrors.length} actionable-looking error/fatal log entries were emitted in the last 60 seconds.`,
+        'Correlate timestamps with the current interaction and reproduce before assigning the error to an application component.',
         artifactIds,
         labels,
       ),
     );
   }
 
-  const a11y = auditAccessibility(input.tree, input.densityDpi);
+  if (recentPlatformWarnings.length > 0) {
+    const labels = recentPlatformWarnings
+      .map((entry) => sanitizeUiText(entry.message.split(/\r?\n/)[0] ?? ''))
+      .filter(Boolean)
+      .slice(-5);
+    issues.push(
+      issue(
+        'runtime-platform-warning',
+        'info',
+        'Non-fatal React Native platform warnings observed',
+        `${recentPlatformWarnings.length} ReactHost soft-exception entries were preserved but excluded from the application runtime-error count.`,
+        'Keep the evidence and correlate it with foreground state or a visible failure; do not treat a soft exception alone as an application defect.',
+        artifactIds,
+        labels,
+      ),
+    );
+  }
+
+  const a11y = auditAccessibility(input.tree, input.densityDpi, input.screen);
   if (language.language === 'unknown' && normalizedTexts.length > 0) {
     issues.push(
       issue(
@@ -489,6 +539,18 @@ export function analyzeScreen(input: AnalyzeScreenInput): ScreenUnderstanding {
         'Touch targets below 48dp',
         `${a11y.smallTouchTargets} labeled controls are narrower or shorter than 48dp.`,
         'Increase the pressable hit area or use hitSlop, then repeat the audit on-device.',
+        artifactIds,
+      ),
+    );
+  }
+  if (a11y.partiallyObservedTouchTargets > 0) {
+    issues.push(
+      issue(
+        'partially-observed-touch-target',
+        'info',
+        'Touch target is clipped by the current viewport',
+        `${a11y.partiallyObservedTouchTargets} labeled controls touch a viewport edge and are visible below 48dp in that clipped dimension; their intrinsic size is not observable from this UI tree.`,
+        'Scroll the control fully into view, then repeat the accessibility audit before reporting an intrinsic touch-target defect.',
         artifactIds,
       ),
     );
@@ -612,7 +674,7 @@ export function analyzeScreen(input: AnalyzeScreenInput): ScreenUnderstanding {
       interactiveElements: actions.length,
       unlabeledControls: a11y.unlabeledCount,
       smallTouchTargets: a11y.smallTouchTargets,
-      runtimeErrors: recentErrors.length,
+      runtimeErrors: recentActionableErrors.length,
     },
     visual: input.pixelStatistics,
     issues,

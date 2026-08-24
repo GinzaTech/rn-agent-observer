@@ -14,6 +14,7 @@ const REDACTED_TEXT = /\[REDACTED(?:_[A-Z]+)?\]/u;
 
 export interface PassiveAccessibilityOptions {
   densityDpi?: number | null;
+  viewport?: { width: number; height: number } | null;
   minimumTouchTargetDp?: number;
   availability?: EvidenceAvailability;
   evidence?: EvidenceReference[];
@@ -268,6 +269,19 @@ export function analyzePassiveAccessibility(
       }
       const widthDp = (element.bounds.width * 160) / densityDpi;
       const heightDp = (element.bounds.height * 160) / densityDpi;
+      const viewport = options.viewport;
+      const widthMayBeClipped =
+        widthDp < minimumTouchTargetDp &&
+        viewport !== undefined &&
+        viewport !== null &&
+        (element.bounds.x <= 0 ||
+          element.bounds.x + element.bounds.width >= viewport.width);
+      const heightMayBeClipped =
+        heightDp < minimumTouchTargetDp &&
+        viewport !== undefined &&
+        viewport !== null &&
+        (element.bounds.y <= 0 ||
+          element.bounds.y + element.bounds.height >= viewport.height);
       return {
         ref,
         interactive: true,
@@ -275,9 +289,11 @@ export function analyzePassiveAccessibility(
         visibility: observedVisibility,
         name: observedName,
         touchTarget:
-          widthDp < minimumTouchTargetDp || heightDp < minimumTouchTargetDp
-            ? 'fail'
-            : 'pass',
+          widthMayBeClipped || heightMayBeClipped
+            ? 'not-verified'
+            : widthDp < minimumTouchTargetDp || heightDp < minimumTouchTargetDp
+              ? 'fail'
+              : 'pass',
         widthDp: Math.round(widthDp * 10) / 10,
         heightDp: Math.round(heightDp * 10) / 10,
       };
@@ -346,7 +362,7 @@ export function analyzePassiveAccessibility(
       'No explicitly visible, enabled clickable target with bounds was observed.';
   } else if (unverifiedTouchTargets > 0) {
     touchOutcome = 'NOT_VERIFIED';
-    touchLimitation = `${unverifiedTouchTargets} clickable targets lacked explicit visibility or bounds evidence.`;
+    touchLimitation = `${unverifiedTouchTargets} clickable targets lacked explicit visibility/bounds evidence or touched a viewport edge while measured below the minimum.`;
   } else if (degradedReason) {
     touchOutcome = 'NOT_VERIFIED';
     touchLimitation = `UI-tree evidence was degraded: ${degradedReason}`;

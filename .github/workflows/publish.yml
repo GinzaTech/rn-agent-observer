@@ -32,9 +32,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.12
+          node-version: 22.14
           cache: pnpm
           registry-url: https://registry.npmjs.org
+
+      - name: Install trusted-publishing capable npm CLI
+        run: npm install --global npm@^11.5.1
 
       - name: Verify release tag matches the workspace version
         shell: bash
@@ -53,3 +56,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+
+      - name: Verify registry metadata and clean consumer install
+        run: pnpm registry:check

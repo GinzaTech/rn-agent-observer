@@ -216,10 +216,12 @@ limit evidence/payload và evidence envelope versioned. Host kiểm provider ide
 target match, status/limitation và cấm inline binary/base64 trước khi dữ liệu được
 nhận; provider được cài hay manifest hợp lệ vẫn chưa chứng minh device runtime.
 
-CI chạy host logic trên Windows, Ubuntu và macOS nhưng không có device/emulator, vì
-vậy không chứng minh runtime Android trên các host đó. Chỉ workflow có device
-artifact đúng fixture trong [testing.md](testing.md) mới là runtime evidence; bề mặt
-mới chưa chạy device giữ `NOT_VERIFIED`.
+CI chạy host logic trên Windows, Ubuntu và macOS. Một job riêng khởi tạo AVD API 30
+x86_64 trên Ubuntu, build/install owned demo, nối Metro và chạy read-only
+`app-state -> session -> understand-screen -> ui-model -> session stop`; job phải có
+artifact local, UI source/native evidence và không có capture failure mới pass.
+Điều này chỉ chứng minh exact CI fixture đó. API/OEM/ABI khác và macOS device runtime
+không được suy rộng; bề mặt chưa chạy đúng fixture giữ `NOT_VERIFIED`.
 
 ## Runtime state
 

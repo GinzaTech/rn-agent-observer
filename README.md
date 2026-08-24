@@ -4,7 +4,7 @@
 
 RN Agent Observer là cầu nối quan sát và kiểm định cục bộ cho React Native/Expo. Công cụ dùng cùng một core TypeScript cho CLI và MCP, điều khiển Android qua ADB/UIAutomator, nhận telemetry từ instrumentation phát triển, chạy quality suite có evidence, kiểm tra bảo mật thụ động/supply chain và active scenario bị ràng buộc, lặp performance experiment, tạo dashboard offline đã lược dữ liệu nhạy cảm, chia sẻ `.rnobs` metadata-first, kiểm coverage route/action semantic, và lưu session bằng SQLite trong khi giữ binary lớn ở dạng artifact trên đĩa.
 
-Bề mặt public hiện có CLI, 66 MCP tools, 6 MCP resources và 2 workflow prompts. Các gate host và bằng chứng runtime Android được báo riêng trong [tài liệu kiểm thử](docs/testing.md), [ma trận AVD API 24/30/36](docs/android-device-matrix.md) và [compatibility matrix](docs/compatibility.md); tính năng mới chưa chạy đúng fixture trên device giữ trạng thái `NOT_VERIFIED`, không được suy ra từ unit test hay CI không có emulator. Ví dụ [Maestro + Observer](examples/maestro/README.md) minh hoạ cách runner E2E điều khiển flow còn Observer thu evidence, thay vì cố thay thế toàn bộ Maestro/Detox/Appium hoặc device farm.
+Bề mặt public hiện có CLI, 66 MCP tools, 6 MCP resources và 2 workflow prompts. Các gate host và bằng chứng runtime Android được báo riêng trong [tài liệu kiểm thử](docs/testing.md), [ma trận AVD API 24/30/36](docs/android-device-matrix.md) và [compatibility matrix](docs/compatibility.md). CI có API 30 emulator smoke read-only cho exact demo fixture; tính năng hoặc API/OEM khác chưa chạy đúng fixture vẫn giữ `NOT_VERIFIED`, không được suy rộng từ unit test, export hay một AVD. Ví dụ [Maestro + Observer](examples/maestro/README.md) minh hoạ cách runner E2E điều khiển flow còn Observer thu evidence, thay vì cố thay thế toàn bộ Maestro/Detox/Appium hoặc device farm.
 
 ## Yêu cầu
 
@@ -238,7 +238,7 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 
 ## Phiên bản hiện tại
 
-- Device/runtime provider hiện là Android. Bằng chứng runtime đã ghi nhận trên host Windows với physical Android 15/arm64 và AVD API 24/30/36 x86_64; CI Ubuntu/macOS là host-only và không mở rộng runtime support. Đây chưa phải broad OEM/device-farm matrix; mọi exact assurance scenario chưa chạy đúng fixture vẫn giữ `NOT_VERIFIED`.
+- Device/runtime provider hiện là Android. Bằng chứng runtime đã ghi nhận trên host Windows với physical Android 15/arm64 và AVD API 24/30/36 x86_64; CI còn chạy read-only demo smoke trên Ubuntu/API 30 x86_64. macOS vẫn host-only, và một AVD CI không mở rộng thành broad OEM/device-farm support; mọi exact assurance scenario chưa chạy đúng fixture giữ `NOT_VERIFIED`.
 - ADB không có tín hiệu JS FPS đáng tin cậy; field được trả `available: false`, không đoán số.
 - JS blocking, route, React renders và network metadata cần instrumentation phát triển trong app.
 - Export DevTools qua CDP (`devtools-export`, `devtools-profile`) và network per-request (`metro-network`) cần Metro đang chạy và app kết nối được Metro (`adb reverse tcp:8081 tcp:8081`); không dùng được khi một phiên React Native DevTools khác đang giữ kết nối.
@@ -515,7 +515,7 @@ All three can be combined: the skill/AGENTS.md teach the _workflow_, MCP provide
 
 ## Current boundary
 
-- The device/runtime provider currently targets Android. Recorded runtime evidence used a Windows host with a physical Android 15/arm64 device and API 24/30/36 x86_64 AVDs; Ubuntu/macOS CI is host-only and does not expand runtime support. This is not yet a broad OEM/device-farm matrix, and any exact assurance scenario not run on the correct fixture remains `NOT_VERIFIED`.
+- The device/runtime provider currently targets Android. Recorded runtime evidence used a Windows host with a physical Android 15/arm64 device and API 24/30/36 x86_64 AVDs; CI also runs a read-only owned-demo smoke on Ubuntu/API 30 x86_64. macOS remains host-only, and one CI AVD does not establish broad OEM/device-farm support; any exact scenario not run on the correct fixture remains `NOT_VERIFIED`.
 - ADB has no trustworthy JS FPS signal; the field is returned as `available: false` — values are never guessed.
 - JS blocking, route, React renders, and network metadata require development instrumentation inside the app.
 - CDP features (`devtools-export`, `devtools-profile`, `metro-network`) need Metro running for the right app and the app connected to it (`adb reverse tcp:8081 tcp:8081`); they cannot attach while another React Native DevTools session holds the connection.

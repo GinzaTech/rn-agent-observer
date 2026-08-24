@@ -134,6 +134,27 @@ describe('passive accessibility pack', () => {
     ).toBe(true);
   });
 
+  it('does not fail a target whose observed bounds are clipped by the viewport', () => {
+    const result = analyzePassiveAccessibility(
+      tree([
+        control({
+          text: 'SecurityLab',
+          bounds: { x: 20, y: 769, width: 440, height: 31 },
+        }),
+      ]),
+      {
+        densityDpi: 160,
+        viewport: { width: 480, height: 800 },
+        analyzedAt: NOW,
+      },
+    );
+
+    expect(result.outcome).toBe('NOT_VERIFIED');
+    expect(result.counts.smallTouchTargets).toBe(0);
+    expect(result.counts.unverifiedTouchTargets).toBe(1);
+    expect(result.observations[0]?.touchTarget).toBe('not-verified');
+  });
+
   it('does not pass when the UI tree is missing or degraded', () => {
     const missing = analyzePassiveAccessibility(undefined, { analyzedAt: NOW });
     const degraded = analyzePassiveAccessibility(tree([control()]), {

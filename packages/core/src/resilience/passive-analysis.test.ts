@@ -147,6 +147,39 @@ describe('passive resilience pack', () => {
     expect(serialized).not.toContain('private.example.test');
   });
 
+  it('preserves ReactHost soft exceptions without failing runtime recovery', () => {
+    const result = analyzePassiveResilience(
+      baseInput(
+        [
+          {
+            id: 'logs',
+            title: 'No actionable runtime errors',
+            type: 'no-runtime-errors',
+            phase: 'recovery',
+          },
+        ],
+        {
+          checkpoints: {
+            recovery: checkpoint(RECOVERY, {
+              logs: [
+                {
+                  level: 'error',
+                  source: 'ReactHost',
+                  timestamp: RECOVERY,
+                  message:
+                    'ReactNoCrashSoftException: onWindowFocusChange before context ready',
+                },
+              ],
+            }),
+          },
+        },
+      ),
+    );
+
+    expect(result.outcome).toBe('PASS');
+    expect(result.findings[0]?.outcome).toBe('PASS');
+  });
+
   it('fails explicit crash, stuck-loading, error, network, and deadline evidence', () => {
     const secretLog: LogEntry = {
       level: 'error',

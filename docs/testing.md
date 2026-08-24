@@ -36,8 +36,12 @@ pnpm android:export:check
 CI chạy `pnpm check` trên Windows, Ubuntu và macOS để phát hiện lỗi install, lint,
 format, TypeScript build và unit test theo host. Package-smoke pack/inspect năm package
 public trên Ubuntu; MCP initialization và Expo Android export tiếp tục chạy trên
-Windows. Không job nào có device/emulator, vì vậy CI **không** phải bằng chứng Android
-runtime và không mở rộng support host được công bố trong capability matrix.
+Windows. Job `Android API 30 runtime smoke` dùng Ubuntu/KVM + Google APIs x86_64,
+build/install owned demo, nối Metro, rồi chạy read-only `app-state`,
+`understand-screen`, `ui-model` và session stop. Nó fail nếu app không foreground,
+không có interactive content/source-native model, thiếu evidence artifact hoặc có
+runtime capture failure. Đây chỉ là evidence cho exact API 30 CI fixture, không mở
+rộng thành mọi host/OEM/API hay thay thế ma trận local/physical.
 
 `pnpm check` kiểm repo implementation. `rn-observe ci` là application assurance
 workflow: nó chạy suite được cấu hình trên target và mặc định exit 1 cho cả `FAIL`
@@ -48,8 +52,8 @@ lẫn `NOT_VERIFIED`. Hai lệnh không thay thế nhau.
 Đã chạy trên workspace này:
 
 - `pnpm check`: PASS — ESLint, Prettier, TypeScript build và Vitest; schemas
-  19 tests, instrumentation 17, demo Expo 10, core 285, CLI 15, MCP 6 (tổng
-  **352 tests**);
+  19 tests, instrumentation 17, demo Expo 10, core 294, CLI 15, MCP 6 (tổng
+  **361 tests**);
 - `pnpm mcp:check`: PASS; server MCP khởi tạo được;
 - `pnpm rn-observe --version`: `2.4.0`;
 - `pnpm pack:check`: PASS cho 5 package public;
@@ -125,10 +129,12 @@ tier đều low-confidence vì chỉ có hai sample.
 Cold launch có ReactHost window-focus soft-error trên cả ba tier; API 24 còn có
 WebView variation-seed file-missing và API 36 có loading `BadToken`/deprecated
 pinning message. App vẫn foreground/Home `content`, còn checkpoint NetworkLab cuối
-có `runtimeErrors: 0`. Trên API 24/30, SecurityLab chỉ lộ 31 px ở cuối viewport
-480×800 nên Home heuristic báo một small touch target; NetworkLab cuối báo 0. Đây
-là evidence/limitation được giữ lại, không bị diễn giải thành crash hoặc kích thước
-intrinsic của control.
+có `runtimeErrors: 0`. Source 2.4.0 hiện phân loại ReactHost non-fatal soft-exception
+thành `runtime-platform-warning` info và loại khỏi app `runtimeErrors`/diagnosis,
+nhưng vẫn giữ message làm evidence; fatal ReactHost và lỗi độc lập như `BadToken`
+không bị hạ cấp. Trên API 24/30, SecurityLab chỉ lộ 31 px ở cuối viewport 480×800;
+source mới trả `partially-observed-touch-target`/`NOT_VERIFIED` thay vì kết luận
+intrinsic target nhỏ. Artifact run cũ vẫn giữ nguyên kết quả lịch sử trước fix.
 
 Sau run, exact AVD API 24/30/36 đã bị xóa; hai system image API 24/30 cài cho run
 đã uninstall; data root tạm trên ổ D và active config cục bộ đã xóa; Metro đã dừng.
@@ -234,7 +240,7 @@ Kết quả Unreleased screen-understanding: `pnpm check` pass lint, Prettier, T
 - Focused tests pass cho TypeScript AST source scanner, generated/explicit testID Babel transform, instrumentation privacy, source/native/telemetry correlation, view-flattening state và physical-interaction replay export.
 - Static scan Vshop: 115 actionable source element, 22 conditional, chỉ 1 explicit testID. Scanner trả được file/line thật; phần lớn source/runtime ownership sẽ ở trạng thái chưa correlate cho tới khi app bật Babel plugin hoặc thêm testID.
 - Physical demo acceptance 2026-08-24 đã đóng positive path hiện tại: model correlate route/source/native interaction, giữ evidence qua logcat rollover, không có capture failure và auto-capture khi stop thành công. Kết quả chỉ áp dụng exact demo fixture/device ở mục trên.
-- Full gate hiện tại là 352/352 tests + MCP/package/Android export; các con số 77 test bên dưới chỉ còn là record lịch sử của milestone UI-model đầu tiên.
+- Full gate hiện tại là 361/361 tests + MCP/package/Android export; các con số 77 test bên dưới chỉ còn là record lịch sử của milestone UI-model đầu tiên.
 
 ## Demo Expo native dogfood
 
@@ -301,7 +307,7 @@ Final-contract artifact:
 - `devtools-export` tự động có console/heap, nhưng RN 0.86 bridgeless không expose CDP Network/Profiler domains trên runtime đã thử. Không suy rộng giới hạn này sang mọi RN version.
 - JS FPS tiếp tục explicit unavailable; Perfetto là artifact thô, chưa tự phân tích thành app-specific CPU flame chart.
 - Vshop không được sửa source để thêm instrumentation, nên network/route/render event ở Vshop có thể rỗng. Đây là expected behavior, không phải dữ liệu 0 giả.
-- UIAutomator vẫn có latency và không có off-screen FlatList. Runtime UI model đã có source location/handler ownership nhưng chưa export toàn bộ React props/component stack như DevTools. CI host hiện chạy Windows/Ubuntu/macOS, nhưng macOS/Linux device runtime vẫn `NOT_VERIFIED`; contrast/focus-order audit, CDP protocol negotiation và loại native `better-sqlite3` vẫn là backlog.
+- UIAutomator vẫn có latency và không có off-screen FlatList. Runtime UI model đã có source location/handler ownership nhưng chưa export toàn bộ React props/component stack như DevTools. CI Android hiện chỉ cover Ubuntu/API 30 owned-demo smoke; macOS device runtime và broad Linux/OEM matrix vẫn `NOT_VERIFIED`. Contrast/focus-order audit, CDP protocol negotiation và loại native `better-sqlite3` vẫn là backlog.
 - Cold-start metric chỉ là Android `am start -W` khi `LaunchState=COLD`, không phải React Native time-to-interactive/full-display. Memory growth chỉ là process PSS signal, không chứng minh JS/native leak nếu chưa heap-profile.
 - Passive security/MASVS mapping không thay thế dynamic pentest. OSV match cần triage reachability/exploitability; OSV query bất toàn là `NOT_VERIFIED`.
 - Dashboard aggregate loại payload/path/secret/binary; session resource/report khác vẫn có thể chứa internal path/timeline và phải được review trước khi share.

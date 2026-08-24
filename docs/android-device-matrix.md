@@ -42,12 +42,23 @@ Quan sát không bị giấu khỏi kết quả:
 - cold launch ở cả ba tier có ReactHost `onWindowFocusChange` soft-error trong
   logcat; API 24 thêm WebView variation-seed file-missing và API 36 có loading
   `BadToken`/deprecated pinning message. App vẫn foreground, Home vẫn `content`, và
-  checkpoint NetworkLab cuối có `runtimeErrors: 0`; đây là dev-build/emulator
-  startup evidence cần theo dõi, không phải bằng chứng app crash;
+  checkpoint NetworkLab cuối có `runtimeErrors: 0`. Source hiện giữ ReactHost
+  non-fatal soft-exception dưới `runtime-platform-warning` info thay vì app-error,
+  còn fatal/`BadToken` vẫn actionable; artifact cũ không bị viết lại;
 - trên viewport 480×800 của API 24/30, nút SecurityLab cuối chỉ lộ 31 px ở mép
-  scroll nên Home checkpoint báo một `small-touch-target`. NetworkLab checkpoint
-  có 0 small target. Warning này phản ánh phần đang lộ trong viewport, không chứng
-  minh kích thước đầy đủ của control dưới vùng scroll.
+  scroll nên Home checkpoint cũ báo một `small-touch-target`. Analyzer hiện trả
+  `partially-observed-touch-target` info (passive pack trả `NOT_VERIFIED`) cho case
+  chạm mép viewport dưới 48dp; chỉ khi control nằm trọn viewport mới kết luận
+  intrinsic target nhỏ. NetworkLab checkpoint có 0 small target.
+
+## CI API 30 smoke duy trì
+
+Workflow CI tạo Google APIs API 30 x86_64 trên Ubuntu/KVM, prebuild/build/install
+owned debug demo, nối Metro bằng exact `adb -s emulator-5554 reverse`, rồi chạy script
+read-only `scripts/check-android-emulator-runtime.mjs`. Gate yêu cầu foreground app,
+interactive `content`, screenshot/UI-tree artifact, runtime UI model có source và
+native actions, session `complete`, không có runtime capture failure. Nó không tap,
+grant permission, chạy performance benchmark hay mở rộng kết quả sang API/OEM khác.
 
 ## Kịch bản acceptance chung
 

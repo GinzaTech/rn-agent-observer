@@ -143,6 +143,17 @@ exactly one Android Hermes bundle, then removes only that temporary directory.
 Do not report Android runtime as verified unless the relevant scenario also ran on
 a device or emulator and produced scoped before/after evidence.
 
+After publication, verify registry propagation, sha512 integrity and a clean
+consumer install of all five exact-version packages:
+
+```sh
+pnpm registry:check
+```
+
+The check retries bounded registry propagation, installs into a safety-checked OS
+temporary directory, runs the public CLI version and MCP health check, prints only
+registry metadata, and removes the temporary consumer.
+
 ## Verify release artifacts
 
 For npm, compare the installed version with the GitHub release tag and inspect npm
@@ -177,7 +188,7 @@ must be regenerated.
    provenance. The repository must provide an npm publishing credential through its
    protected `npm` environment.
 6. Verify the package pages, provenance, executable names, and a clean install in a
-   new temporary project before announcing the release.
+   new temporary project with `pnpm registry:check` before announcing the release.
 
 npm versions are immutable. If publication is partial, do not overwrite an already
 published version; diagnose the failed package and prepare a new version according

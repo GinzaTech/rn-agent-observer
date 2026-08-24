@@ -1638,15 +1638,21 @@ export class ObserverCore {
     totalInteractive: number;
     unlabeledCount: number;
     smallTouchTargets: number;
+    partiallyObservedTouchTargets: number;
     issues: Array<{
       className: string;
-      issue: 'unlabeled' | 'small-touch-target';
+      issue:
+        'unlabeled' | 'small-touch-target' | 'partially-observed-touch-target';
       bounds?: unknown;
     }>;
   }> {
     const tree = await this.getUiTree();
     const device = await this.adb.deviceInfo().catch(() => undefined);
-    const audit = auditAccessibility(tree, device?.densityDpi ?? 420);
+    const audit = auditAccessibility(
+      tree,
+      device?.densityDpi ?? 420,
+      device?.resolution,
+    );
     const result = {
       timestamp: new Date().toISOString(),
       ...audit,
@@ -1680,6 +1686,7 @@ export class ObserverCore {
     const device = await this.adb.deviceInfo().catch(() => undefined);
     const result = analyzePassiveAccessibility(tree, {
       densityDpi: device?.densityDpi ?? null,
+      viewport: device?.resolution ?? null,
     });
     this.record('a11y_audit', {
       analyzer: result.analyzer,

@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased — screen understanding cho Codex/agent
+## 2.4.0 — 2026-08-24
+
+### Host-only fixes và automated Android runtime gate
+
+- `understand-screen`, diagnosis và passive resilience tách ReactHost non-fatal
+  soft-exception thành platform warning: evidence vẫn được giữ nhưng không tăng app
+  runtime-error count; fatal ReactHost, `BadToken` và lỗi độc lập không bị hạ cấp.
+- Accessibility phân biệt intrinsic target nhỏ với bounds bị cắt ở mép viewport.
+  Case clipped trả info/`NOT_VERIFIED` và yêu cầu scroll vào trọn màn trước khi fail.
+- CI thêm Ubuntu/KVM API 30 x86_64 smoke: build/install owned demo, nối Metro, kiểm
+  foreground/content, screenshot/UI tree, source/native runtime UI model, complete
+  session và không có runtime capture failure. Đây không phải device-farm claim.
+- Thêm `pnpm registry:check` để chờ registry propagation có giới hạn, xác minh
+  sha512/tarball metadata của năm package, cài exact version trong consumer tạm rồi
+  chạy public CLI version + MCP health check và cleanup an toàn.
+- Publish workflow dùng Node >=22.14 + npm 11 để sẵn sàng provenance/trusted
+  publishing và chạy registry clean-consumer verification sau publish.
 
 ### Android API-tier emulator acceptance
 
@@ -34,7 +50,7 @@
   development fixture, không phải production/device-matrix claim.
 - Dependency hook `.pnpmfile.cjs` pin Metro security patch và CommonJS-compatible
   UUID; frozen install, 5 public tarball clean-consumer smoke, Android/Hermes export,
-  352/352 tests và OSV strict 673/673 components đều pass ở gate 2026-08-24.
+  361/361 tests và OSV strict 673/673 components đều pass ở gate 2026-08-24.
 
 ### Documentation và onboarding
 
@@ -134,43 +150,43 @@
 - Blank detection dùng semantic emptiness + pixel distribution; theme/canvas tối giản có thể cần người/agent mở screenshot để xác nhận.
 - Runtime log lỗi có thể gồm ReactHost/system soft error; response ghi rõ phải correlate timestamp, không coi số log là proof app defect.
 
-## 2.4.0 — 2026-08-22
+### Core hardening đã hoàn thành trước release — 2026-08-22
 
 Xử lý các điểm yếu ưu tiên đã thừa nhận, kèm runtime verification có phạm vi trên device thật (Xiaomi 23013PC75G, Android 15, MIUI). Các case chưa chạy đúng fixture vẫn giữ trạng thái `NOT VERIFIED`.
 
-### Diagnosis: confidence tính từ data + ngưỡng cấu hình được
+#### Diagnosis: confidence tính từ data + ngưỡng cấu hình được
 
 - Confidence giờ là hàm của (1) mức độ vượt ngưỡng và (2) độ mạnh đo được (frame sample count, tỷ lệ request chậm) — không còn hằng số viết tay.
 - `DiagnosisThresholds` override được qua core, các flag `diagnose`, và input MCP; quan hệ ngưỡng sai bị từ chối trước khi đo.
 - Mỗi finding trả `confidenceBasis`, ghi rõ đây là `heuristic-v1`, **không phải xác suất thống kê**. Ít mẫu sẽ gate confidence xuống (1 frame không còn cho score cao chỉ vì giá trị cực đoan).
 
-### CDP connection lock (giữa các process)
+#### CDP connection lock (giữa các process)
 
 - `CdpConnectionLock` dùng atomic create (`wx`) + owner UUID + pid-alive check. Lệnh thứ hai xếp hàng tối đa 180s; không cướp lock sống dù command chạy lâu. Hết thời gian trả `CDP_LOCK_HELD` recoverable.
 - Áp dụng cho `devtools-export`, `devtools-profile`, `metro-network`, `reload --fast`.
 
-### Evidence honest
+#### Evidence honest
 
 - Mọi event gọi `record()` khi chưa có session phát cảnh báo `EVIDENCE_NOT_RECORDED`; không còn âm thầm bỏ timeline. `launch`/`reload` còn trả `evidenceRecorded` trực tiếp.
 
-### Auto-record replay
+#### Auto-record replay
 
 - `session stop` tự sinh replay JSON; `replay export SESSION_ID` / MCP `replay_export` vẫn dùng được khi cần export thủ công.
 - Text nhập chỉ lưu độ dài và bị bỏ khỏi replay để không ghi password/token. `press --ref` ghi testID hoặc tọa độ fallback nên export không còn bỏ tap có cấu trúc.
 
-### Ref ổn định theo session
+#### Ref ổn định theo session
 
 - Registry ref được lưu trong thư mục session. Element cùng identity giữ nguyên ref khi reorder/scroll; ref đã biến mất không bị tái sử dụng cho element mới.
 
-### Artifact retention
+#### Artifact retention
 
 - `artifacts cleanup [--days N] [--dry-run]` / MCP `cleanup_artifacts`: xóa session + artifact cũ hơn N ngày (mặc định 14), trả số file/bytes; bỏ qua session active; SQLite xóa trong transaction.
 
-### A11y nâng cấp
+#### A11y nâng cấp
 
 - `a11y-audit` thêm kiểm tra **touch-target** (nhỏ hơn 48dp theo density device, chuẩn Android) bên cạnh unlabeled; trả cả hai counters.
 
-### Public contract và CLI/MCP
+#### Public contract và CLI/MCP
 
 - `FindingSchema` thêm optional `confidenceBasis: string[]`; contract cũ vẫn parse được.
 - `diagnose` CLI nhận `--ui-fps-low`, `--ui-fps-critical`, `--js-blocking`, `--js-blocking-high`, `--slow-request`, `--very-slow-request`, `--render-count`; MCP nhận các field snake_case tương ứng.
@@ -179,11 +195,11 @@ Xử lý các điểm yếu ưu tiên đã thừa nhận, kèm runtime verificat
 - `appLaunch` và `appReload` trả `evidenceRecorded`; các command khác vẫn giữ response schema và dùng warning channel để tránh breaking response envelope.
 - `OBSERVER_VERSION` đọc package metadata tại runtime; `rn-observe --version`, MCP version và package manifests cùng một nguồn.
 
-### Redaction fail-closed
+#### Redaction fail-closed
 
 - Query/header/body preview chuyển từ blocklist sang allowlist. Key lạ mặc định `[REDACTED]`; body text không có cấu trúc bị che toàn bộ.
 
-### Fix bug thật phát hiện khi verify
+#### Fix bug thật phát hiện khi verify
 
 - `record start`: `sh -c` multi-arg bị adb ghép mất quoting → screenrecord không bao giờ chạy. Fix: truyền pipeline là một string duy nhất + `setsid` detach khỏi session adbd (MIUI kill SIGHUP). Verify: mp4 366KB/6s.
 - `press` settle-diff dùng snapshot chế độ khác snapshot gốc (`-i` vs full) → diff nhiễu text node. Fix: lưu `interactiveOnly` vào state và tái dùng.
@@ -192,13 +208,13 @@ Xử lý các điểm yếu ưu tiên đã thừa nhận, kèm runtime verificat
 - `dumpsys gfxinfo` có thể trả lại nguyên cửa sổ frame cũ: observer giờ lưu chữ ký và đánh dấu frame metrics `available: false` nếu không có sample mới, thay vì trình bày cùng số như ba benchmark độc lập.
 - Version runtime đọc trực tiếp từ `packages/core/package.json`, bỏ hằng số version thứ hai dễ lệch.
 
-### Known limitations mới xác nhận trên runtime thật
+#### Known limitations mới xác nhận trên runtime thật
 
 - `reload --fast` (CDP Page.reload): JS tải lại nhưng **input tap có thể bị nuốt** trên MIUI/Android 15 tới khi relaunch thật — khuyến nghị dùng fast reload chỉ cho quan sát không tương tác, dùng `reload` đầy đủ trước khi tái hiện.
 - RN 0.86 bridgeless (Hermes) hiện **không expose CDP Network domain** (`metro-network` attach thành công nhưng 0 events) và **không hỗ trợ `Profiler.enable`** (`devtools-profile` lỗi tường minh). Cả hai kênh vẫn hữu ích với runtime RN hỗ trợ (0.83+ docs) và fallback instrumentation network vẫn hoạt động.
 - `exceptions[]` của `devtools-export` rỗng trên runtime này (unhandled error đi redbox/logcat, không qua `Runtime.exceptionThrown`).
 
-### Runtime verification đã chạy (device thật, serial được lược)
+#### Runtime verification đã chạy (device thật, serial được lược)
 
 - Vshop 4.1.1, `com.android.vshop`, perf mode: cảnh báo thiếu session xuất hiện; 16/16 element chung giữ ref qua scroll; auto replay 30 step chạy lại 30/30; recording 1,286,509 bytes và Perfetto trace đều attach session; hai `devtools-export` 2s chạy đồng thời hoàn thành nối tiếp trong 4.98s; custom diagnosis trả threshold + `confidenceBasis`.
 - Demo/device verification từ các lượt trước vẫn chỉ được công nhận theo từng case đã có artifact; không suy rộng thành toàn bộ blueprint 2.2–2.4.
@@ -206,13 +222,13 @@ Xử lý các điểm yếu ưu tiên đã thừa nhận, kèm runtime verificat
 
 Artifact chính của lượt Vshop nằm dưới `.artifacts/sessions/eba59716-bc2b-4fed-88c9-d8ae9037ba3e/`: `summaries/summary.json`, replay JSON, recording mp4 và Perfetto trace. Lượt benchmark freshness riêng dùng session `cbc0e2c8-88ad-496f-a974-85745a8ec429`.
 
-### Validation/release gate
+#### Validation/release gate
 
 - `pnpm release:check`: PASS (`lint`, `format:check`, build 6 workspace packages, 61 tests, MCP init, CLI version 2.4.0).
 - Android Expo export fixture: PASS, Hermes bundle khoảng 1.4MB.
 - `git diff --check`: PASS.
 
-### Chưa giải quyết trong 2.4.0
+#### Chưa giải quyết trong 2.4.0
 
 - UIAutomator vẫn chậm, không thấy off-screen FlatList và không thay thế React component/props tree.
 - Chưa có host support chính thức cho macOS/Linux; usage/protocol/troubleshooting chi tiết vẫn chủ yếu tiếng Việt/PowerShell.
@@ -221,7 +237,7 @@ Artifact chính của lượt Vshop nằm dưới `.artifacts/sessions/eba59716-
 - CDP chưa negotiation protocol version; runtime capability hiện được xác nhận bằng command success/structured unsupported error.
 - Chưa chạy lại toàn bộ blueprint 2.2–2.4 đúng fixture; case thiếu artifact vẫn `NOT VERIFIED`, không được suy rộng từ Vshop smoke/performance flow.
 
-### Khác
+#### Khác
 
 - MCP 41 → 43 tools (`replay_export`, `cleanup_artifacts`); CLI 35 → 37 lệnh; version 2.4.0 lấy từ package metadata; 61 unit tests.
 

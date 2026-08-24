@@ -4,6 +4,8 @@ import { buildSnapshot } from '../refs/snapshot.js';
 import {
   analyzePixels,
   analyzeScreen,
+  auditAccessibility,
+  isNonActionablePlatformLog,
   redactSensitiveUiTree,
   type AnalyzeScreenInput,
   type PriorUnderstandingState,
@@ -45,6 +47,8 @@ function input(
     prior?: PriorUnderstandingState;
     now?: string;
     visuallyBlank?: boolean;
+    screen?: { width: number; height: number };
+    errorLogs?: AnalyzeScreenInput['errorLogs'];
   } = {},
 ): AnalyzeScreenInput {
   const redacted = redactSensitiveUiTree(uiTree);
@@ -52,8 +56,8 @@ function input(
     tree: redacted,
     snapshot: buildSnapshot(redacted),
     screen: {
-      width: 1080,
-      height: 2400,
+      width: options.screen?.width ?? 1080,
+      height: options.screen?.height ?? 2400,
       orientation: 'portrait',
       timestamp: NOW,
       artifactId: 'shot-1',
@@ -72,7 +76,7 @@ function input(
         },
     densityDpi: 160,
     appState: appState(),
-    errorLogs: [],
+    errorLogs: options.errorLogs ?? [],
     route: '/profile',
     stuckAfterMs: 15_000,
     ...(options.prior ? { prior: options.prior } : {}),
@@ -228,5 +232,89 @@ describe('screen understanding', () => {
     });
     expect(white.dominantColorRatio).toBe(1);
     expect(white.luminanceStdDev).toBe(0);
+  });
+
+  it('keeps a viewport-clipped control distinct from an intrinsic small target', () => {
+    const clippedTree = tree([
+      {
+        type: 'android.widget.Button',
+        text: 'SecurityLab',
+        clickable: true,
+        bounds: { x: 20, y: 769, width: 440, height: 31 },
+      },
+    ]);
+    const audit = auditAccessibility(clippedTree, 160, {
+      width: 480,
+      height: 800,
+    });
+    expect(audit.smallTouchTargets).toBe(0);
+    expect(audit.partiallyObservedTouchTargets).toBe(1);
+
+    const result = analyzeScreen(
+      input(clippedTree, { screen: { width: 480, height: 800 } }),
+    );
+    expect(result.counts.smallTouchTargets).toBe(0);
+    expect(result.issues.map((finding) => finding.code)).toContain(
+      'partially-observed-touch-target',
+    );
+  });
+
+  it('still reports a fully observed intrinsic small touch target', () => {
+    const audit = auditAccessibility(
+      tree([
+        {
+          type: 'android.widget.Button',
+          text: 'Compact action',
+          clickable: true,
+          bounds: { x: 100, y: 100, width: 120, height: 32 },
+        },
+      ]),
+      160,
+      { width: 480, height: 800 },
+    );
+    expect(audit.smallTouchTargets).toBe(1);
+    expect(audit.partiallyObservedTouchTargets).toBe(0);
+  });
+
+  it('preserves ReactHost soft exceptions without counting them as app errors', () => {
+    const softException = {
+      level: 'error' as const,
+      source: 'ReactHost',
+      timestamp: NOW,
+      message:
+        'ReactHost: com.facebook.react.bridge.ReactNoCrashSoftException: onWindowFocusChange before context ready',
+    };
+    expect(isNonActionablePlatformLog(softException)).toBe(true);
+    const result = analyzeScreen(
+      input(tree([{ type: 'TextView', text: 'Home' }]), {
+        errorLogs: [softException],
+      }),
+    );
+    expect(result.counts.runtimeErrors).toBe(0);
+    expect(result.issues.map((finding) => finding.code)).toContain(
+      'runtime-platform-warning',
+    );
+    expect(result.issues.map((finding) => finding.code)).not.toContain(
+      'runtime-log-error',
+    );
+  });
+
+  it('keeps independent window errors actionable', () => {
+    const result = analyzeScreen(
+      input(tree([{ type: 'TextView', text: 'Home' }]), {
+        errorLogs: [
+          {
+            level: 'error',
+            source: 'WindowManager',
+            timestamp: NOW,
+            message: 'BadTokenException while adding application window',
+          },
+        ],
+      }),
+    );
+    expect(result.counts.runtimeErrors).toBe(1);
+    expect(result.issues.map((finding) => finding.code)).toContain(
+      'runtime-log-error',
+    );
   });
 });

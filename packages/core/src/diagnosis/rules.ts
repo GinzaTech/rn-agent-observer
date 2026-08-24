@@ -5,6 +5,7 @@ import type {
   PerformanceSnapshot,
   ReactRenderStat,
 } from '@rn-agent-observer/schemas';
+import { isNonActionablePlatformLog } from './runtime-errors.js';
 
 export interface DiagnosisThresholds {
   /** UI FPS below this flags a frame-rate finding. Default 45. */
@@ -283,6 +284,7 @@ export function diagnoseEvidence(
     (entry) =>
       (entry.level === 'error' || entry.level === 'fatal') &&
       !ignoredSystemSources.has(entry.source) &&
+      !isNonActionablePlatformLog(entry) &&
       !/^\s*at\s/.test(entry.message),
   );
   if (errors.length) {

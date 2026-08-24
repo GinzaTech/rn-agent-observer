@@ -120,7 +120,7 @@ understand-screen -> reproduce -> inspect issue + screenshot/log/network
   -> understand-screen -> compare before/after -> replay
 ```
 
-Classification là heuristic deterministic, không tự chứng minh nguyên nhân. UIAutomator không thấy off-screen FlatList, React props/component owner, contrast hoặc focus order. Giá trị hiện tại của mọi text-field bị redact trước khi ghi artifact và snapshot ref không bao giờ trả nội dung ô nhập.
+Classification là heuristic deterministic, không tự chứng minh nguyên nhân. ReactHost non-fatal soft-exception được giữ dưới `runtime-platform-warning` nhưng không tăng app `runtimeErrors`; fatal/independent errors vẫn actionable. Control dưới 48dp chỉ vì bounds chạm mép viewport được báo `partially-observed-touch-target`, yêu cầu scroll vào trọn màn trước khi kết luận intrinsic size. UIAutomator không thấy off-screen FlatList, React props/component owner, contrast hoặc focus order. Giá trị hiện tại của mọi text-field bị redact trước khi ghi artifact và snapshot ref không bao giờ trả nội dung ô nhập.
 
 ## 3c. Nối source React Native với runtime và tự ghi interaction
 
