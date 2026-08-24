@@ -122,6 +122,14 @@ frame rows; API 30 không có gfx frame rows; API 36 có 39 frame sample trong l
 fixture. Không giá trị unavailable nào bị đổi thành 0. Network percentile cả ba
 tier đều low-confidence vì chỉ có hai sample.
 
+Cold launch có ReactHost window-focus soft-error trên cả ba tier; API 24 còn có
+WebView variation-seed file-missing và API 36 có loading `BadToken`/deprecated
+pinning message. App vẫn foreground/Home `content`, còn checkpoint NetworkLab cuối
+có `runtimeErrors: 0`. Trên API 24/30, SecurityLab chỉ lộ 31 px ở cuối viewport
+480×800 nên Home heuristic báo một small touch target; NetworkLab cuối báo 0. Đây
+là evidence/limitation được giữ lại, không bị diễn giải thành crash hoặc kích thước
+intrinsic của control.
+
 Sau run, exact AVD API 24/30/36 đã bị xóa; hai system image API 24/30 cài cho run
 đã uninstall; data root tạm trên ổ D và active config cục bộ đã xóa; Metro đã dừng.
 Inventory cuối không có device ADB và chỉ còn AVD `Medium_Phone_API_36.1` có sẵn

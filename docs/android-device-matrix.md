@@ -37,6 +37,18 @@ thiếu gfx frame rows không bị chuyển thành FPS 0; trên API 24, CPU proc
 đọc được cũng được giữ `available: false`. Hai request network ở mỗi tier là mẫu
 quá nhỏ nên percentile vẫn `percentileLowConfidence: true`.
 
+Quan sát không bị giấu khỏi kết quả:
+
+- cold launch ở cả ba tier có ReactHost `onWindowFocusChange` soft-error trong
+  logcat; API 24 thêm WebView variation-seed file-missing và API 36 có loading
+  `BadToken`/deprecated pinning message. App vẫn foreground, Home vẫn `content`, và
+  checkpoint NetworkLab cuối có `runtimeErrors: 0`; đây là dev-build/emulator
+  startup evidence cần theo dõi, không phải bằng chứng app crash;
+- trên viewport 480×800 của API 24/30, nút SecurityLab cuối chỉ lộ 31 px ở mép
+  scroll nên Home checkpoint báo một `small-touch-target`. NetworkLab checkpoint
+  có 0 small target. Warning này phản ánh phần đang lộ trong viewport, không chứng
+  minh kích thước đầy đủ của control dưới vùng scroll.
+
 ## Kịch bản acceptance chung
 
 1. Xác minh exact SDK bằng `getprop`, không tiếp tục nếu khác tier dự kiến.

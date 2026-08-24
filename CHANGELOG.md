@@ -10,6 +10,9 @@
 - Availability được giữ đúng theo target: API 24 không có process CPU/gfx rows,
   API 30 không có gfx rows; không metric thiếu nào bị điền 0. Mọi network percentile
   đều low-confidence vì chỉ có hai sample.
+- Tài liệu giữ cả warning quan sát được: cold-launch ReactHost/window soft-error và
+  Home 480×800 có nút cuối chỉ lộ 31 px; checkpoint NetworkLab cuối trở về 0 runtime
+  error và 0 small touch target.
 - Ba AVD tạm đã xóa; image API 24/30 cài riêng đã uninstall; data root/active config
   tạm và Metro đã cleanup. AVD API 36.1 có sẵn trước run được giữ nguyên.
 - Thêm `docs/android-device-matrix.md` với exact fixture, acceptance flow, lệnh tạo
