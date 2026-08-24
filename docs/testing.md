@@ -74,7 +74,7 @@ lẫn `NOT_VERIFIED`. Hai lệnh không thay thế nhau.
 - Expo Android/Hermes export: PASS, 581 modules, 2 files và đúng một Hermes bundle;
   output local ở temporary directory;
 - `pnpm install --frozen-lockfile`: PASS với checksum `.pnpmfile.cjs`;
-- OSV strict: PASS, 683/683 locked component queried và 0 advisory.
+- OSV strict: PASS, 654/654 locked component queried và 0 advisory.
 
 Lượt này còn khóa exact inventory 66 MCP tools, policy action fail-closed ở
 Core/CLI, redaction deep-link xuyên response/session/replay và SecurityLab

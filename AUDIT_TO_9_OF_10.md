@@ -72,7 +72,7 @@ evidence trong cùng session.
 - `uuid` transitively từ `xcode` được nâng 7.0.3 lên CommonJS-compatible 11.1.1.
 - Hook `.pnpmfile.cjs` áp hai pin trên cho cả pnpm 9.6 của repo và wrapper pnpm
   mới hơn; `pack:check` chặn release nếu lockfile tái xuất hiện bản dễ tổn thương.
-- Audit OSV strict ngày 2026-08-24: **683/683 components queried, 0 advisory,
+- Audit OSV strict ngày 2026-08-24: **654/654 components queried, 0 advisory,
   `PASS`**. SBOM và report nằm trong `.artifacts/sessions/standalone/`.
 - GitHub `main` bắt buộc PR, 11 status checks, linear history và conversation
   resolution; admin cũng chịu rule, force-push/xóa nhánh bị tắt. npm environment
@@ -127,7 +127,7 @@ Trạng thái evidence gần nhất:
 | Frozen lockfile                        | `PASS`                                                  |
 | Build                                  | `PASS`                                                  |
 | Android/Hermes export                  | `PASS`, 2 files, 1 Hermes bundle                        |
-| OSV dependency audit                   | `PASS`, 683 queried, 0 advisory                         |
+| OSV dependency audit                   | `PASS`, 654 queried, 0 advisory                         |
 | Full `release:check` sau thay đổi cuối | `PASS`, 363/363 tests + coverage/OSV/MCP/package/export |
 | Physical Android positive flow         | `PASS`, exact target pinned, session complete           |
 | Emulator API 24/30/36 positive flow    | `PASS`, ba AVD/session tạm đã cleanup                   |

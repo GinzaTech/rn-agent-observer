@@ -12,6 +12,9 @@
 - Cô lập MCP handshake test khỏi `.artifacts` của workspace và thêm bounded,
   deterministic fuzz regression cho ADB text parsers; extreme numeric input giờ
   fail closed thay vì có thể tạo timestamp/bounds/PSS không hữu hạn.
+- Nâng `better-sqlite3` từ 11.10 lên 13.0.3 sau khi Node 24 CI phát hiện native
+  cleanup-hook assertion; giữ Node 22 minimum và xác minh lại SQLite/MCP trên cả
+  Node 22 lẫn clean Node 24 install.
 - Thêm CodeQL, dependency review, strict OSV CI, Node 24 compatibility, Dependabot
   config, CODEOWNERS, issue/RFC forms và PR evidence checklist.
 - Thêm `ROADMAP.md`, `MAINTAINERS.md`, `SUPPORT.md`; công khai bus factor 1 và giữ
