@@ -17,6 +17,12 @@
   chạy public CLI version + MCP health check và cleanup an toàn.
 - Publish workflow dùng Node >=22.14 + npm 11 để sẵn sàng provenance/trusted
   publishing và chạy registry clean-consumer verification sau publish.
+- Demo khai báo trực tiếp `babel-preset-expo` thay vì dựa vào dependency bắc cầu;
+  export gate kiểm manifest package trước khi bundle để node_modules cũ không che
+  lỗi clean install. Các GitHub Actions chính được nâng lên runtime Node 24-ready.
+- External-process fixture dùng startup/request budget riêng cho test dưới tải song
+  song, vẫn kiểm timeout và cleanup process tree nhưng tránh false timeout trên host
+  Windows bận.
 
 ### Android API-tier emulator acceptance
 

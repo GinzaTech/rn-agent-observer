@@ -8,6 +8,7 @@ import path from 'node:path';
 
 const projectRoot = process.cwd();
 const demoRoot = path.join(projectRoot, 'apps', 'demo-expo');
+const demoPackagePath = path.join(demoRoot, 'package.json');
 const temporaryRoot = path.resolve(tmpdir());
 const outputDirectory = await mkdtemp(
   path.join(temporaryRoot, 'rn-observer-android-export-'),
@@ -65,6 +66,17 @@ async function runExpoExport() {
 }
 
 try {
+  const demoPackage = JSON.parse(await readFile(demoPackagePath, 'utf8'));
+  if (
+    typeof demoPackage.devDependencies !== 'object' ||
+    demoPackage.devDependencies === null ||
+    typeof demoPackage.devDependencies['babel-preset-expo'] !== 'string'
+  ) {
+    fail(
+      'babel-preset-expo must be declared directly in demo devDependencies.',
+    );
+  }
+
   await runExpoExport();
   const metadataPath = path.join(outputDirectory, 'metadata.json');
   const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));

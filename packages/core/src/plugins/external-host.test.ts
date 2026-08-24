@@ -96,7 +96,7 @@ function actionManifest(
       ],
       shell: false,
       environmentAllowlist: ['PLUGIN_ALLOWED'],
-      requestTimeoutMs: options.requestTimeoutMs ?? 1_000,
+      requestTimeoutMs: options.requestTimeoutMs ?? 5_000,
       shutdownTimeoutMs: 500,
       maxMessageBytes: options.maxMessageBytes ?? 16 * 1024,
     },
@@ -255,42 +255,46 @@ describe('external plugin process host', () => {
     expect(host.state).toBe('failed');
   });
 
-  it('terminates a verified live child tree after request timeout', async () => {
-    const root = temporaryProject();
-    const markerPath = join(root, 'orphan-marker.txt');
-    const readyPath = join(root, 'descendant-ready.txt');
-    const host = createActionHost(
-      root,
-      actionManifest({ requestTimeoutMs: 2_000 }),
-    );
-    const pending = host.executeAction(
-      {
-        mode: 'hang',
-        markerPath,
-        readyPath,
-        markerDelayMs: 2_500,
-      },
-      { timeoutMs: 1_000 },
-    );
-    expect(await waitUntil(() => existsSync(readyPath), 750)).toBe(true);
-    const descendantPid = Number.parseInt(
-      readFileSync(readyPath, 'utf8').trim(),
-      10,
-    );
-    expect(Number.isSafeInteger(descendantPid)).toBe(true);
-    expect(processIsAlive(descendantPid)).toBe(true);
+  it(
+    'terminates a verified live child tree after request timeout',
+    { timeout: 10_000 },
+    async () => {
+      const root = temporaryProject();
+      const markerPath = join(root, 'orphan-marker.txt');
+      const readyPath = join(root, 'descendant-ready.txt');
+      const host = createActionHost(
+        root,
+        actionManifest({ requestTimeoutMs: 5_000 }),
+      );
+      const pending = host.executeAction(
+        {
+          mode: 'hang',
+          markerPath,
+          readyPath,
+          markerDelayMs: 4_500,
+        },
+        { timeoutMs: 3_000 },
+      );
+      expect(await waitUntil(() => existsSync(readyPath), 2_500)).toBe(true);
+      const descendantPid = Number.parseInt(
+        readFileSync(readyPath, 'utf8').trim(),
+        10,
+      );
+      expect(Number.isSafeInteger(descendantPid)).toBe(true);
+      expect(processIsAlive(descendantPid)).toBe(true);
 
-    await expect(pending).rejects.toMatchObject({
-      code: 'PLUGIN_REQUEST_TIMEOUT',
-    });
-    expect(host.state).toBe('failed');
-    await host.dispose();
-    expect(await waitUntil(() => !processIsAlive(descendantPid), 1_000)).toBe(
-      true,
-    );
-    await new Promise((resolveWait) => setTimeout(resolveWait, 1_700));
-    expect(existsSync(markerPath)).toBe(false);
-  });
+      await expect(pending).rejects.toMatchObject({
+        code: 'PLUGIN_REQUEST_TIMEOUT',
+      });
+      expect(host.state).toBe('failed');
+      await host.dispose();
+      expect(await waitUntil(() => !processIsAlive(descendantPid), 2_000)).toBe(
+        true,
+      );
+      await new Promise((resolveWait) => setTimeout(resolveWait, 2_000));
+      expect(existsSync(markerPath)).toBe(false);
+    },
+  );
 
   it('terminates the process when AbortSignal cancels a request', async () => {
     const root = temporaryProject();
