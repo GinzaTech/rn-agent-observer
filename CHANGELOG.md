@@ -15,6 +15,9 @@
   foreground/content, screenshot/UI tree, source/native runtime UI model, complete
   session, không có actionable runtime error hoặc runtime capture failure. Đây
   không phải device-farm claim.
+- Current evidence: CI run 32716081081 trên commit `0300864` đạt 7/7 jobs; API 30
+  trả Home `content`, `runtimeErrors: 0`, model 18 source/7 native action, session
+  `complete` 32 event/16 artifact và exact emulator được kill ở post-step.
 - Thêm `pnpm registry:check` để chờ registry propagation có giới hạn, xác minh
   sha512/tarball metadata của năm package, cài exact version trong consumer tạm rồi
   chạy public CLI version + MCP health check và cleanup an toàn.

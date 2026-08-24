@@ -57,8 +57,15 @@ Workflow CI tạo Google APIs API 30 x86_64 trên Ubuntu/KVM, prebuild/build/ins
 owned debug demo, nối Metro bằng exact `adb -s emulator-5554 reverse`, rồi chạy script
 read-only `scripts/check-android-emulator-runtime.mjs`. Gate yêu cầu foreground app,
 interactive `content`, screenshot/UI-tree artifact, runtime UI model có source và
-native actions, session `complete`, không có runtime capture failure. Nó không tap,
-grant permission, chạy performance benchmark hay mở rộng kết quả sang API/OEM khác.
+native actions, session `complete`, không có actionable runtime error hoặc runtime
+capture failure. Nó không tap, grant permission, chạy performance benchmark hay mở
+rộng kết quả sang API/OEM khác.
+
+[CI run 32716081081](https://github.com/GinzaTech/rn-agent-observer/actions/runs/32716081081)
+trên commit `0300864` đạt 7/7 jobs. Runtime summary của API 30 ghi Home `content`,
+26 visible/7 interactive element, `runtimeErrors: 0`, model 18 source/7 native
+action, session `complete` 32 event/16 artifact; post-step nhận `OK: killing
+emulator` sau exact `adb -s emulator-5554 emu kill`.
 
 ## Kịch bản acceptance chung
 

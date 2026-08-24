@@ -1,5 +1,7 @@
 # RN Agent Observer
 
+[![CI](https://github.com/GinzaTech/rn-agent-observer/actions/workflows/ci.yml/badge.svg)](https://github.com/GinzaTech/rn-agent-observer/actions/workflows/ci.yml)
+
 **VI** · [English](#rn-agent-observer-1)
 
 RN Agent Observer là cầu nối quan sát và kiểm định cục bộ cho React Native/Expo. Công cụ dùng cùng một core TypeScript cho CLI và MCP, điều khiển Android qua ADB/UIAutomator, nhận telemetry từ instrumentation phát triển, chạy quality suite có evidence, kiểm tra bảo mật thụ động/supply chain và active scenario bị ràng buộc, lặp performance experiment, tạo dashboard offline đã lược dữ liệu nhạy cảm, chia sẻ `.rnobs` metadata-first, kiểm coverage route/action semantic, và lưu session bằng SQLite trong khi giữ binary lớn ở dạng artifact trên đĩa.

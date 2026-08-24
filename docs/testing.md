@@ -40,8 +40,17 @@ Windows. Job `Android API 30 runtime smoke` dùng Ubuntu/KVM + Google APIs x86_6
 build/install owned demo, nối Metro, rồi chạy read-only `app-state`,
 `understand-screen`, `ui-model` và session stop. Nó fail nếu app không foreground,
 không có interactive content/source-native model, thiếu evidence artifact hoặc có
-runtime capture failure. Đây chỉ là evidence cho exact API 30 CI fixture, không mở
-rộng thành mọi host/OEM/API hay thay thế ma trận local/physical.
+actionable runtime error/runtime capture failure. Đây chỉ là evidence cho exact API
+30 CI fixture, không mở rộng thành mọi host/OEM/API hay thay thế ma trận
+local/physical.
+
+Commit `0300864` đã đạt [CI run 32716081081](https://github.com/GinzaTech/rn-agent-observer/actions/runs/32716081081)
+với **7/7 jobs PASS**. Exact Ubuntu/API 30 runtime job trả `outcome: PASS`, Home
+`content`, 26 visible/7 interactive element, `runtimeErrors: 0`; runtime UI model có
+18 source action, 7 native action và 0 interaction error; session `complete` có 32
+event/16 artifact. Post-step chạy exact `adb -s emulator-5554 emu kill` và nhận
+`OK: killing emulator`. Đây là current CI fixture evidence cho commit đó, không
+phải chứng nhận mọi Android device.
 
 `pnpm check` kiểm repo implementation. `rn-observe ci` là application assurance
 workflow: nó chạy suite được cấu hình trên target và mặc định exit 1 cho cả `FAIL`
