@@ -1,0 +1,15 @@
+appId: dev.rnagentobserver.demo
+---
+- launchApp:
+    clearState: false
+- assertVisible: 'RN Agent Observer Demo'
+- tapOn: 'PerformanceLab'
+- assertVisible: 'Trigger 100ms JS task'
+- tapOn: 'Trigger 100ms JS task'
+- assertVisible: 'Last block: .*ms'
+- tapOn: 'Back'
+- tapOn: 'NetworkLab'
+- tapOn: '500ms request'
+- assertVisible: '200 in .*ms fixture'
+- tapOn: 'Back'
+- assertVisible: 'RN Agent Observer Demo'

@@ -202,7 +202,11 @@ describe('runtime instrumentation', () => {
     });
 
     const line = String(info.mock.calls[0]?.[0]);
-    const payload = JSON.parse(line.slice(line.indexOf('{'))) as {
+    const jsonPart = line.slice(
+      line.indexOf('{'),
+      line.indexOf(' rnobsSig=') > 0 ? line.indexOf(' rnobsSig=') : undefined,
+    );
+    const payload = JSON.parse(jsonPart) as {
       namespace: string;
       data: Record<string, unknown>;
       privacy: { policy: string; redacted: boolean; truncated: boolean };

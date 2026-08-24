@@ -33,8 +33,22 @@ export type ReplayStep =
       redactedComponents?: readonly DeepLinkRedactedComponent[];
     }
   | { action: 'reload'; fast?: boolean }
-  | { action: 'assert'; testId?: string; text?: string; visible?: boolean }
+  | {
+      action: 'assert';
+      testId?: string;
+      text?: string;
+      visible?: boolean;
+      textEquals?: string;
+    }
   | { action: 'wait'; ms: number }
+  | {
+      action: 'wait-for';
+      testId?: string;
+      text?: string;
+      visible?: boolean;
+      textEquals?: string;
+      timeoutMs?: number;
+    }
   | { action: 'screenshot' };
 
 export interface ReplayScript {
@@ -68,6 +82,7 @@ export interface ReplayActions {
   reload(step: Extract<ReplayStep, { action: 'reload' }>): Promise<string>;
   assert(step: Extract<ReplayStep, { action: 'assert' }>): Promise<string>;
   wait(step: Extract<ReplayStep, { action: 'wait' }>): Promise<string>;
+  waitFor(step: Extract<ReplayStep, { action: 'wait-for' }>): Promise<string>;
   screenshot(): Promise<string>;
 }
 
@@ -109,6 +124,12 @@ export async function runReplayScript(
           break;
         case 'wait':
           summary = await actions.wait(step);
+          break;
+        case 'wait-for':
+          summary = await actions.waitFor(step);
+          if (!summary.startsWith('wait-for passed')) {
+            ok = false;
+          }
           break;
         case 'screenshot':
           summary = await actions.screenshot();

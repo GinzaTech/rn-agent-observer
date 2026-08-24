@@ -45,6 +45,20 @@ export const ScreenComparisonSchema = z.object({
   }),
   similarity: z.number().min(0).max(1),
   changedPixels: z.number().int().nonnegative(),
+  comparedPixels: z.number().int().nonnegative().optional(),
+  ignoredPixels: z.number().int().nonnegative().optional(),
+  /** Pixelmatch uses perceptual YIQ colour distance with this threshold. */
+  perceptualThreshold: z.number().min(0).max(1).optional(),
+  ignoredRegions: z
+    .array(
+      z.object({
+        x: z.number().int().nonnegative(),
+        y: z.number().int().nonnegative(),
+        width: z.number().int().positive(),
+        height: z.number().int().positive(),
+      }),
+    )
+    .optional(),
   changedRegions: z.array(
     z.object({
       x: z.number(),

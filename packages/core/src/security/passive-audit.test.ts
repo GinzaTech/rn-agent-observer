@@ -50,6 +50,12 @@ describe('passive project security audit', () => {
     expect(result.manifestAnalyses).toHaveLength(1);
     expect(result.networkSecurityAnalyses).toHaveLength(1);
     expect(result.secretScans).toHaveLength(1);
+    expect(result.scope).toEqual({
+      manifests: { explicit: false, candidates: 1, found: 1 },
+      networkSecurityConfigs: { explicit: false, candidates: 1, found: 1 },
+      text: { explicit: false, found: 0 },
+      artifacts: { enabled: true, found: 1 },
+    });
     expect(serialized).not.toContain('exampleBearerToken1234567890');
   });
 
@@ -82,5 +88,11 @@ describe('passive project security audit', () => {
         outcome: 'NOT_VERIFIED',
       }),
     );
+    expect(result.scope).toEqual({
+      manifests: { explicit: false, candidates: 1, found: 0 },
+      networkSecurityConfigs: { explicit: false, candidates: 0, found: 0 },
+      text: { explicit: false, found: 0 },
+      artifacts: { enabled: false, found: 0 },
+    });
   });
 });

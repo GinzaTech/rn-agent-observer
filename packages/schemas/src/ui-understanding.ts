@@ -23,6 +23,7 @@ export const UiIssueCodeSchema = z.enum([
   'duplicate-test-id',
   'zero-size-control',
   'offscreen-control',
+  'text-language-unknown',
 ]);
 
 export const UiIssueSchema = z.object({
@@ -46,6 +47,9 @@ export const ScreenUnderstandingSchema = z.object({
   fingerprint: z.string().min(1),
   route: z.string().nullable(),
   headline: z.string().nullable(),
+  textLanguage: z
+    .enum(['en', 'vi', 'ja', 'ko', 'zh', 'es', 'unknown'])
+    .default('unknown'),
   summary: z.string().min(1),
   visibleText: z.array(z.string()),
   actions: z.array(

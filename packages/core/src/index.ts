@@ -49,6 +49,7 @@ import {
 } from './accessibility/passive-audit.js';
 import { ArtifactManager } from './artifacts/artifact-manager.js';
 import { comparePngFiles } from './comparison/compare.js';
+import type { PngComparisonOptions } from './comparison/compare.js';
 import {
   analyzeActionCoverage,
   type ActionCoverageResult,
@@ -87,6 +88,12 @@ import {
   uiInteractionsFromLogs,
   type AppDataEvent,
 } from './network/network.js';
+import {
+  mergeRuntimeTelemetry,
+  readRuntimeTelemetryCache,
+  writeRuntimeTelemetryCache,
+  type RuntimeTelemetryCache,
+} from './network/runtime-telemetry-cache.js';
 import { TraceManager } from './performance/trace-manager.js';
 import {
   frameMetricSignature,
@@ -237,6 +244,12 @@ export interface ObserverCoreOptions {
   adbExecutable?: string;
   sessionId?: string;
   captureRuntimeUiOnStop?: boolean;
+  /**
+   * Explicit host-side acknowledgement for a repository config that requests
+   * active mutations. It is intentionally not stored in `.rn-observer.json`:
+   * a cloned repository cannot self-attest its own authorization.
+   */
+  trustActiveConfig?: boolean;
   onWarning?: (warning: ObserverWarning) => void;
 }
 
@@ -297,6 +310,7 @@ export class ObserverCore {
   private readonly explicitAppId: string | undefined;
   private readonly onWarning: (warning: ObserverWarning) => void;
   private readonly captureRuntimeUiOnStop: boolean;
+  private readonly activeConfigTrusted: boolean;
   private activeSessionId: string | undefined;
   private warnedWithoutSession = false;
 
@@ -310,6 +324,9 @@ export class ObserverCore {
     this.config = loadedConfig.config;
     this.configPath = loadedConfig.path;
     this.configExists = loadedConfig.exists;
+    this.activeConfigTrusted =
+      options.trustActiveConfig === true ||
+      process.env.RN_OBSERVER_TRUST_ACTIVE_CONFIG === '1';
     const deviceId =
       options.deviceId ??
       process.env.RN_OBSERVER_DEVICE_ID ??
@@ -366,6 +383,7 @@ export class ObserverCore {
    * Read-only evidence collection deliberately does not use this boundary.
    */
   assertActionAuthorized(action: ObserverAction): void {
+    this.assertActiveConfigTrusted();
     const decision = authorizeObserverAction(
       this.config,
       action,
@@ -382,6 +400,7 @@ export class ObserverCore {
   }
 
   private assertPersistentPermissionChangeAuthorized(permission: string): void {
+    this.assertActiveConfigTrusted();
     const decision = authorizePersistentPermissionChange(
       this.config,
       permission,
@@ -395,6 +414,20 @@ export class ObserverCore {
       true,
       'Enable only the exact owned app, ADB device, persistent-permission risk, and runtime permission in project policy.',
     );
+  }
+
+  private assertActiveConfigTrusted(): void {
+    if (
+      this.config.security.mode === 'authorized-active' &&
+      !this.activeConfigTrusted
+    ) {
+      throw new ObserverError(
+        'ACTION_NOT_AUTHORIZED',
+        'Refused active action: the repository config is not trusted by this process.',
+        true,
+        'Review the config, then set RN_OBSERVER_TRUST_ACTIVE_CONFIG=1 for this command or pass trustActiveConfig: true from an owning integration.',
+      );
+    }
   }
 
   getStatus() {
@@ -595,6 +628,7 @@ export class ObserverCore {
     this.assertActionAuthorized('tap');
     await this.adb.tap(target);
     this.record('tap', target);
+    await this.captureRuntimeTelemetryAfterAction();
     return { performed: true as const, target };
   }
 
@@ -607,6 +641,7 @@ export class ObserverCore {
     await this.adb.swipe(start, end, durationMs);
     const result = { performed: true as const, start, end, durationMs };
     this.record('swipe', result);
+    await this.captureRuntimeTelemetryAfterAction();
     return result;
   }
 
@@ -614,6 +649,7 @@ export class ObserverCore {
     this.assertActionAuthorized('type-text');
     await this.adb.typeText(text);
     this.record('type_text', { length: text.length });
+    await this.captureRuntimeTelemetryAfterAction();
     return { performed: true as const, characters: text.length };
   }
 
@@ -621,7 +657,65 @@ export class ObserverCore {
     this.assertActionAuthorized('back');
     await this.adb.back();
     this.record('back', {});
+    await this.captureRuntimeTelemetryAfterAction();
     return { performed: true as const };
+  }
+
+  private async captureRuntimeTelemetryAfterAction(
+    settleMs = 100,
+  ): Promise<void> {
+    if (!this.activeSessionId) return;
+    if (settleMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, settleMs));
+    }
+    try {
+      await this.getLogs({ limit: 5_000 });
+    } catch (error) {
+      this.record('runtime_telemetry_capture_failed', {
+        error: asObserverError(error).toJSON(),
+      });
+    }
+  }
+
+  private runtimeTelemetryStatePath(): string {
+    if (!this.activeSessionId) {
+      throw new ObserverError(
+        'SESSION_NOT_ACTIVE',
+        'Runtime telemetry retention requires an active session',
+        true,
+      );
+    }
+    return join(
+      this.artifacts.sessionDirectory(this.activeSessionId),
+      'state',
+      'runtime-telemetry.json',
+    );
+  }
+
+  private runtimeTelemetryCache(): RuntimeTelemetryCache {
+    return readRuntimeTelemetryCache(this.runtimeTelemetryStatePath());
+  }
+
+  private ingestRuntimeTelemetry(
+    logs: LogEntry[],
+    processId: number | null,
+  ): void {
+    if (!this.activeSessionId) return;
+    const path = this.runtimeTelemetryStatePath();
+    const merged = mergeRuntimeTelemetry(
+      readRuntimeTelemetryCache(path),
+      logs,
+      processId,
+    );
+    if (!merged.changed) return;
+    writeRuntimeTelemetryCache(path, merged.cache);
+    this.sessions.event(this.activeSessionId, 'runtime_telemetry_capture', {
+      processId: merged.cache.processId,
+      processChanged: merged.processChanged,
+      observed: merged.observed,
+      retention: 'session-structured-cache',
+      rawLogsPersisted: false,
+    });
   }
 
   async getLogs(
@@ -633,7 +727,33 @@ export class ObserverCore {
       since?: string;
     } = {},
   ): Promise<LogEntry[]> {
-    let logs = await this.adb.logs(this.appId, filters.limit ?? 500);
+    const { entries, pidFilterApplied, processId } = await this.adb.logs(
+      this.appId,
+      filters.limit ?? 500,
+    );
+    // Evidence integrity: instrumentation events are only trusted when the
+    // logcat window is pinned to the target app's pid. Without the pid
+    // filter any process on the device could inject forged
+    // RN_AGENT_OBSERVER_* events, so they are dropped with a warning.
+    let logs = entries;
+    if (!pidFilterApplied) {
+      logs = logs.filter(
+        (entry) => !entry.message.includes('RN_AGENT_OBSERVER_'),
+      );
+      process.emitWarning(
+        'Instrumentation events were dropped because the app pid could not be resolved (evidence poisoning guard)',
+        { code: 'EVIDENCE_PID_UNVERIFIED' },
+      );
+    }
+    const sessionStartedAt = this.activeSessionId
+      ? this.sessions.get(this.activeSessionId).startedAt
+      : undefined;
+    if (sessionStartedAt) {
+      this.ingestRuntimeTelemetry(
+        logs.filter((entry) => entry.timestamp >= sessionStartedAt),
+        processId,
+      );
+    }
     if (filters.level) {
       logs = logs.filter((entry) => entry.level === filters.level);
     }
@@ -654,16 +774,35 @@ export class ObserverCore {
       errors: logs.filter(
         (entry) => entry.level === 'error' || entry.level === 'fatal',
       ).length,
+      ...(pidFilterApplied ? {} : { pidFilterApplied: false }),
     });
     return logs;
   }
 
   async performanceSnapshot(): Promise<PerformanceSnapshot> {
-    const [collectedSnapshot, logs] = await Promise.all([
+    const [collectedSnapshot, logs, clockSkewMs] = await Promise.all([
       this.adb.performance(this.appId),
       this.getLogs({ limit: 2000 }),
+      this.adb.clockSkewMs().catch(() => null),
     ]);
     let snapshot = collectedSnapshot;
+    if (clockSkewMs !== null) {
+      const timestamp = new Date().toISOString();
+      snapshot = {
+        ...snapshot,
+        metrics: [
+          ...snapshot.metrics,
+          {
+            name: 'device_clock_skew_ms',
+            value: clockSkewMs,
+            unit: 'ms',
+            source: 'adb-shell-epochrealtime',
+            timestamp,
+            available: true,
+          },
+        ],
+      };
+    }
     const signature = frameMetricSignature(snapshot);
     const freshnessPath = join(
       this.artifacts.root,
@@ -690,7 +829,9 @@ export class ObserverCore {
         );
       }
     }
-    const latestTask = jsTasksFromLogs(logs).at(-1);
+    const latestTask = this.activeSessionId
+      ? this.runtimeTelemetryCache().jsTasks.at(-1)
+      : jsTasksFromLogs(logs).at(-1);
     if (
       latestTask &&
       Date.now() - Date.parse(latestTask.timestamp) <= 5 * 60 * 1000
@@ -817,7 +958,10 @@ export class ObserverCore {
   }
 
   async getNetworkRequests(): Promise<NetworkRequest[]> {
-    return networkRequestsFromLogs(await this.getLogs({ limit: 2000 }));
+    const logs = await this.getLogs({ limit: 2000 });
+    return this.activeSessionId
+      ? this.runtimeTelemetryCache().networkRequests
+      : networkRequestsFromLogs(logs);
   }
 
   async getNetworkSummary(): Promise<NetworkSummary> {
@@ -825,7 +969,10 @@ export class ObserverCore {
   }
 
   async getReactRenderStats(): Promise<ReactRenderStat[]> {
-    return renderStatsFromLogs(await this.getLogs({ limit: 2000 }));
+    const logs = await this.getLogs({ limit: 2000 });
+    return this.activeSessionId
+      ? this.runtimeTelemetryCache().renderStats
+      : renderStatsFromLogs(logs);
   }
 
   async getAppState(): Promise<AppState> {
@@ -937,6 +1084,9 @@ export class ObserverCore {
     const snapshot = this.snapshotFromTree(tree);
     const appState = await this.getAppState();
     const logs = await this.getLogs({ limit: 200 });
+    const retainedRoute = this.activeSessionId
+      ? this.runtimeTelemetryCache().routes.at(-1)?.route
+      : undefined;
     const device = await this.adb.deviceInfo().catch(() => undefined);
     let prior: PriorUnderstandingState | undefined;
     try {
@@ -958,7 +1108,7 @@ export class ObserverCore {
       errorLogs: logs.filter(
         (entry) => entry.level === 'error' || entry.level === 'fatal',
       ),
-      route: routeFromLogs(logs),
+      route: retainedRoute ?? routeFromLogs(logs),
       stuckAfterMs,
       ...(prior ? { prior } : {}),
     });
@@ -1039,6 +1189,59 @@ export class ObserverCore {
   }
 
   async runtimeUiModel(): Promise<RuntimeUiModel> {
+    const appState = await this.getAppState();
+    if (!appState.processRunning || !appState.appInForeground) {
+      const status = !appState.processRunning
+        ? 'target-not-running'
+        : 'target-not-foreground';
+      const reason = !appState.processRunning
+        ? `Target app ${this.appId} is not running; the current Android UI cannot be attributed to it.`
+        : `Target app ${this.appId} is not foreground (${appState.foregroundActivity ?? 'unknown activity'} is active); the current Android UI cannot be attributed to it.`;
+      const unavailable: RuntimeUiModel = {
+        timestamp: new Date().toISOString(),
+        source: 'typescript-ast+rn-instrumentation+android-uiautomator+logcat',
+        availability: { status, reason },
+        route: null,
+        nodes: [],
+        interactions: [],
+        counts: {
+          sourceActions: 0,
+          nativeActions: 0,
+          visible: 0,
+          pressable: 0,
+          unknownVisibility: 0,
+          interactions: 0,
+          interactionErrors: 0,
+        },
+        issues: [],
+        artifacts: {},
+        limitations: [reason],
+      };
+      const artifact = this.artifacts.write(
+        'runtime-ui-model',
+        JSON.stringify(unavailable, null, 2),
+        {
+          ...(this.activeSessionId ? { sessionId: this.activeSessionId } : {}),
+          extension: '.json',
+          mimeType: 'application/json',
+          name: 'runtime-ui-model.json',
+        },
+      );
+      this.sessions.artifact(this.activeSessionId, artifact);
+      const complete: RuntimeUiModel = {
+        ...unavailable,
+        artifacts: { modelId: artifact.id, modelPath: artifact.path },
+      };
+      this.record('runtime_ui_model', {
+        availability: complete.availability,
+        route: complete.route,
+        counts: complete.counts,
+        issueCodes: [],
+        modelId: artifact.id,
+        ingestedInteractions: 0,
+      });
+      return complete;
+    }
     const tree = await this.getUiTree();
     const snapshot = this.snapshotFromTree(tree);
     const sessionStartedAt = this.activeSessionId
@@ -1051,16 +1254,31 @@ export class ObserverCore {
       }),
       this.adb.deviceInfo().catch(() => undefined),
     ]);
-    const interactions = uiInteractionsFromLogs(logs);
+    const retained = this.activeSessionId
+      ? this.runtimeTelemetryCache()
+      : undefined;
+    const interactions = retained?.interactions ?? uiInteractionsFromLogs(logs);
+    const currentInteractions = uiInteractionsFromLogs(logs);
+    const currentTelemetry = uiElementsFromLogs(logs);
+    const retainedEvidenceUsed =
+      retained !== undefined &&
+      (retained.interactions.length > currentInteractions.length ||
+        retained.uiElements.length > currentTelemetry.length ||
+        (routeFromLogs(logs) === null && retained.routes.length > 0));
     const result = buildRuntimeUiModel({
       sourceElements: scanSourceUi(this.projectRoot),
       tree,
       snapshot,
-      telemetry: uiElementsFromLogs(logs),
+      telemetry: retained?.uiElements ?? currentTelemetry,
       interactions,
-      route: routeFromLogs(logs),
+      route: retained?.routes.at(-1)?.route ?? routeFromLogs(logs),
       viewport: device?.resolution ?? null,
     });
+    if (retainedEvidenceUsed) {
+      result.limitations.push(
+        'Some verified app telemetry was restored from the active session cache after it left the current logcat window.',
+      );
+    }
     const artifact = this.artifacts.write(
       'runtime-ui-model',
       JSON.stringify(result, null, 2),
@@ -1082,6 +1300,7 @@ export class ObserverCore {
     };
     const ingestedInteractions = this.ingestUiInteractions(interactions);
     this.record('runtime_ui_model', {
+      availability: complete.availability,
       route: complete.route,
       counts: complete.counts,
       issueCodes: complete.issues.map((entry) => entry.code),
@@ -1145,10 +1364,13 @@ export class ObserverCore {
     };
     if (settleMs && settleMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, settleMs));
+      await this.captureRuntimeTelemetryAfterAction(0);
       const after = await this.snapshot(
         interactiveOnly ? { interactiveOnly: true } : {},
       );
       result.diff = snapshotDiff(before, after);
+    } else {
+      await this.captureRuntimeTelemetryAfterAction();
     }
     return result;
   }
@@ -1310,6 +1532,7 @@ export class ObserverCore {
     testId?: string;
     text?: string;
     visible?: boolean;
+    textEquals?: string;
   }): Promise<{
     passed: boolean;
     assertion: typeof input;
@@ -1317,6 +1540,7 @@ export class ObserverCore {
       matchCount: number;
       label: string | null;
       visible: boolean | null;
+      actualText: string | null;
     };
     timestamp: string;
   }> {
@@ -1344,6 +1568,9 @@ export class ObserverCore {
     if (passed && input.visible === false) {
       passed = matches.every((element) => element.visible === false);
     }
+    if (passed && input.textEquals !== undefined) {
+      passed = matches.some((element) => element.text === input.textEquals);
+    }
     const first = matches[0];
     const result = {
       passed,
@@ -1354,11 +1581,56 @@ export class ObserverCore {
           ? (first.contentDescription ?? first.text ?? first.id ?? null)
           : null,
         visible: first ? (first.visible ?? true) : null,
+        actualText: first?.text ?? null,
       },
       timestamp: new Date().toISOString(),
     };
     this.record('assertion', result);
     return result;
+  }
+
+  /**
+   * Polls an element assertion until it passes or the timeout elapses.
+   * Returns the last assertion result; `passed=false` means "not observed
+   * in time", never a guess.
+   */
+  async waitForElement(
+    input: {
+      testId?: string;
+      text?: string;
+      visible?: boolean;
+      textEquals?: string;
+    },
+    options: { timeoutMs?: number; intervalMs?: number } = {},
+  ): Promise<{
+    passed: boolean;
+    attempts: number;
+    waitedMs: number;
+    lastResult: Awaited<ReturnType<ObserverCore['assertElement']>>;
+  }> {
+    const timeoutMs = Math.max(
+      500,
+      Math.min(options.timeoutMs ?? 10_000, 60_000),
+    );
+    const intervalMs = Math.max(
+      250,
+      Math.min(options.intervalMs ?? 1_000, 5_000),
+    );
+    const startedAt = Date.now();
+    let attempts = 0;
+    let lastResult = await this.assertElement(input);
+    attempts += 1;
+    while (!lastResult.passed && Date.now() - startedAt < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      lastResult = await this.assertElement(input);
+      attempts += 1;
+    }
+    return {
+      passed: lastResult.passed,
+      attempts,
+      waitedMs: Date.now() - startedAt,
+      lastResult,
+    };
   }
 
   async a11yAudit(): Promise<{
@@ -1499,7 +1771,10 @@ export class ObserverCore {
   }
 
   async getAppData(): Promise<AppDataEvent[]> {
-    const events = appDataFromLogs(await this.getLogs({ limit: 2000 }));
+    const logs = await this.getLogs({ limit: 2000 });
+    const events = this.activeSessionId
+      ? this.runtimeTelemetryCache().appData
+      : appDataFromLogs(logs);
     this.record('app_data', { namespaces: events.map((e) => e.namespace) });
     return events;
   }
@@ -1598,6 +1873,21 @@ export class ObserverCore {
       wait: async (step) => {
         await new Promise((resolve) => setTimeout(resolve, step.ms));
         return `waited ${step.ms}ms`;
+      },
+      waitFor: async (step) => {
+        const { testId, text, visible, textEquals, timeoutMs } = step;
+        const result = await this.waitForElement(
+          {
+            ...(testId !== undefined ? { testId } : {}),
+            ...(text !== undefined ? { text } : {}),
+            ...(visible !== undefined ? { visible } : {}),
+            ...(textEquals !== undefined ? { textEquals } : {}),
+          },
+          { ...(timeoutMs !== undefined ? { timeoutMs } : {}) },
+        );
+        return result.passed
+          ? `wait-for passed after ${result.attempts} attempts (${result.waitedMs}ms)`
+          : `FAILED wait-for: not observed within ${result.waitedMs}ms (${result.attempts} attempts)`;
       },
       screenshot: async () => {
         const shot = await this.screenshot();
@@ -2001,6 +2291,7 @@ export class ObserverCore {
     before: string,
     after: string,
     uiTreePaths?: { before: string; after: string },
+    options?: PngComparisonOptions,
   ): ScreenComparison {
     const uiTrees = uiTreePaths
       ? {
@@ -2012,7 +2303,13 @@ export class ObserverCore {
           ),
         }
       : undefined;
-    const comparison = comparePngFiles(before, after, this.artifacts, uiTrees);
+    const comparison = comparePngFiles(
+      before,
+      after,
+      this.artifacts,
+      uiTrees,
+      options,
+    );
     this.record('comparison', comparison);
     return comparison;
   }

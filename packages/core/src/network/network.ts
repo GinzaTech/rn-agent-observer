@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import {
   AppDataTelemetryPayloadSchema,
   JsTaskTelemetryPayloadSchema,
@@ -12,7 +13,6 @@ import {
   type NetworkRequest,
   type NetworkSummary,
   type ReactRenderStat,
-  type RouteTelemetryPayload,
   type UiInteractionEvent,
 } from '@rn-agent-observer/schemas';
 
@@ -23,6 +23,7 @@ const JS_TASK_PREFIX = 'RN_AGENT_OBSERVER_JS_TASK ';
 const APP_DATA_PREFIX = 'RN_AGENT_OBSERVER_APP_DATA ';
 const UI_ELEMENT_PREFIX = 'RN_AGENT_OBSERVER_UI_ELEMENT ';
 const UI_INTERACTION_PREFIX = 'RN_AGENT_OBSERVER_UI_INTERACTION ';
+const BATCH_PREFIX = 'RN_AGENT_OBSERVER_BATCH ';
 
 export interface UiElementTelemetry {
   elementId: string;
@@ -49,6 +50,42 @@ export interface AppDataEvent {
  * Sources: instrumentation `reportAppData` (Redux store, navigation state,
  * MMKV storage dumps, or any app-owned state).
  */
+/**
+ * Expands `RN_AGENT_OBSERVER_BATCH ["line","line",...]` entries (emitted by
+ * the instrumentation's batching mode) back into individual log entries so
+ * downstream parsers stay simple. Non-batch entries pass through untouched.
+ */
+export function expandBatchedEntries(logs: LogEntry[]): LogEntry[] {
+  const expanded: LogEntry[] = [];
+  for (const entry of logs) {
+    const marker = entry.message.indexOf(BATCH_PREFIX);
+    if (marker < 0) {
+      expanded.push(entry);
+      continue;
+    }
+    try {
+      const lines = JSON.parse(
+        entry.message.slice(marker + BATCH_PREFIX.length),
+      ) as unknown;
+      if (!Array.isArray(lines)) {
+        expanded.push(entry);
+        continue;
+      }
+      for (const line of lines) {
+        if (typeof line !== 'string') continue;
+        expanded.push({
+          ...entry,
+          message: line,
+          metadata: { ...entry.metadata, batched: true },
+        });
+      }
+    } catch {
+      expanded.push(entry);
+    }
+  }
+  return expanded;
+}
+
 export function appDataFromLogs(logs: LogEntry[]): AppDataEvent[] {
   const latest = new Map<string, AppDataEvent>();
   for (const entry of logs) {
@@ -123,6 +160,12 @@ export interface JsTaskEvent {
   source: string;
 }
 
+export interface RouteEvent {
+  route: string;
+  timestamp: string;
+  source: string;
+}
+
 export type TelemetryKind =
   | 'network'
   | 'render'
@@ -156,6 +199,37 @@ type PayloadParseResult<T> =
       details: string;
     };
 
+/**
+ * Verifies the optional HMAC-SHA-256 tag appended by instrumentation
+ * (`rnobsSig=<hex>`). Once the observer has RN_OBSERVER_TELEMETRY_SECRET,
+ * unsigned payloads are rejected too: accepting them would reopen the
+ * evidence-poisoning path that enabled the integrity mode in the first place.
+ */
+export function verifyTelemetrySignature(body: string): {
+  body: string;
+  signatureValid: boolean | null;
+} {
+  const secret = process.env.RN_OBSERVER_TELEMETRY_SECRET ?? '';
+  const match = body.match(/\s?rnobsSig=([0-9a-fA-F]{64})$/);
+  if (!match) {
+    return { body, signatureValid: secret.length > 0 ? false : null };
+  }
+  const signedBody = body.slice(0, match.index);
+  const signature = match[1];
+  if (!signature) return { body: signedBody, signatureValid: false };
+  if (secret.length === 0) return { body: signedBody, signatureValid: null };
+  const expected = Buffer.from(
+    createHmac('sha256', secret).update(signedBody).digest('hex'),
+    'hex',
+  );
+  const actual = Buffer.from(signature, 'hex');
+  return {
+    body: signedBody,
+    signatureValid:
+      actual.length === expected.length && timingSafeEqual(actual, expected),
+  };
+}
+
 function parsePayload<T>(
   message: string,
   prefix: string,
@@ -163,9 +237,19 @@ function parsePayload<T>(
 ): PayloadParseResult<T> {
   const index = message.indexOf(prefix);
   if (index < 0) return { status: 'not-present' };
+  const raw = message.slice(index + prefix.length);
+  const { body, signatureValid } = verifyTelemetrySignature(raw);
+  if (signatureValid === false) {
+    return {
+      status: 'invalid',
+      reason: 'schema-validation',
+      details:
+        'Telemetry signature mismatch (possible forged RN_AGENT_OBSERVER event)',
+    };
+  }
   let candidate: unknown;
   try {
-    candidate = JSON.parse(message.slice(index + prefix.length));
+    candidate = JSON.parse(body);
   } catch {
     return {
       status: 'invalid',
@@ -257,7 +341,7 @@ export function invalidTelemetryFromLogs(
 }
 
 export function networkRequestsFromLogs(logs: LogEntry[]): NetworkRequest[] {
-  return logs
+  return expandBatchedEntries(logs)
     .map((entry) =>
       validPayload(
         parsePayload(
@@ -278,7 +362,7 @@ export function networkRequestsFromLogs(logs: LogEntry[]): NetworkRequest[] {
 }
 
 export function renderStatsFromLogs(logs: LogEntry[]): ReactRenderStat[] {
-  return logs
+  return expandBatchedEntries(logs)
     .map((entry) =>
       validPayload(
         parsePayload(
@@ -296,26 +380,29 @@ export function renderStatsFromLogs(logs: LogEntry[]): ReactRenderStat[] {
     });
 }
 
+export function routeEventsFromLogs(logs: LogEntry[]): RouteEvent[] {
+  const events: RouteEvent[] = [];
+  for (const entry of expandBatchedEntries(logs)) {
+    const payload = validPayload(
+      parsePayload(entry.message, ROUTE_PREFIX, RouteTelemetryPayloadSchema),
+    );
+    if (!payload) continue;
+    events.push({
+      route: payload.route,
+      timestamp: payload.timestamp ?? entry.timestamp,
+      source: entry.source,
+    });
+  }
+  return events;
+}
+
 export function routeFromLogs(logs: LogEntry[]): string | null {
-  return (
-    logs
-      .map((entry) =>
-        validPayload(
-          parsePayload(
-            entry.message,
-            ROUTE_PREFIX,
-            RouteTelemetryPayloadSchema,
-          ),
-        ),
-      )
-      .filter((value): value is RouteTelemetryPayload => value !== null)
-      .at(-1)?.route ?? null
-  );
+  return routeEventsFromLogs(logs).at(-1)?.route ?? null;
 }
 
 export function uiElementsFromLogs(logs: LogEntry[]): UiElementTelemetry[] {
   const latest = new Map<string, UiElementTelemetry>();
-  for (const entry of logs) {
+  for (const entry of expandBatchedEntries(logs)) {
     const payload = validPayload(
       parsePayload(
         entry.message,
@@ -342,7 +429,7 @@ export function uiElementsFromLogs(logs: LogEntry[]): UiElementTelemetry[] {
 
 export function uiInteractionsFromLogs(logs: LogEntry[]): UiInteractionEvent[] {
   const events: UiInteractionEvent[] = [];
-  for (const entry of logs) {
+  for (const entry of expandBatchedEntries(logs)) {
     const payload = validPayload(
       parsePayload(
         entry.message,
@@ -366,7 +453,7 @@ export function uiInteractionsFromLogs(logs: LogEntry[]): UiInteractionEvent[] {
 }
 
 export function jsTasksFromLogs(logs: LogEntry[]): JsTaskEvent[] {
-  return logs
+  return expandBatchedEntries(logs)
     .map((entry) =>
       validPayload(
         parsePayload(
@@ -397,6 +484,9 @@ export function summarizeNetwork(requests: NetworkRequest[]): NetworkSummary {
     .map((request) => request.durationMs)
     .filter((value): value is number => value !== undefined)
     .sort((a, b) => a - b);
+  // A p95/p99 from a handful of samples is statistically meaningless;
+  // disclose the sample count and flag low confidence instead of hiding it.
+  const minSamplesForTailPercentile = 20;
   return {
     requestCount: requests.length,
     failedRequests: requests.filter(
@@ -408,6 +498,8 @@ export function summarizeNetwork(requests: NetworkRequest[]): NetworkSummary {
     p50Ms: percentile(durations, 0.5),
     p95Ms: percentile(durations, 0.95),
     p99Ms: percentile(durations, 0.99),
+    latencySampleCount: durations.length,
+    percentileLowConfidence: durations.length < minSamplesForTailPercentile,
     totalBytes: requests.reduce(
       (sum, request) =>
         sum + (request.requestBytes ?? 0) + (request.responseBytes ?? 0),

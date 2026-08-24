@@ -113,6 +113,50 @@ describe('screen understanding', () => {
     });
   });
 
+  it('classifies localized error/empty states across languages', () => {
+    const japanese = analyzeScreen(
+      input(tree([{ type: 'TextView', text: '読み込みに失敗しました' }])),
+    );
+    expect(japanese.state).toBe('error');
+    expect(japanese.textLanguage).toBe('ja');
+    const korean = analyzeScreen(
+      input(tree([{ type: 'TextView', text: '오류가 발생했습니다' }])),
+    );
+    expect(korean.state).toBe('error');
+    expect(korean.textLanguage).toBe('ko');
+    const chinese = analyzeScreen(
+      input(tree([{ type: 'TextView', text: '暂无数据' }])),
+    );
+    expect(chinese.state).toBe('empty');
+    expect(chinese.textLanguage).toBe('zh');
+    const spanish = analyzeScreen(
+      input(tree([{ type: 'TextView', text: 'Ha ocurrido un error' }])),
+    );
+    expect(spanish.state).toBe('error');
+  });
+
+  it('flags unknown languages instead of guessing state semantics', () => {
+    const result = analyzeScreen(
+      input(tree([{ type: 'TextView', text: 'Загрузка не удалась' }])),
+    );
+    expect(result.state).toBe('content');
+    expect(result.textLanguage).toBe('unknown');
+    expect(result.issues.map((finding) => finding.code)).toContain(
+      'text-language-unknown',
+    );
+  });
+
+  it('matches decomposed Vietnamese text through NFC normalization', () => {
+    // "Không thể tải dữ liệu" in NFD form (base letter + combining marks).
+    const decomposed =
+      'Kh\u00f4ng th\u1ec3 t\u1ea3i d\u1eef li\u1ec7u'.normalize('NFD');
+    const result = analyzeScreen(
+      input(tree([{ type: 'TextView', text: decomposed }])),
+    );
+    expect(result.state).toBe('error');
+    expect(result.textLanguage).toBe('vi');
+  });
+
   it('detects visible errors and blank screens', () => {
     const error = analyzeScreen(
       input(tree([{ type: 'TextView', text: 'Không thể tải dữ liệu' }])),

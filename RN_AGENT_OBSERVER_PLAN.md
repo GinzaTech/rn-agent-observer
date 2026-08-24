@@ -1,5 +1,11 @@
 # RN Agent Observer — Development Plan & Codex Instructions
 
+> Historical planning document. The implementation has moved beyond several
+> inventories and counts below. Use [README](README.md),
+> [installation](docs/installation.md), [project structure](docs/project-structure.md),
+> [testing](docs/testing.md) and [the current audit](AUDIT_TO_9_OF_10.md) for the
+> verified 2.4.0 state. Keep this file for design history, not operational setup.
+
 ## 0. Project goal
 
 Build a local developer tool that gives AI coding agents such as Codex, Claude Code, OpenCode and Cursor enough runtime visibility to debug a React Native + Expo application.

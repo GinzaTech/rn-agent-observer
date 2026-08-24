@@ -419,6 +419,7 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
         return {
           screen,
           runtimeUi: {
+            availability: model.availability,
             route: model.route,
             counts: model.counts,
             issues: model.issues,
@@ -433,7 +434,7 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
     'security_audit',
     {
       description:
-        'Run passive MASVS-aligned Android manifest/network config and redacted artifact secret checks.',
+        'Run passive MASVS-aligned Android manifest/network config and redacted artifact secret checks. The result reports its selected input scope and is NOT_VERIFIED when no manifest is available.',
       inputSchema: z.object({
         manifest_paths: z.array(z.string()).optional(),
         network_config_paths: z.array(z.string()).optional(),
@@ -1198,7 +1199,7 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
     'runtime_ui_model',
     {
       description:
-        'Correlate actionable React Native JSX source locations, instrumentation mount/press events, and the current Android native tree. Returns what is rendered, visible, disabled, or a verified press candidate without guessing through view flattening.',
+        'Correlate actionable React Native JSX source locations, instrumentation mount/press events, and the current Android native tree. Returns target-not-running or target-not-foreground instead of attributing another app UI to the target.',
       inputSchema: z.object({}),
     },
     () => safe(() => core.runtimeUiModel()),
@@ -1216,6 +1217,41 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
     ({ ref, settle_ms }) =>
       safe(() =>
         authorized(core, 'app-state', () => core.press(ref, settle_ms)),
+      ),
+  );
+  server.registerTool(
+    'wait_for_element',
+    {
+      description:
+        'Poll an element assertion until it passes or the timeout elapses (default 10s, max 60s). passed=false means not observed in time.',
+      inputSchema: z
+        .object({
+          test_id: z.string().optional(),
+          text: z.string().optional(),
+          visible: z.boolean().optional(),
+          text_equals: z.string().optional(),
+          timeout_ms: z.number().int().min(500).max(60_000).optional(),
+          interval_ms: z.number().int().min(250).max(5_000).optional(),
+        })
+        .refine(
+          (value) => value.test_id !== undefined || value.text !== undefined,
+          { message: 'Provide test_id or text' },
+        ),
+    },
+    ({ test_id, text, visible, text_equals, timeout_ms, interval_ms }) =>
+      safe(() =>
+        core.waitForElement(
+          {
+            ...(test_id !== undefined ? { testId: test_id } : {}),
+            ...(text !== undefined ? { text } : {}),
+            ...(visible !== undefined ? { visible } : {}),
+            ...(text_equals !== undefined ? { textEquals: text_equals } : {}),
+          },
+          {
+            ...(timeout_ms !== undefined ? { timeoutMs: timeout_ms } : {}),
+            ...(interval_ms !== undefined ? { intervalMs: interval_ms } : {}),
+          },
+        ),
       ),
   );
   server.registerTool(
@@ -1296,24 +1332,26 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
     'assert_element',
     {
       description:
-        'Evidenced assertion: element exists (by testID or text), optionally visible.',
+        'Evidenced assertion: element exists (by testID or text), optionally visible with exact text.',
       inputSchema: z
         .object({
           test_id: z.string().optional(),
           text: z.string().optional(),
           visible: z.boolean().optional(),
+          text_equals: z.string().optional(),
         })
         .refine(
           (value) => value.test_id !== undefined || value.text !== undefined,
           { message: 'Provide test_id or text' },
         ),
     },
-    ({ test_id, text, visible }) =>
+    ({ test_id, text, visible, text_equals }) =>
       safe(() =>
         core.assertElement({
           ...(test_id !== undefined ? { testId: test_id } : {}),
           ...(text !== undefined ? { text } : {}),
           ...(visible !== undefined ? { visible } : {}),
+          ...(text_equals !== undefined ? { textEquals: text_equals } : {}),
         }),
       ),
   );
@@ -1620,6 +1658,18 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
           after: z.string(),
           before_ui_tree: z.string().optional(),
           after_ui_tree: z.string().optional(),
+          perceptual_threshold: z.number().min(0).max(1).optional(),
+          ignore_regions: z
+            .array(
+              z.object({
+                x: z.number().int(),
+                y: z.number().int(),
+                width: z.number().int().positive(),
+                height: z.number().int().positive(),
+              }),
+            )
+            .max(20)
+            .optional(),
         })
         .refine(
           (value) =>
@@ -1627,7 +1677,14 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
           { message: 'Provide both UI tree paths or neither' },
         ),
     },
-    ({ before, after, before_ui_tree, after_ui_tree }) =>
+    ({
+      before,
+      after,
+      before_ui_tree,
+      after_ui_tree,
+      perceptual_threshold,
+      ignore_regions,
+    }) =>
       safe(() =>
         core.compareScreens(
           resolveContainedReadFile(core.projectRoot, before, 'before'),
@@ -1646,6 +1703,14 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
                 ),
               }
             : undefined,
+          {
+            ...(perceptual_threshold === undefined
+              ? {}
+              : { perceptualThreshold: perceptual_threshold }),
+            ...(ignore_regions === undefined
+              ? {}
+              : { ignoreRegions: ignore_regions }),
+          },
         ),
       ),
   );

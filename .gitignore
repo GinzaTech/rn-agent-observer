@@ -18,6 +18,13 @@ coverage/
 artifacts/**
 !/artifacts/.gitkeep
 **/.artifacts/**
+*.rnobs
+
+# Observer policy/config is machine- and device-specific. Commit reviewed
+# examples only; never commit a live authorized-active allowlist.
+.rn-observer.json
+**/.rn-observer.json
+!.rn-observer.*.example.json
 
 # Observer state/binary files (defensive — normally under .artifacts)
 *.sqlite
@@ -28,19 +35,30 @@ artifacts/**
 
 # ---- Expo / React Native (demo app) ----
 .expo/
+.expo-shared/
 apps/demo-expo/android/
 apps/demo-expo/ios/
+.gradle/
+local.properties
 *.apk
 *.aab
+*.jks
+*.keystore
 
 # ---- Secrets / environment ----
 .env
 .env.*
+!.env.example
+!.env.*.example
 
 # ---- Logs ----
 *.log
 npm-debug.log*
 pnpm-debug.log*
+test-results/
+playwright-report/
+*.junit.xml
+*.sarif
 
 # ---- Release bundles ----
 release/
@@ -53,5 +71,12 @@ $RECYCLE.BIN/
 
 # ---- IDE / agent local state ----
 .idea/
+.vscode/
+.fleet/
+.history/
+.cursor/
+.claude/
 .opencode/
 *.tmp
+*.swp
+*.swo

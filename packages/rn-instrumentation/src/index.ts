@@ -1,3 +1,5 @@
+import { hmacSha256Hex } from './hmac.js';
+
 const SAFE_QUERY_KEYS = new Set([
   'q',
   'query',
@@ -218,9 +220,94 @@ function serializeTelemetryPayload(payload: object): string {
   return JSON.stringify({ ...payload, telemetryVersion: TELEMETRY_VERSION });
 }
 
+/**
+ * Batched telemetry sink: many short events (render ticks, interactions) are
+ * queued and flushed as a few console lines instead of one line per event,
+ * which protects the logcat ring buffer during long sessions. Interactive
+ * evidence is never lost — the queue always flushes on a timer and at
+ * teardown. Batching is disabled by default; enable via
+ * `configureTelemetryBatching({ enabled: true })` when a flow emits a high
+ * event rate.
+ */
+interface TelemetryBatchingConfig {
+  enabled: boolean;
+  flushIntervalMs: number;
+  maxQueuedEvents: number;
+}
+
+let batchingConfig: TelemetryBatchingConfig = {
+  enabled: false,
+  flushIntervalMs: 1_000,
+  maxQueuedEvents: 20,
+};
+let telemetryQueue: string[] = [];
+let flushTimer: ReturnType<typeof setInterval> | undefined;
+
+export function configureTelemetryBatching(
+  config: Partial<TelemetryBatchingConfig>,
+): TelemetryBatchingConfig {
+  batchingConfig = { ...batchingConfig, ...config };
+  if (!batchingConfig.enabled) flushTelemetryQueue();
+  return { ...batchingConfig };
+}
+
+function flushTelemetryQueue(): void {
+  if (telemetryQueue.length === 0) return;
+  const batch = telemetryQueue;
+  telemetryQueue = [];
+  console.info(`RN_AGENT_OBSERVER_BATCH ${JSON.stringify(batch)}`);
+}
+
+function ensureFlushTimer(): void {
+  if (flushTimer !== undefined || !batchingConfig.enabled) return;
+  flushTimer = setInterval(() => {
+    flushTelemetryQueue();
+    if (flushTimer !== undefined && telemetryQueue.length === 0) {
+      clearInterval(flushTimer);
+      flushTimer = undefined;
+    }
+  }, batchingConfig.flushIntervalMs);
+}
+
 function emit(prefix: string, payload: object): void {
   if (!isDevelopmentInstrumentationEnabled()) return;
-  console.info(`${prefix} ${serializeTelemetryPayload(payload)}`);
+  const body = serializeTelemetryPayload(payload);
+  const line = `${prefix} ${signTelemetryBody(body)}`;
+  if (batchingConfig.enabled) {
+    telemetryQueue.push(line);
+    if (telemetryQueue.length >= batchingConfig.maxQueuedEvents) {
+      flushTelemetryQueue();
+    }
+    ensureFlushTimer();
+    return;
+  }
+  console.info(line);
+}
+
+/** Flushes any queued telemetry immediately (call before app teardown). */
+export function flushTelemetry(): void {
+  flushTelemetryQueue();
+}
+
+declare global {
+  var __RNOBS_TELEMETRY_SECRET__: string | undefined;
+}
+
+/**
+ * HMAC-SHA-256 integrity tag over the payload + a per-build secret set by the
+ * app via globalThis.__RNOBS_TELEMETRY_SECRET__. The same secret must be set
+ * in the observer process as RN_OBSERVER_TELEMETRY_SECRET. It protects against
+ * another process injecting logcat lines without knowing the secret; it does
+ * not protect a development bundle whose secret has been extracted. Pair it
+ * with the observer's pid-pinned logcat filter.
+ */
+export function signTelemetryBody(body: string): string {
+  const secret =
+    (typeof globalThis !== 'undefined' &&
+      globalThis.__RNOBS_TELEMETRY_SECRET__) ||
+    '';
+  if (secret.length === 0) return body;
+  return `${body} rnobsSig=${hmacSha256Hex(secret, body)}`;
 }
 
 function safeUiLabel(value: string | undefined): string | undefined {

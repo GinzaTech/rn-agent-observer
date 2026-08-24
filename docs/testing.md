@@ -1,14 +1,13 @@
 # Báo cáo kiểm thử và runtime verification
 
-Ngày xác minh host gần nhất: **2026-08-23**
-Host của runtime verification lịch sử: Windows, Node.js >=22.12, pnpm 9.6.0
+Ngày xác minh host gần nhất: **2026-08-24**
+Host của runtime verification hiện tại: Windows, Node.js 22.19, pnpm 9.6.0
 Thiết bị của bằng chứng active-security mới: Android AVD do nhóm sở hữu, chạy
 development fixture `SecurityLab` của demo.
-Thiết bị của bằng chứng runtime lịch sử: physical Android, Android 15, 1080×2400.
-Model/serial và local session IDs được lược khỏi tài liệu public. Bề mặt assurance/
-security/performance/dashboard/plugin/share-bundle/coverage/target-provider mới bên
-dưới, ngoài evidence active-security hẹp ghi riêng bên dưới, chưa được chạy lại trọn
-bộ trên device này.
+Thiết bị của bằng chứng runtime mới: Xiaomi `23013PC75G`/`mondrian`, physical
+Android 15 API 35, arm64, development fixture. Serial và local session IDs được
+lược khỏi tài liệu public. Kết quả này xác minh scenario ghi riêng bên dưới, không
+suy rộng thành production benchmark hay device matrix.
 
 ## Contract trạng thái
 
@@ -30,7 +29,7 @@ Các lệnh chuẩn:
 ```powershell
 pnpm check
 pnpm release:check
-pnpm --filter @rn-agent-observer/demo-expo exec expo export --platform android --output-dir <temporary-directory>
+pnpm android:export:check
 ```
 
 CI chạy `pnpm check` trên Windows, Ubuntu và macOS để phát hiện lỗi install, lint,
@@ -43,17 +42,20 @@ runtime và không mở rộng support host được công bố trong capability
 workflow: nó chạy suite được cấu hình trên target và mặc định exit 1 cho cả `FAIL`
 lẫn `NOT_VERIFIED`. Hai lệnh không thay thế nhau.
 
-## Host verification hiện tại — 2026-08-23
+## Host verification hiện tại — 2026-08-24
 
 Đã chạy trên workspace này:
 
 - `pnpm check`: PASS — ESLint, Prettier, TypeScript build và Vitest; schemas
-  18 tests, instrumentation 16, demo Expo 10, core 257, CLI 14, MCP 5 (tổng
-  320 tests);
+  19 tests, instrumentation 17, demo Expo 10, core 285, CLI 15, MCP 6 (tổng
+  **352 tests**);
 - `pnpm mcp:check`: PASS; server MCP khởi tạo được;
 - `pnpm rn-observe --version`: `2.4.0`;
 - `pnpm pack:check`: PASS cho 5 package public;
-- Expo Android export: PASS, 580 modules; output local ở temporary directory.
+- Expo Android/Hermes export: PASS, 581 modules, 2 files và đúng một Hermes bundle;
+  output local ở temporary directory;
+- `pnpm install --frozen-lockfile`: PASS với checksum `.pnpmfile.cjs`;
+- OSV strict: PASS, 673/673 locked component queried và 0 advisory.
 
 Lượt này còn khóa exact inventory 66 MCP tools, policy action fail-closed ở
 Core/CLI, redaction deep-link xuyên response/session/replay và SecurityLab
@@ -68,6 +70,33 @@ cũng PASS sau khi cleanup process tree được sửa. Đây vẫn chỉ là ho
 target provider ngoài, performance scenario và quality suite mới vẫn chưa có Android
 device run mới trong record này. Active-security có evidence AVD hẹp ở mục kế tiếp;
 nó không nâng trạng thái runtime của các surface khác.
+
+## Physical Android acceptance — 2026-08-24
+
+Demo development build 2.4.0 đã chạy end-to-end trên physical Xiaomi
+`23013PC75G`/`mondrian`, Android 15 API 35. Exact serial được pin trong local config
+và mọi ADB call, nhưng không được commit. Session complete có 268 event, 67 artifact
+bao gồm summary/evidence graph/replay và 24 runtime telemetry capture; không có
+`runtime_telemetry_capture_failed` hoặc `runtime_ui_capture_failed`.
+
+Evidence của đúng run này:
+
+- PerformanceLab phát long JS task `100.0005ms`; `performance` đọc lại được sau
+  logcat rollover và `diagnose` tạo finding high có source/confidence basis;
+- NetworkLab trả HTTP 200 khoảng 15.05ms và fixture 503 khoảng 102.30ms; query token
+  bị redact, không có body preview persisted và percentile ghi low-confidence vì chỉ
+  có hai sample;
+- RenderLab thu 46 profiler commit và app-data chỉ giữ key allowlist;
+- khi Android Settings ở foreground, `ui-model` trả `target-not-foreground`, không
+  ghép UI app khác; launch lại app phục hồi đúng target;
+- compare sửa contrast chỉ đổi 1,369/2,473,200 pixel trong vùng status text,
+  similarity `0.999446`; UI tree giữ 36 node và không đổi semantic structure;
+- runtime cache giữ telemetry đã parse/redact qua logcat rollover và xóa toàn bộ
+  process-owned evidence khi PID đổi.
+
+Đây là development-build pipeline evidence trên một OEM/API với sample nhỏ, không
+phải performance benchmark production, pentest hoặc compatibility wildcard. Raw
+`.artifacts`, device serial và session ID vẫn local.
 
 ## Active-security runtime — owned demo AVD (2026-08-23)
 
@@ -164,8 +193,8 @@ Kết quả Unreleased screen-understanding: `pnpm check` pass lint, Prettier, T
 
 - Focused tests pass cho TypeScript AST source scanner, generated/explicit testID Babel transform, instrumentation privacy, source/native/telemetry correlation, view-flattening state và physical-interaction replay export.
 - Static scan Vshop: 115 actionable source element, 22 conditional, chỉ 1 explicit testID. Scanner trả được file/line thật; phần lớn source/runtime ownership sẽ ở trạng thái chưa correlate cho tới khi app bật Babel plugin hoặc thêm testID.
-- Device lịch sử mất kết nối trước runtime call cuối. `ui-model` trả `ADB_COMMAND_FAILED`; session local đã complete với `runtime_ui_capture_failed`. Vì vậy case device cho feature mới giữ **`NOT_VERIFIED`**; không tái sử dụng evidence screen-understanding cũ để tuyên bố pass.
-- Full gate lịch sử tại thời điểm record này: `pnpm check` pass lint, Prettier, TypeScript build và **77 tests** (schemas 6, instrumentation/Babel 10, core 57, CLI 3, MCP 1); `pnpm mcp:check` và Expo Android export có Babel plugin đều pass.
+- Physical demo acceptance 2026-08-24 đã đóng positive path hiện tại: model correlate route/source/native interaction, giữ evidence qua logcat rollover, không có capture failure và auto-capture khi stop thành công. Kết quả chỉ áp dụng exact demo fixture/device ở mục trên.
+- Full gate hiện tại là 352/352 tests + MCP/package/Android export; các con số 77 test bên dưới chỉ còn là record lịch sử của milestone UI-model đầu tiên.
 
 ## Demo Expo native dogfood
 

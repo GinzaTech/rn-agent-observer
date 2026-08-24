@@ -133,6 +133,7 @@ describe('ObserverCore', () => {
       appId: 'dev.example.app',
       deviceId: 'emulator-5554',
       captureRuntimeUiOnStop: false,
+      trustActiveConfig: true,
       onWarning: () => {},
     });
     const raw =
@@ -182,6 +183,191 @@ describe('ObserverCore', () => {
         'Could not open deep link demo://store.example/products/42',
       );
       expect((failure as Error).message).not.toContain('private-token');
+    } finally {
+      core.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not correlate source with another app when the target is not foreground', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rn-observer-runtime-ui-'));
+    const core = new ObserverCore({
+      projectRoot: root,
+      appId: 'dev.example.app',
+      deviceId: 'emulator-5554',
+      onWarning: () => {},
+    });
+    const tree = vi.spyOn(core, 'getUiTree');
+    vi.spyOn(core.adb, 'appState').mockResolvedValue({
+      appId: 'dev.example.app',
+      processRunning: true,
+      pid: 42,
+      foregroundActivity: 'com.android.launcher/.Launcher',
+      appInForeground: false,
+      source: 'adb-pidof+dumpsys-activity',
+      timestamp: '2026-08-23T00:00:00.000Z',
+    });
+    try {
+      const model = await core.runtimeUiModel();
+
+      expect(model.availability).toEqual({
+        status: 'target-not-foreground',
+        reason: expect.stringContaining('cannot be attributed'),
+      });
+      expect(model.nodes).toEqual([]);
+      expect(model.issues).toEqual([]);
+      expect(tree).not.toHaveBeenCalled();
+    } finally {
+      core.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('retains verified runtime telemetry after logcat rolls over', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rn-observer-telemetry-cache-'));
+    const core = new ObserverCore({
+      projectRoot: root,
+      appId: 'dev.example.app',
+      deviceId: 'emulator-5554',
+      captureRuntimeUiOnStop: false,
+      trustActiveConfig: true,
+      onWarning: () => {},
+    });
+    try {
+      core.config.security.mode = 'authorized-active';
+      core.config.security.allowedActions = ['read', 'app-state'];
+      core.config.security.allowedAppIds = ['dev.example.app'];
+      core.config.target.deviceId = 'emulator-5554';
+      const session = core.startSession();
+      const timestamp = new Date().toISOString();
+      vi.spyOn(core.adb, 'uiTree').mockResolvedValue({
+        roots: [
+          {
+            type: 'android.widget.Button',
+            text: 'Trigger JS task',
+            id: 'trigger-js-block',
+            clickable: true,
+            children: [],
+          },
+        ],
+        timestamp,
+        source: 'test-uiautomator',
+      });
+      vi.spyOn(core.adb, 'tap').mockResolvedValue(undefined);
+      vi.spyOn(core.adb, 'appState').mockResolvedValue({
+        appId: 'dev.example.app',
+        processRunning: true,
+        pid: 42,
+        foregroundActivity: 'dev.example.app/.MainActivity',
+        appInForeground: true,
+        source: 'adb-pidof+dumpsys-activity',
+        timestamp,
+      });
+      vi.spyOn(core.adb, 'deviceInfo').mockRejectedValue(
+        new Error('not required'),
+      );
+      const logs = vi.spyOn(core.adb, 'logs');
+      logs.mockResolvedValueOnce({
+        pidFilterApplied: true,
+        processId: 42,
+        entries: [
+          {
+            level: 'info',
+            source: 'ReactNativeJS',
+            timestamp,
+            message: `RN_AGENT_OBSERVER_ROUTE {"route":"PerformanceLab","timestamp":"${timestamp}"}`,
+          },
+          {
+            level: 'info',
+            source: 'ReactNativeJS',
+            timestamp,
+            message: `RN_AGENT_OBSERVER_JS_TASK {"durationMs":100,"label":"intentional-block","timestamp":"${timestamp}","source":"rn-instrumentation"}`,
+          },
+          {
+            level: 'info',
+            source: 'ReactNativeJS',
+            timestamp,
+            message: `RN_AGENT_OBSERVER_NETWORK {"id":"request-1","method":"GET","url":"/fixture","status":200,"durationMs":25,"timestamp":"${timestamp}","source":"rn-instrumentation"}`,
+          },
+        ],
+      });
+      logs.mockResolvedValue({
+        pidFilterApplied: true,
+        processId: 42,
+        entries: [],
+      });
+      vi.spyOn(core.adb, 'performance').mockResolvedValue({
+        timestamp,
+        metrics: [
+          {
+            name: 'js_blocking_ms',
+            value: null,
+            unit: 'ms',
+            source: 'rn-instrumentation',
+            timestamp,
+            available: false,
+            reason: 'No JS task is present in the current logcat window',
+          },
+        ],
+      });
+      vi.spyOn(core.adb, 'clockSkewMs').mockResolvedValue(null);
+
+      const before = await core.snapshot();
+      await core.press(before.elements[0]?.ref ?? '', 1);
+
+      const performance = await core.performanceSnapshot();
+      expect(
+        performance.metrics.find((metric) => metric.name === 'js_blocking_ms'),
+      ).toMatchObject({ available: true, value: 100 });
+      expect(await core.getNetworkRequests()).toMatchObject([
+        { id: 'request-1', durationMs: 25 },
+      ]);
+      const model = await core.runtimeUiModel();
+      expect(model.route).toBe('PerformanceLab');
+      expect(model.limitations).toContainEqual(
+        expect.stringContaining('restored from the active session cache'),
+      );
+      expect(
+        core
+          .getSession(session.id)
+          .timeline.some((event) => event.type === 'runtime_telemetry_capture'),
+      ).toBe(true);
+    } finally {
+      core.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('records an unavailable runtime UI model when stopping a session off-target', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'rn-observer-runtime-stop-'));
+    const core = new ObserverCore({
+      projectRoot: root,
+      appId: 'dev.example.app',
+      deviceId: 'emulator-5554',
+      onWarning: () => {},
+    });
+    const tree = vi.spyOn(core, 'getUiTree');
+    vi.spyOn(core.adb, 'appState').mockResolvedValue({
+      appId: 'dev.example.app',
+      processRunning: false,
+      pid: null,
+      foregroundActivity: 'com.android.launcher/.Launcher',
+      appInForeground: false,
+      source: 'adb-pidof+dumpsys-activity',
+      timestamp: '2026-08-23T00:00:00.000Z',
+    });
+    try {
+      const session = core.startSession();
+      const stopped = await core.stopSession(session.id);
+      const modelEvent = stopped.timeline.find(
+        (event) => event.type === 'runtime_ui_model',
+      );
+
+      expect(modelEvent?.data).toMatchObject({
+        availability: { status: 'target-not-running' },
+        issueCodes: [],
+      });
+      expect(tree).not.toHaveBeenCalled();
     } finally {
       core.close();
       rmSync(root, { recursive: true, force: true });

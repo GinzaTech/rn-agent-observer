@@ -110,7 +110,24 @@ export function diagnoseEvidence(
   },
   thresholdOverrides?: Partial<DiagnosisThresholds>,
 ): Diagnosis {
-  const thresholds = mergeThresholds(thresholdOverrides);
+  const refreshHz = metric(input.performance, 'display_refresh_hz');
+  // Device-aware FPS budget: 45fps means very different things on a 60Hz and
+  // a 120Hz panel. Unless the caller pinned uiFps explicitly, derive the
+  // thresholds from the measured refresh rate (75% low / 50% critical).
+  const derivedThresholds =
+    thresholdOverrides?.uiFpsLow === undefined &&
+    thresholdOverrides?.uiFpsCritical === undefined &&
+    refreshHz !== null &&
+    refreshHz > 0
+      ? {
+          uiFpsLow: Math.round(refreshHz * 0.75),
+          uiFpsCritical: Math.round(refreshHz * 0.5),
+        }
+      : {};
+  const thresholds = mergeThresholds({
+    ...thresholdOverrides,
+    ...derivedThresholds,
+  });
   const findings: Diagnosis['findings'] = [];
   const uiFps = metric(input.performance, 'ui_fps');
   const jsBlockingEvidence = metricEvidence(

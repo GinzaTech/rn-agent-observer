@@ -1,15 +1,35 @@
 # Xử lý sự cố
 
+> **English summary**: Android is the built-in runtime target; Windows/Linux/macOS
+> are Node hosts. Start read-only. Active actions require exact policy binding and
+> process trust; CDP commands require the correct Metro target and ADB reverse.
+
 ## Không tìm thấy pnpm/workspace package
 
 ```powershell
 corepack enable
 corepack prepare pnpm@9.6.0 --activate
-pnpm install --force
+pnpm install --frozen-lockfile
 pnpm build
 ```
 
 Repo đặt pnpm virtual store ngắn (`.pnpm`) để tránh giới hạn đường dẫn CMake/Prefab trên Windows. Không chạy package-local `npm install`.
+
+Chỉ thêm `--force` khi active virtual store bị stale và bạn đã xác nhận
+`pnpm-lock.yaml`/`.pnpmfile.cjs` đúng; không xóa lockfile để né lỗi frozen install.
+
+## npm trả 404 cho package Observer
+
+Kiểm tra trực tiếp:
+
+```powershell
+pnpm view @rn-agent-observer/cli version
+```
+
+Tại snapshot 2026-08-24, package scoped chưa được publish. Dùng
+[source installation](installation.md) thay vì đổi registry hoặc cài package cùng
+tên không thuộc scope. Sau lần publish đầu, chỉ tin exact package
+`@rn-agent-observer/*` và verify version/provenance.
 
 ## ADB không thấy device hoặc có nhiều device
 

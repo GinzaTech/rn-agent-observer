@@ -1,9 +1,10 @@
 # Release installation and publication
 
-Published npm packages are the primary distribution for RN Agent Observer. GitHub
-release attachments may additionally contain source or Windows portable archives,
-but those attachments are optional and must not be treated as the only install
-path.
+The intended primary distribution is the five npm packages below. They are
+release-ready but were **not present in the npm registry at the 2026-08-24
+verification snapshot**; until the first publication, use the source-checkout path
+in [installation.md](installation.md). GitHub release attachments may additionally
+contain source or Windows portable archives, but those attachments are optional.
 
 All public packages use the same version:
 
@@ -33,6 +34,16 @@ target remains the one explicitly documented in the README and capability matrix
 An Expo Android export proves bundling only and never substitutes for a device run.
 
 ## Install a published CLI release
+
+First confirm that publication exists. Do not present a local tarball smoke result
+as a public npm release:
+
+```sh
+pnpm view @rn-agent-observer/cli version
+pnpm view @rn-agent-observer/mcp-server version
+```
+
+Only after both commands return the expected lockstep version:
 
 Install in the project that will run the observer:
 
@@ -103,8 +114,9 @@ pnpm release:check
 ```
 
 `pnpm release:check` runs lint, format validation, builds, tests, the MCP health
-check, the CLI version check, and a tarball plus clean-consumer smoke check for all
-five public packages. The tarball check writes ignored archives to
+check, the CLI version check, a tarball plus clean-consumer smoke check for all
+five public packages, and a disposable Android/Hermes export validation. The
+tarball check writes ignored archives to
 `.artifacts/package-smoke/` and verifies:
 
 - package version and public npm metadata;
@@ -119,13 +131,14 @@ dependencies), and runs `rn-observe --version`, `rn-observe --help`,
 without relying on the repository's installed workspace packages; the temporary
 project is removed only after its path is safety-checked.
 
-Run the Android export gate separately when the demo or instrumentation changes:
+The Android export sub-gate can also be run independently:
 
 ```sh
-pnpm --filter @rn-agent-observer/demo-expo exec expo export \
-  --platform android \
-  --output-dir <temporary-directory>
+pnpm android:export:check
 ```
+
+It writes to a safety-checked OS temporary directory, verifies `metadata.json` and
+exactly one Android Hermes bundle, then removes only that temporary directory.
 
 Do not report Android runtime as verified unless the relevant scenario also ran on
 a device or emulator and produced scoped before/after evidence.
@@ -153,8 +166,8 @@ must be regenerated.
 
 1. Update `CHANGELOG.md` and set one identical version in the root, demo, and five
    public package manifests. Keep internal source dependencies as `workspace:*`.
-2. Run `pnpm install --frozen-lockfile`, `pnpm release:check`, and the Android export
-   gate. Run the relevant device blueprint for runtime-facing changes.
+2. Run `pnpm install --frozen-lockfile` and `pnpm release:check`. Run the relevant
+   device blueprint for runtime-facing changes.
 3. Review every tarball produced under `.artifacts/package-smoke/`. Verify that the
    release claims distinguish static/unit coverage from device evidence.
 4. Create a `v<version>` tag that exactly matches `package.json`, then create the
@@ -174,9 +187,10 @@ to the changelog and compatibility policy.
 
 # Cài đặt và phát hành
 
-Các package npm công khai là kênh phân phối chính. Attachment của GitHub Release có
-thể bổ sung source hoặc portable bundle cho Windows, nhưng là tùy chọn và không thay
-thế npm.
+Năm package npm là kênh phân phối dự kiến. Tại snapshot kiểm tra 2026-08-24, chúng
+**chưa tồn tại trên npm registry**; trước lần publish đầu, dùng source checkout theo
+[hướng dẫn cài đặt](installation.md). Attachment GitHub Release có thể bổ sung source
+hoặc portable bundle cho Windows nhưng là tùy chọn.
 
 Năm package công khai luôn dùng cùng một version:
 
@@ -188,6 +202,15 @@ Năm package công khai luôn dùng cùng một version:
 Root workspace và demo Expo vẫn `private`.
 
 ## Cài release đã publish
+
+Xác nhận package đã tồn tại và cùng version trước:
+
+```sh
+pnpm view @rn-agent-observer/cli version
+pnpm view @rn-agent-observer/mcp-server version
+```
+
+Chỉ sau khi registry trả version thay vì `404`:
 
 ```sh
 pnpm add --save-dev @rn-agent-observer/cli
@@ -210,9 +233,6 @@ hai kết quả này thành Android runtime đã chạy trên device.
 ```sh
 pnpm install --frozen-lockfile
 pnpm release:check
-pnpm --filter @rn-agent-observer/demo-expo exec expo export \
-  --platform android \
-  --output-dir <temporary-directory>
 ```
 
 `release:check` kiểm tra cả năm tarball, README/LICENSE/entrypoint, metadata public,
@@ -220,7 +240,9 @@ file thừa và việc rewrite `workspace:*` thành đúng version release. Sau 
 consumer project trong thư mục tạm của hệ điều hành, cài tarball local của CLI, MCP,
 Core và Schemas, rồi chạy `--version`, `--help`, `init --dry-run` và MCP `--check`.
 Việc này không dựa vào package workspace đã cài trong repo; thư mục tạm chỉ bị xóa
-sau khi kiểm tra an toàn đường dẫn. Archive kiểm tra nằm trong
+sau khi kiểm tra an toàn đường dẫn. Gate này cũng export Android/Hermes vào thư mục
+tạm của hệ điều hành, kiểm tra metadata và đúng một bundle, rồi dọn đúng thư mục đó.
+Archive kiểm tra nằm trong
 `.artifacts/package-smoke/` và không được commit.
 
 Maintainer phải cập nhật changelog, đồng bộ version toàn workspace, chạy scenario

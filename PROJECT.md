@@ -1,19 +1,23 @@
 # RN Agent Observer
 
-**VI** · [EN](#english) · Version 2.4.0 · Android + Windows
+**VI** · [EN](#english) · Version 2.4.0 · Android target, cross-platform Node host
 
 RN Agent Observer là cầu nối quan sát runtime cục bộ (local runtime observability bridge) cho ứng dụng React Native/Expo trên Android. Công cụ cho phép AI coding agent (OpenCode, Claude Code, Codex, Cursor...) hoặc lập trình viên **quan sát, chẩn đoán và xác minh** ứng dụng đang chạy mà không cần nhìn màn hình — mọi bằng chứng runtime (screenshot, UI tree, FPS, network, render, console, heap, trace, video) đều có cấu trúc, đo đếm được và so sánh trước/sau được.
 
 ```text
-AI Agent ──CLI (37 lệnh)──┐
+AI Agent ──CLI─────────────┐
                            ├──> ObserverCore ──> ADB / UIAutomator / Perfetto (Android)
-AI Agent ──MCP (45 tools)─┘        │      ──> Metro CDP (console/network/profile/heap)
+AI Agent ──MCP (66 tools)─┘        │      ──> Metro CDP (console/network/profile/heap)
                                    │      ──> RN instrumentation (fetch/route/render/JS task)
                                    v
                         SQLite session + artifact trên đĩa (.artifacts/)
 ```
 
 > **Triết lý cốt lõi**: Evidence trước, kết luận sau. Không bao giờ bịa số liệu — metric nào đo không được phải trả `available: false` kèm lý do.
+
+Cài đặt/cập nhật theo [installation](docs/installation.md) và
+[upgrading](docs/upgrading.md); bản đồ source chi tiết nằm trong
+[project structure](docs/project-structure.md).
 
 ## Mục lục
 
@@ -39,7 +43,7 @@ AI Agent ──MCP (45 tools)─┘        │      ──> Metro CDP (console/n
 ## Bắt đầu nhanh
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check                    # lint + format + build + test
 pnpm build                    # CLI/MCP chạy từ dist — bắt buộc sau khi sửa source
 adb devices -l
@@ -98,7 +102,7 @@ rn-agent-observer/
 │   │                       # diagnosis, observer, artifact, trace, status, devtools, app-state
 │   ├── core/               # TOÀN BỘ device/runtime logic — bộ não duy nhất
 │   │   └── src/
-│   │       ├── index.ts        # ObserverCore façade: 37 commands, session/artifact wiring
+│   │       ├── index.ts        # ObserverCore façade, session/artifact wiring
 │   │       ├── adb/            # AdbClient + parsers (devices/UI tree/logcat/framestats/
 │   │       │                   # meminfo/top/resumed-activity/proc-net-dev/permissions)
 │   │       ├── devtools/       # CDP client (ws), metro discovery, devtools-exporter,
@@ -114,7 +118,7 @@ rn-agent-observer/
 │   │       ├── session/        # SQLite WAL SessionStore (sessions/events/artifacts)
 │   │       └── artifacts/      # ArtifactManager (đĩa) + config.ts (app ID resolution)
 │   ├── cli/                # rn-observe — parse flag + in JSON, KHÔNG chứa logic
-│   ├── mcp-server/         # MCP stdio server — 45 tools, adapter mỏng gọi core
+│   ├── mcp-server/         # MCP stdio server — 66 tools, adapter mỏng gọi core
 │   └── rn-instrumentation/ # package dev-only cài vào app (fetch/route/render/js-task/app-data
 │                           # + redactUrl/redactSensitiveText/redactHeaders) — dependency-free
 ├── apps/
@@ -179,7 +183,7 @@ CLI observe
 | `RN_OBSERVER_METRO_URL`    | Base URL Metro cho tính năng CDP             | `http://127.0.0.1:8081`            |
 | `RN_OBSERVER_ADB`          | Đường dẫn adb executable khác                | `adb`                              |
 
-### Lệnh CLI theo nhóm (37 lệnh)
+### Lệnh CLI theo nhóm
 
 ```text
 Thiết bị & app:
@@ -222,7 +226,7 @@ Phân tích & session:
 ```powershell
 # 0. Môi trường
 $env:RN_OBSERVER_PROJECT_ROOT = 'C:\apps\my-expo-app'
-$env:RN_OBSERVER_DEVICE_ID = '45218ba'
+$env:RN_OBSERVER_DEVICE_ID = '<physical-device-serial>'
 
 # 1. Baseline
 pnpm rn-observe launch
@@ -316,7 +320,7 @@ pnpm mcp:check    # health check
 pnpm mcp:start    # stdio server
 ```
 
-Cấu hình client (Claude/OpenCode/Cursor...) — xem danh sách 45 tools trong `docs/protocol.md`:
+Cấu hình client (Claude/OpenCode/Cursor...) — xem danh sách 66 tools trong `docs/protocol.md`:
 
 ```json
 {
@@ -379,9 +383,9 @@ pnpm --filter @rn-agent-observer/core test -- src/refs   # một file/pattern
 pnpm mcp:check                                # MCP health check
 ```
 
-- **Unit/integration**: 45 tests — parsers, session SQLite, compare, network/diagnosis rules, CLI, MCP handshake, schemas, redaction, refs/diff, replay, sitemap
+- **Unit/integration**: gate 2026-08-24 pass 352/352 tests; xem breakdown và lịch sử trong `docs/testing.md`
 - **Test blueprint** (`docs/test-blueprint.md`): bộ tham chiếu chuẩn ~190 case (21 domain, 4 tier T0–T3) để test observer trên bất kỳ app RN nào và regression chính observer — golden AUT là `apps/demo-expo`
-- **Runtime verification**: đã verify trên Xiaomi 23013PC75G (Android 15) qua các bản 2.0–2.1; các tính năng 2.2–2.3 cần chạy lại khi có device
+- **Runtime verification**: physical Android 15 development fixture đã hoàn tất vòng 2.4.0 ngày 2026-08-24; chỉ đúng một OEM/API/scenario, không phải device matrix
 - **Quy tắc**: không tuyên bố runtime Android hoạt động nếu chưa chạy trên device/emulator thật
 
 ## Bảo mật & giới hạn
@@ -408,7 +412,7 @@ pnpm mcp:check                                # MCP health check
 
 # English
 
-**EN** · [VI](#rn-agent-observer) · Version 2.4.0 · Android + Windows
+**EN** · [VI](#rn-agent-observer) · Version 2.4.0 · Android target, cross-platform Node host
 
 RN Agent Observer is a local runtime observability bridge for React Native/Expo apps on Android. It lets AI coding agents (OpenCode, Claude Code, Codex, Cursor...) or developers **observe, diagnose and verify** a running app without looking at the screen — every piece of runtime evidence (screenshot, UI tree, FPS, network, renders, console, heap, traces, video) is structured, measurable, and comparable before/after code changes.
 
@@ -436,7 +440,7 @@ RN Agent Observer is a local runtime observability bridge for React Native/Expo 
 ## Quick Start
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check                    # lint + format + build + test
 pnpm build                    # CLI/MCP run from dist — required after source changes
 adb devices -l
@@ -493,7 +497,7 @@ rn-agent-observer/
 │   ├── schemas/            # Zod schemas + shared types — NO runtime logic
 │   ├── core/               # ALL device/runtime logic — the single brain
 │   │   └── src/
-│   │       ├── index.ts        # ObserverCore façade: 37 commands, session/artifact wiring
+│   │       ├── index.ts        # ObserverCore façade, session/artifact wiring
 │   │       ├── adb/            # AdbClient + parsers (devices/UI tree/logcat/framestats/
 │   │       │                   # meminfo/top/resumed-activity/proc-net-dev/permissions)
 │   │       ├── devtools/       # CDP client (ws), metro discovery, devtools-exporter,
@@ -509,7 +513,7 @@ rn-agent-observer/
 │   │       ├── session/        # SQLite WAL SessionStore (sessions/events/artifacts)
 │   │       └── artifacts/      # ArtifactManager (disk) + config.ts (app ID resolution)
 │   ├── cli/                # rn-observe — flag parsing + JSON printing, NO logic
-│   ├── mcp-server/         # MCP stdio server — 45 tools, thin adapter over core
+│   ├── mcp-server/         # MCP stdio server — 66 tools, thin adapter over core
 │   └── rn-instrumentation/ # dev-only package for the observed app (fetch/route/render/
 │                           # js-task/app-data + redactUrl/redactSensitiveText/redactHeaders)
 ├── apps/
@@ -573,7 +577,7 @@ CLI observe
 | `RN_OBSERVER_METRO_URL`    | Metro base URL for CDP features                       | `http://127.0.0.1:8081`              |
 | `RN_OBSERVER_ADB`          | Custom adb executable path                            | `adb`                                |
 
-### CLI commands by group (37 commands)
+### CLI commands by group
 
 ```text
 Device & app:
@@ -616,7 +620,7 @@ Analysis & sessions:
 ```powershell
 # 0. Environment
 $env:RN_OBSERVER_PROJECT_ROOT = 'C:\apps\my-expo-app'
-$env:RN_OBSERVER_DEVICE_ID = '45218ba'
+$env:RN_OBSERVER_DEVICE_ID = '<physical-device-serial>'
 
 # 1. Baseline
 pnpm rn-observe launch
@@ -710,7 +714,7 @@ pnpm mcp:check    # health check
 pnpm mcp:start    # stdio server
 ```
 
-Client config (Claude/OpenCode/Cursor...) — see all 45 tools in `docs/protocol.md`:
+Client config (Claude/OpenCode/Cursor...) — see all 66 tools in `docs/protocol.md`:
 
 ```json
 {
@@ -773,9 +777,9 @@ pnpm --filter @rn-agent-observer/core test -- src/refs   # single file/pattern
 pnpm mcp:check                                # MCP health check
 ```
 
-- **Unit/integration**: 45 tests — parsers, session SQLite, compare, network/diagnosis rules, CLI, MCP handshake, schemas, redaction, refs/diff, replay, sitemap
+- **Unit/integration**: the 2026-08-24 gate passed 352/352 tests; see `docs/testing.md` for the package breakdown and historical records
 - **Test blueprint** (`docs/test-blueprint.md`): ~190 reference cases (21 domains, 4 tiers T0–T3) for testing the observer against any RN app and regression-testing the observer itself — golden AUT is `apps/demo-expo`
-- **Runtime verification**: verified on a Xiaomi 23013PC75G (Android 15) through 2.0–2.1; 2.2–2.3 features need a rerun when a device is available
+- **Runtime verification**: a physical Android 15 development fixture completed the 2.4.0 workflow on 2026-08-24; this is one OEM/API/scenario, not a device matrix
 - **Rule**: never claim Android runtime works without running on a real device/emulator
 
 ## Security & Limitations

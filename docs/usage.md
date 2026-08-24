@@ -1,6 +1,17 @@
 # Hướng dẫn sử dụng chi tiết
 
-Tài liệu áp dụng cho RN Agent Observer 2.4.0, target Android + Windows + Expo/React Native.
+> **English summary**: This guide covers the full RN Agent Observer 2.4.0+
+> workflow with Android as the built-in target and Windows/Linux/macOS as Node
+> hosts. Safety is read-only by default; mutation requires an exact
+> authorized-active policy plus process trust. CDP features need the correct Metro
+> target and ADB reverse.
+>
+> Tài liệu áp dụng cho RN Agent Observer 2.4.0. Android là built-in runtime target;
+> Windows/Linux/macOS là host, không phải target support mặc định.
+
+Nếu chưa có workspace chạy được, hoàn tất [cài đặt từng bước](installation.md)
+trước. Lệnh trong tài liệu dùng `pnpm rn-observe` từ source checkout; sau khi package
+npm được publish/cài, thay bằng `pnpm exec rn-observe`.
 
 ## 1. Cài đặt và kiểm tra môi trường
 
@@ -8,7 +19,7 @@ Tài liệu áp dụng cho RN Agent Observer 2.4.0, target Android + Windows + E
 node --version
 pnpm --version
 adb version
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check
 ```
 

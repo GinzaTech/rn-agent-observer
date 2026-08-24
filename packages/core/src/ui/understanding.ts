@@ -23,12 +23,57 @@ const GENERIC_LABELS = new Set([
   'button',
   'edittext',
 ]);
+// Patterns are multilingual (EN/VI/JA/KO/ZH/ES). Vietnamese input is NFC
+// normalized first so decomposed characters still match.
 const ERROR_TEXT =
-  /(?:^error(?:\s*[:!.-]|$)|exception|uncaught|crash(?:ed)?|fatal error|failed to|request failed|network error|something went wrong|unable to|timed? out|timeout|đã xảy ra lỗi|không thể|thất bại|(?:^|\s)lỗi(?:\s|:|$))/i;
+  /(?:^error(?:\s*[:!.-]|$)|exception|uncaught|crash(?:ed)?|fatal error|failed to|request failed|network error|something went wrong|unable to|timed? out|timeout|đã xảy ra lỗi|xảy ra lỗi|không thể|thất bại|(?:^|\s)lỗi(?:\s|:|$)|エラー|失敗しました|読み込みに失敗|오류가 발생|실패했|加载失败|出错了|错误|no se pudo|ha ocurrido un error|fallo al cargar|error al)/i;
 const LOADING_TEXT =
-  /(?:^|\s)(?:loading|connecting|please wait|syncing|đang tải|đang kết nối|vui lòng chờ|đang đồng bộ)(?:\s|[.!…]|$)/i;
+  /(?:^|\s)(?:loading|connecting|please wait|syncing|đang tải|đang kết nối|vui lòng chờ|đang đồng bộ|読み込み中|接続中|少々お待ち|로딩 중|로딩중|연결 중|잠시만 기다려|加载中|正在加载|请稍候|cargando|conectando|espera un momento)/i;
 const EMPTY_TEXT =
-  /(?:no data|nothing here|no results|list is empty|empty state|không có dữ liệu|không tìm thấy kết quả|danh sách (?:đang )?trống|chưa có dữ liệu)/i;
+  /(?:no data|nothing here|no results|list is empty|empty state|không có dữ liệu|không tìm thấy kết quả|danh sách (?:đang )?trống|chưa có dữ liệu|データがありません|検索結果なし|데이터 없음|결과 없음|결과가 없습니다|暂无数据|没有数据|没有找到|sin datos|sin resultados|no hay datos|lista vacía)/i;
+
+/**
+ * Best-effort language detection over visible screen text. Returns 'unknown'
+ * when no marker matches — callers must treat classifications as heuristic,
+ * not proof, and say so.
+ */
+export function detectTextLanguage(texts: string[]): {
+  language: 'en' | 'vi' | 'ja' | 'ko' | 'zh' | 'es' | 'unknown';
+  matchedMarkers: number;
+} {
+  const joined = texts.join('\n');
+  // Tight Unicode blocks only — a loose range like \u00c0-\u1efa would also
+  // swallow Cyrillic/Greek/Arabic and misreport them as Vietnamese.
+  const hasKana = /[\u3040-\u30ff]/.test(joined);
+  const hasHangul = /[\uac00-\ud7af]/.test(joined);
+  const hasHanzi = /[\u4e00-\u9fff]/.test(joined);
+  const hasVietnameseLatin = /[\u00c0-\u024f\u1e00-\u1ef9]/.test(joined);
+  const hasSpanishMarker =
+    /\b(?:por favor|bienvenido|iniciar sesión|cargando)\b/i.test(joined);
+  const hasEnglishMarker =
+    /\b(?:welcome|sign in|loading|settings|search)\b/i.test(joined);
+
+  let language: 'en' | 'vi' | 'ja' | 'ko' | 'zh' | 'es' | 'unknown' = 'unknown';
+  let matchedMarkers = 0;
+  const consider = (candidate: typeof language, matches: boolean): void => {
+    if (!matches) return;
+    if (language === 'unknown') language = candidate;
+    matchedMarkers += 1;
+  };
+  consider('vi', hasVietnameseLatin);
+  consider('ko', hasHangul);
+  // Kana is uniquely Japanese; hanzi without kana is Chinese.
+  consider('ja', hasKana);
+  consider('zh', hasHanzi && !hasKana);
+  consider('es', hasSpanishMarker);
+  consider('en', hasEnglishMarker);
+  return { language, matchedMarkers };
+}
+
+/** NFD->NFC so Vietnamese decomposed glyphs still match the patterns. */
+function normalizeVisibleText(value: string): string {
+  return value.normalize('NFC');
+}
 
 export interface PixelStatistics {
   sampledPixels: number;
@@ -281,9 +326,13 @@ export function analyzeScreen(input: AnalyzeScreenInput): ScreenUnderstanding {
   const meaningfulActions = actions.filter(
     (element) => element.label && !genericLabel(element.label),
   );
-  const errorTexts = texts.filter((value) => ERROR_TEXT.test(value));
-  const loadingTexts = texts.filter((value) => LOADING_TEXT.test(value));
-  const emptyTexts = texts.filter((value) => EMPTY_TEXT.test(value));
+  const normalizedTexts = texts.map(normalizeVisibleText);
+  const language = detectTextLanguage(normalizedTexts);
+  const errorTexts = normalizedTexts.filter((value) => ERROR_TEXT.test(value));
+  const loadingTexts = normalizedTexts.filter((value) =>
+    LOADING_TEXT.test(value),
+  );
+  const emptyTexts = normalizedTexts.filter((value) => EMPTY_TEXT.test(value));
   const looksVisuallyBlank =
     input.pixelStatistics.dominantColorRatio >= 0.9 &&
     input.pixelStatistics.luminanceStdDev <= 24;
@@ -408,6 +457,18 @@ export function analyzeScreen(input: AnalyzeScreenInput): ScreenUnderstanding {
   }
 
   const a11y = auditAccessibility(input.tree, input.densityDpi);
+  if (language.language === 'unknown' && normalizedTexts.length > 0) {
+    issues.push(
+      issue(
+        'text-language-unknown',
+        'info',
+        'Screen text language not recognized',
+        'Visible text matched no known language marker (en/vi/ja/ko/zh/es); state heuristics may miss localized error/empty wording.',
+        'Classifications are heuristic. Open screenshotPath to verify the screen state directly.',
+        artifactIds,
+      ),
+    );
+  }
   if (a11y.unlabeledCount > 0) {
     issues.push(
       issue(
@@ -541,6 +602,7 @@ export function analyzeScreen(input: AnalyzeScreenInput): ScreenUnderstanding {
     fingerprint: screenFingerprint,
     route: input.route,
     headline,
+    textLanguage: language.language,
     summary,
     visibleText,
     actions: visibleActions,

@@ -147,7 +147,9 @@ function PerformanceLab({ onBack }: { onBack: () => void }) {
         testID="trigger-js-block"
         onPress={triggerBlock}
       />
-      <Text testID="last-block">Last block: {lastBlockMs.toFixed(1)}ms</Text>
+      <Text testID="last-block" style={styles.statusText}>
+        Last block: {lastBlockMs.toFixed(1)}ms
+      </Text>
       <FlatList
         style={styles.list}
         data={Array.from({ length: 500 }, (_, index) => index)}
@@ -239,7 +241,9 @@ function NetworkLab({ onBack }: { onBack: () => void }) {
         testID="network-real"
         onPress={() => void realFetch()}
       />
-      <Text testID="network-result">{result}</Text>
+      <Text testID="network-result" style={styles.statusText}>
+        {result}
+      </Text>
     </Screen>
   );
 }
@@ -272,7 +276,9 @@ function RenderLab({ onBack }: { onBack: () => void }) {
           })
         }
       />
-      <Text testID="render-count">Parent tick: {tick}</Text>
+      <Text testID="render-count" style={styles.statusText}>
+        Parent tick: {tick}
+      </Text>
       <ScrollView style={styles.list}>
         {Array.from({ length: 100 }, (_, index) => (
           <BadRow key={index} index={index} tick={tick} />
@@ -346,7 +352,7 @@ function ErrorLab({ onBack }: { onBack: () => void }) {
           }, 0);
         }}
       />
-      <Text>
+      <Text style={styles.statusText}>
         {handled ? 'Handled exception captured' : 'No handled exception yet'}
       </Text>
     </Screen>
@@ -567,6 +573,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   title: { color: '#f8fafc', fontSize: 28, fontWeight: '700', flexShrink: 1 },
   subtitle: { color: '#94a3b8', fontSize: 16, marginBottom: 12 },
+  statusText: { color: '#cbd5e1' },
   securityLab: { gap: 12 },
   button: {
     backgroundColor: '#2563eb',

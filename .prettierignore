@@ -8,11 +8,14 @@ pnpm-lock.yaml
 .artifacts
 **/.artifacts
 artifacts
+*.rnobs
 
 # Native demo build tree
 apps/demo-expo/android
 apps/demo-expo/ios
 release
+test-results
+playwright-report
 
 # Legacy unformatted plan document
 RN_AGENT_OBSERVER_PLAN.md

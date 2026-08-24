@@ -1,5 +1,11 @@
 # CLI và MCP protocol
 
+> **English summary**: Android is the built-in runtime target; Windows/Linux/macOS
+> are Node hosts. CLI and MCP share one Core contract. Mutation requires an exact
+> authorized-active policy plus `RN_OBSERVER_TRUST_ACTIVE_CONFIG=1`; repository
+> config cannot trust itself. CDP commands need the correct Metro target and ADB
+> reverse.
+
 ## Môi trường chung
 
 | Biến                       | Ý nghĩa                                                                         |

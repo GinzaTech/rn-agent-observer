@@ -4,7 +4,7 @@
 
 RN Agent Observer là cầu nối quan sát và kiểm định cục bộ cho React Native/Expo. Công cụ dùng cùng một core TypeScript cho CLI và MCP, điều khiển Android qua ADB/UIAutomator, nhận telemetry từ instrumentation phát triển, chạy quality suite có evidence, kiểm tra bảo mật thụ động/supply chain và active scenario bị ràng buộc, lặp performance experiment, tạo dashboard offline đã lược dữ liệu nhạy cảm, chia sẻ `.rnobs` metadata-first, kiểm coverage route/action semantic, và lưu session bằng SQLite trong khi giữ binary lớn ở dạng artifact trên đĩa.
 
-Bề mặt public hiện có CLI, 66 MCP tools, 6 MCP resources và 2 workflow prompts. Các gate host và bằng chứng runtime Android được báo riêng trong [tài liệu kiểm thử](docs/testing.md); tính năng mới chưa chạy đúng fixture trên device giữ trạng thái `NOT_VERIFIED`, không được suy ra từ unit test hay CI không có emulator.
+Bề mặt public hiện có CLI, 66 MCP tools, 6 MCP resources và 2 workflow prompts. Các gate host và bằng chứng runtime Android được báo riêng trong [tài liệu kiểm thử](docs/testing.md) và [compatibility matrix](docs/compatibility.md); tính năng mới chưa chạy đúng fixture trên device giữ trạng thái `NOT_VERIFIED`, không được suy ra từ unit test hay CI không có emulator. Ví dụ [Maestro + Observer](examples/maestro/README.md) minh hoạ cách runner E2E điều khiển flow còn Observer thu evidence, thay vì cố thay thế toàn bộ Maestro/Detox/Appium hoặc device farm.
 
 ## Yêu cầu
 
@@ -14,7 +14,20 @@ Bề mặt public hiện có CLI, 66 MCP tools, 6 MCP resources và 2 workflow p
 - Android emulator hoặc thiết bị vật lý đã cho phép USB debugging
 - Expo development build nếu cần telemetry riêng của ứng dụng
 
-## Cài release từ npm
+## Cài đặt
+
+Đường dùng được kiểm chứng hiện tại là clone source:
+
+```powershell
+git clone https://github.com/GinzaTech/rn-agent-observer.git
+Set-Location .\rn-agent-observer
+corepack prepare pnpm@9.6.0 --activate
+pnpm install --frozen-lockfile
+pnpm release:check
+```
+
+Tại snapshot 2026-08-24, năm package scoped chưa được publish lên npm. Sau lần
+publish đầu, consumer có thể cài CLI/MCP bằng:
 
 ```powershell
 pnpm add --save-dev @rn-agent-observer/cli
@@ -24,14 +37,14 @@ pnpm add --save-dev @rn-agent-observer/mcp-server
 pnpm exec rn-observer-mcp --check
 ```
 
-Năm package public, cách cài integration và quy trình kiểm tra release nằm trong
-[hướng dẫn cài đặt/phát hành](docs/release-installation.md). Instrumentation chỉ được
-bật trong development build.
+Xem [hướng dẫn cài đặt từng bước](docs/installation.md) cho source, device, MCP và
+instrumentation; xem [cài đặt/phát hành](docs/release-installation.md) cho maintainer.
+Instrumentation chỉ được bật trong development build.
 
 ## Bắt đầu nhanh từ source
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check
 adb devices -l
 pnpm rn-observe --help
@@ -204,7 +217,10 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 
 ## Tài liệu
 
+- [Cài đặt từng bước](docs/installation.md)
 - [Hướng dẫn sử dụng chi tiết](docs/usage.md)
+- [Cấu trúc repository](docs/project-structure.md)
+- [Cập nhật và migration](docs/upgrading.md)
 - [Tổng quan dự án đầy đủ (VI/EN)](PROJECT.md)
 - [Kiến trúc](docs/architecture.md)
 - [CLI và MCP protocol](docs/protocol.md)
@@ -221,7 +237,7 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 
 ## Phiên bản hiện tại
 
-- Device/runtime provider hiện là Android. Bằng chứng runtime đã ghi nhận dùng Windows + physical device; CI Ubuntu/macOS là host-only và không mở rộng runtime support. Các workflow assurance mới chưa rerun trên device giữ `NOT_VERIFIED`.
+- Device/runtime provider hiện là Android. Bằng chứng runtime đã ghi nhận trên host Windows + physical device; CI Ubuntu/macOS là host-only và không mở rộng runtime support. Mọi exact assurance scenario chưa được chạy trên đúng fixture/device vẫn giữ `NOT_VERIFIED`.
 - ADB không có tín hiệu JS FPS đáng tin cậy; field được trả `available: false`, không đoán số.
 - JS blocking, route, React renders và network metadata cần instrumentation phát triển trong app.
 - Export DevTools qua CDP (`devtools-export`, `devtools-profile`) và network per-request (`metro-network`) cần Metro đang chạy và app kết nối được Metro (`adb reverse tcp:8081 tcp:8081`); không dùng được khi một phiên React Native DevTools khác đang giữ kết nối.
@@ -267,7 +283,20 @@ The public surface currently includes the CLI, 66 MCP tools, 6 MCP resources, an
 - An Android emulator or physical device with USB debugging enabled
 - An Expo development build if you need app-specific telemetry
 
-## Install a published npm release
+## Installation
+
+The currently verified path is a source checkout:
+
+```powershell
+git clone https://github.com/GinzaTech/rn-agent-observer.git
+Set-Location .\rn-agent-observer
+corepack prepare pnpm@9.6.0 --activate
+pnpm install --frozen-lockfile
+pnpm release:check
+```
+
+As of the 2026-08-24 snapshot, the five scoped packages have not been published
+to npm. After the first publication, consumers can install CLI/MCP with:
 
 ```powershell
 pnpm add --save-dev @rn-agent-observer/cli
@@ -277,14 +306,15 @@ pnpm add --save-dev @rn-agent-observer/mcp-server
 pnpm exec rn-observer-mcp --check
 ```
 
-See the [release installation guide](docs/release-installation.md) for all five
-public packages, integration setup, integrity checks, and the maintainer release
-process. Instrumentation must remain development-only.
+See the [step-by-step installation guide](docs/installation.md) for source, device,
+MCP, and instrumentation setup. Maintainers should use the
+[release installation guide](docs/release-installation.md). Instrumentation must
+remain development-only.
 
 ## Quick Start from source
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check
 adb devices -l
 pnpm rn-observe --help
@@ -428,8 +458,11 @@ and progress/cancellation behavior are documented in
 
 ## Documentation
 
+- [Step-by-step installation](docs/installation.md)
 - [Full project overview (VI/EN)](PROJECT.md)
 - [Detailed usage guide (Vietnamese)](docs/usage.md)
+- [Repository structure](docs/project-structure.md)
+- [Upgrade and migration guide](docs/upgrading.md)
 - [Architecture](docs/architecture.md)
 - [CLI and MCP protocol](docs/protocol.md)
 - [Metrics definitions](docs/metrics.md)
@@ -480,7 +513,7 @@ All three can be combined: the skill/AGENTS.md teach the _workflow_, MCP provide
 
 ## Current boundary
 
-- The device/runtime provider currently targets Android. Recorded runtime evidence used Windows plus a physical device; Ubuntu/macOS CI is host-only and does not expand runtime support. New assurance workflows not rerun on a device remain `NOT_VERIFIED`.
+- The device/runtime provider currently targets Android. Recorded runtime evidence used a Windows host plus a physical device; Ubuntu/macOS CI is host-only and does not expand runtime support. Any exact assurance scenario not run on the correct fixture/device remains `NOT_VERIFIED`.
 - ADB has no trustworthy JS FPS signal; the field is returned as `available: false` — values are never guessed.
 - JS blocking, route, React renders, and network metadata require development instrumentation inside the app.
 - CDP features (`devtools-export`, `devtools-profile`, `metro-network`) need Metro running for the right app and the app connected to it (`adb reverse tcp:8081 tcp:8081`); they cannot attach while another React Native DevTools session holds the connection.
@@ -488,13 +521,13 @@ All three can be combined: the skill/AGENTS.md teach the _workflow_, MCP provide
 - Observer CDP commands queue across processes; external React Native DevTools must still be closed because it does not participate in the observer lock.
 - `session stop` automatically writes a replay, session refs survive reorder/scroll, and missing sessions produce `EVIDENCE_NOT_RECORDED`.
 - `understand-screen`/MCP `understand_screen` returns the instrumented route when available, screen state, headline, text/action refs, UI findings, and screenshot/UI-tree evidence; repeated calls detect unchanged loading. Classification is heuristic and text-field values are always redacted.
-- `ui-model`/MCP `runtime_ui_model` parses TSX with the TypeScript AST for component + `file:line`, then correlates source with instrumentation and the native tree. It distinguishes rendered, visible/off-screen/hidden/unmounted/flattened-or-unobserved, enabled, and evidence-backed `canPress` states.
+- `ui-model`/MCP `runtime_ui_model` parses TSX with the TypeScript AST for component + `file:line`, then correlates source with instrumentation and the native tree. It returns `target-not-running` or `target-not-foreground` rather than attributing another app's UI to the target, and otherwise distinguishes rendered, visible/off-screen/hidden/unmounted/flattened-or-unobserved, enabled, and evidence-backed `canPress` states.
 - The development-only Babel plugin injects a source-derived testID and wraps `onPress`; session stop collects interaction start/success/error and promotes testID taps into replay. Handler arguments, props, and input values are never recorded.
 - Network body capture is off by default. Development-only opt-in uses fail-closed allowlists and should still be limited to fixtures.
 - Apps without instrumentation: use `metro-network` (CDP), `app-state` (foreground activity, PID), and `device-network` (device-level byte counters, not app-attributed) as fallback evidence.
 - `record` (screenrecord) is limited to 180s per clip by Android.
 - Perfetto tracing is supported on Android; deep trace analysis remains in Perfetto UI/Android Studio.
-- `security audit` is static/passive and MASVS-aligned, not a MASVS certification or a dynamic penetration test. `security dependencies` contacts OSV, and an incomplete query never becomes PASS.
+- `security audit` is static/passive and MASVS-aligned, not a MASVS certification or a dynamic penetration test. Its `scope` reports the selected inputs; artifact-only scans remain `NOT_VERIFIED` for manifest checks. `security dependencies` contacts OSV, and an incomplete query never becomes PASS.
 - Active security is limited to Android malformed deep-link queries and bounded
   permission transitions for an owned, allowlisted development fixture; policy or
   host tests are not a pentest or device-runtime evidence. It never performs login,

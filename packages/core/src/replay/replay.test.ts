@@ -11,6 +11,7 @@ function stubActions(overrides: Partial<ReplayActions> = {}): ReplayActions {
     reload: async () => 'reloaded (mode: app)',
     assert: async () => 'assert passed',
     wait: async () => 'waited',
+    waitFor: async () => 'wait-for passed after 2 attempts (1200ms)',
     screenshot: async () => 'shot.png',
     ...overrides,
   };
@@ -88,5 +89,22 @@ describe('replay runner', () => {
     );
     expect(report.results[0]).toMatchObject({ ok: false, action: 'deep-link' });
     expect(report.results[0]?.summary).toContain('no activity for URI');
+  });
+
+  it('treats an unobserved wait-for target as a failed step', async () => {
+    const report = await runReplayScript(
+      {
+        steps: [{ action: 'wait-for', testId: 'cart-badge', timeoutMs: 2_000 }],
+      },
+      stubActions({
+        waitFor: async () =>
+          'FAILED wait-for: not observed within 2000ms (3 attempts)',
+      }),
+    );
+    expect(report.results[0]).toMatchObject({
+      ok: false,
+      action: 'wait-for',
+    });
+    expect(report.stoppedEarly).toBe(true);
   });
 });

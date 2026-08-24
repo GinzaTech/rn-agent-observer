@@ -69,11 +69,17 @@ export const RuntimeUiIssueSchema = z.object({
   suggestion: z.string().min(1),
 });
 
+export const RuntimeUiAvailabilitySchema = z.object({
+  status: z.enum(['available', 'target-not-running', 'target-not-foreground']),
+  reason: z.string().nullable(),
+});
+
 export const RuntimeUiModelSchema = z.object({
   timestamp: z.iso.datetime(),
   source: z.literal(
     'typescript-ast+rn-instrumentation+android-uiautomator+logcat',
   ),
+  availability: RuntimeUiAvailabilitySchema,
   route: z.string().nullable(),
   nodes: z.array(RuntimeUiNodeSchema),
   interactions: z.array(UiInteractionEventSchema),
@@ -88,8 +94,8 @@ export const RuntimeUiModelSchema = z.object({
   }),
   issues: z.array(RuntimeUiIssueSchema),
   artifacts: z.object({
-    uiTreeId: z.string(),
-    uiTreePath: z.string(),
+    uiTreeId: z.string().optional(),
+    uiTreePath: z.string().optional(),
     modelId: z.string().optional(),
     modelPath: z.string().optional(),
   }),
@@ -101,4 +107,5 @@ export type SourceUiElement = z.infer<typeof SourceUiElementSchema>;
 export type UiInteractionEvent = z.infer<typeof UiInteractionEventSchema>;
 export type RuntimeUiNode = z.infer<typeof RuntimeUiNodeSchema>;
 export type RuntimeUiIssue = z.infer<typeof RuntimeUiIssueSchema>;
+export type RuntimeUiAvailability = z.infer<typeof RuntimeUiAvailabilitySchema>;
 export type RuntimeUiModel = z.infer<typeof RuntimeUiModelSchema>;

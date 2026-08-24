@@ -4,6 +4,10 @@ Thank you for helping make React Native runtime evidence more useful and more
 trustworthy. Contributions of code, tests, documentation, reproducible fixtures,
 and design feedback are welcome.
 
+New contributors should first read the [installation guide](docs/installation.md)
+and [repository structure](docs/project-structure.md). They separate source,
+generated output, local device policy, and sensitive runtime evidence.
+
 By submitting a contribution, you agree that it is licensed under the repository's
 [Apache License 2.0](LICENSE).
 
@@ -37,6 +41,11 @@ pnpm check
 Use pnpm only. Do not add npm, Yarn, or Bun lockfiles. The workspace dependency
 direction is `schemas <- core <- cli/mcp-server`; application instrumentation is
 kept independent of the Node runtime packages.
+
+Do not remove or bypass `.pnpmfile.cjs`: it contains reviewed transitive security
+pins and its checksum is part of the frozen lockfile. Intentional dependency changes
+must regenerate the lockfile with pnpm 9.6.0, pass frozen install again, and run the
+strict dependency audit described in [security testing](docs/security-testing.md).
 
 ## Make a focused change
 
@@ -91,7 +100,9 @@ paths, and every limitation or `NOT VERIFIED` case.
   ```
 
 - Never commit `.artifacts`, device recordings, SQLite stores, credentials, APKs,
-  or generated `dist` output.
+  generated `dist` output, live `.rn-observer.json` policy, or `.rnobs` bundles.
+- Commit only reviewed `.example.json` config with fake app/device IDs. Root
+  `.gitignore` is a safety net, not a substitute for checking staged files.
 - Examples must use fake application IDs, tokens, accounts, and endpoints.
 - Keep claims scoped to the evidence actually collected. Use `NOT APPLICABLE`,
   `NOT VERIFIED`, or a documented limitation where appropriate.

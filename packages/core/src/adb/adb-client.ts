@@ -49,22 +49,46 @@ export class AdbClient {
   }
 
   async run(args: readonly string[], timeoutMs = 30_000): Promise<Buffer> {
-    const result = await runProcess(
-      this.executable,
-      this.args(args),
-      timeoutMs,
-    );
-    if (result.exitCode !== 0) {
-      throw new ObserverError(
-        'ADB_COMMAND_FAILED',
-        result.stderr ||
-          result.stdout.toString('utf8').trim() ||
-          `adb exited ${result.exitCode}`,
-        true,
-        'Run adb devices -l and verify the selected device',
-      );
+    // Transient adb failures (device restarting, USB hiccup, adb server
+    // restarting under load) get a small bounded retry before surfacing.
+    const maxAttempts = 3;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const result = await runProcess(
+          this.executable,
+          this.args(args),
+          timeoutMs,
+        );
+        if (result.exitCode === 0) return result.stdout;
+        const stderr = result.stderr;
+        lastError = new ObserverError(
+          'ADB_COMMAND_FAILED',
+          stderr ||
+            result.stdout.toString('utf8').trim() ||
+            `adb exited ${result.exitCode}`,
+          true,
+          'Run adb devices -l and verify the selected device',
+        );
+        const transient =
+          /device (?:offline|not found|unauthorized)|closed|reset by peer|timed out|more than one device/i.test(
+            stderr,
+          );
+        if (!transient || attempt === maxAttempts) {
+          throw lastError;
+        }
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : String(error);
+        const transient =
+          /timed out|ECONNRESET|ENOENT|EPERM|device (?:offline|not found)/i.test(
+            message,
+          );
+        if (!transient || attempt === maxAttempts) throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 500));
     }
-    return result.stdout;
+    throw lastError;
   }
 
   async text(args: readonly string[], timeoutMs?: number): Promise<string> {
@@ -306,12 +330,29 @@ export class AdbClient {
     await (await this.selected()).shell(['input', 'keyevent', '4']);
   }
 
-  async logs(appId: string, limit = 500): Promise<LogEntry[]> {
+  async logs(
+    appId: string,
+    limit = 500,
+  ): Promise<{
+    entries: LogEntry[];
+    pidFilterApplied: boolean;
+    processId: number | null;
+  }> {
     const client = await this.selected();
     const pid = await client.shell(['pidof', appId]).catch(() => '');
     const args = ['logcat', '-d', '-v', 'epoch', '-t', String(limit)];
-    if (pid) args.push(`--pid=${pid.split(/\s+/)[0]}`);
-    return parseLogcat(await client.text(args));
+    const pidValue = pid.split(/\s+/)[0] ?? '';
+    if (pidValue) args.push(`--pid=${pidValue}`);
+    return {
+      entries: parseLogcat(await client.text(args)),
+      pidFilterApplied: pidValue !== '',
+      processId:
+        pidValue !== '' &&
+        Number.isInteger(Number(pidValue)) &&
+        Number(pidValue) > 0
+          ? Number(pidValue)
+          : null,
+    };
   }
 
   async appState(appId: string): Promise<AppState> {
@@ -403,6 +444,25 @@ export class AdbClient {
       deltas: networkInterfaceDeltas(start.interfaces, end.interfaces),
       source: 'adb-proc-net-dev-delta',
     };
+  }
+
+  /**
+   * Measures device-host clock skew by comparing the device's realtime
+   * clock against the host clock across a single adb round-trip. Positive
+   * values mean the device clock runs ahead of the host. Evidence
+   * timestamps that cross the boundary should disclose this skew.
+   */
+  async clockSkewMs(): Promise<number | null> {
+    const client = await this.selected();
+    const before = Date.now();
+    const deviceEpoch = await client
+      .shell(['echo', '$EPOCHREALTIME'])
+      .catch(() => '');
+    const after = Date.now();
+    const value = Number(deviceEpoch.trim());
+    if (!Number.isFinite(value) || deviceEpoch.trim() === '') return null;
+    const hostMid = (before + after) / 2;
+    return Math.round((value * 1_000 - hostMid) * 10) / 10;
   }
 
   async performance(appId: string): Promise<PerformanceSnapshot> {

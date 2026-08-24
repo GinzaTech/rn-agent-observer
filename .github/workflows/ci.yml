@@ -116,17 +116,22 @@ jobs:
         shell: pwsh
         run: |
           Remove-Item Env:RN_OBSERVER_SECURITY_LAB -ErrorAction SilentlyContinue
-          pnpm --filter @rn-agent-observer/demo-expo exec expo prebuild --no-install
+          pnpm --filter @rn-agent-observer/demo-expo exec expo prebuild --no-install --clean
           node scripts/check-demo-security-manifest.mjs default
 
       - name: Generate and inspect the SecurityLab opt-in manifest
         shell: pwsh
         run: |
           $env:RN_OBSERVER_SECURITY_LAB = '1'
-          pnpm --filter @rn-agent-observer/demo-expo exec expo prebuild --no-install
+          pnpm --filter @rn-agent-observer/demo-expo exec expo prebuild --no-install --clean
           node scripts/check-demo-security-manifest.mjs opt-in
 
-      - name: Export Android JavaScript bundle only
-        run: pnpm --filter @rn-agent-observer/demo-expo exec expo export --platform android --output-dir export-android
-        env:
-          CI: true
+      - name: Restore and re-check the default Android manifest
+        shell: pwsh
+        run: |
+          Remove-Item Env:RN_OBSERVER_SECURITY_LAB -ErrorAction SilentlyContinue
+          pnpm --filter @rn-agent-observer/demo-expo exec expo prebuild --no-install --clean
+          node scripts/check-demo-security-manifest.mjs default
+
+      - name: Export and inspect the Android JavaScript bundle
+        run: pnpm android:export:check

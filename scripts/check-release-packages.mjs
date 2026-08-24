@@ -26,6 +26,19 @@ const packDirectory = resolve(repositoryRoot, '.artifacts', 'package-smoke');
 const repositoryUrl = 'git+https://github.com/GinzaTech/rn-agent-observer.git';
 const issuesUrl = 'https://github.com/GinzaTech/rn-agent-observer/issues';
 const consumerProjectPrefix = 'rn-agent-observer-consumer-smoke-';
+const lockfile = readFileSync(
+  resolve(repositoryRoot, 'pnpm-lock.yaml'),
+  'utf8',
+);
+
+assert(
+  !/^\s{2}(?:metro|metro-[^@]+)@0\.84\.4:/mu.test(lockfile),
+  'Lockfile still contains a Metro 0.84.4 package; the pnpm hook did not enforce the security patch',
+);
+assert(
+  !/^\s{2}uuid@7\.0\.3:/mu.test(lockfile),
+  'Lockfile still contains uuid 7.0.3; the pnpm hook did not enforce the compatibility override',
+);
 
 const packages = [
   {
@@ -157,7 +170,7 @@ function runConsumerInstallSmoke(rootManifest, archivesByPackage) {
     ]),
   );
   const environment = consumerEnvironment(consumerDirectory);
-  let smokeFailed = false;
+  let smokeError = null;
   let cleanupError = null;
 
   try {
@@ -239,22 +252,24 @@ function runConsumerInstallSmoke(rootManifest, archivesByPackage) {
       'consumer smoke: installed local CLI/MCP tarballs and ran CLI plus MCP health checks',
     );
   } catch (error) {
-    smokeFailed = true;
-    throw error;
-  } finally {
-    try {
-      cleanTemporaryConsumerProject(consumerDirectory);
-    } catch (error) {
-      if (smokeFailed) {
-        console.error(
-          `consumer smoke cleanup failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      } else {
-        cleanupError = error;
-      }
+    smokeError = error;
+  }
+  try {
+    cleanTemporaryConsumerProject(consumerDirectory);
+  } catch (error) {
+    cleanupError = error;
+  }
+  if (smokeError) {
+    if (cleanupError) {
+      console.error(
+        `consumer smoke cleanup failed: ${
+          cleanupError instanceof Error
+            ? cleanupError.message
+            : String(cleanupError)
+        }`,
+      );
     }
+    throw smokeError;
   }
   if (cleanupError) {
     throw cleanupError;

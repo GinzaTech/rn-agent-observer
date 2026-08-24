@@ -71,4 +71,30 @@ describe('screen comparison', () => {
       changed: ['cta'],
     });
   });
+
+  it('masks declared dynamic regions and discloses the perceptual threshold', () => {
+    const root = mkdtempSync(join(tmpdir(), 'rn-observer-compare-mask-'));
+    temporaryDirectories.push(root);
+    const before = join(root, 'before.png');
+    const after = join(root, 'after.png');
+    image(before, false);
+    image(after, true);
+    const result = comparePngFiles(
+      before,
+      after,
+      new ArtifactManager(root, join(root, '.artifacts')),
+      undefined,
+      {
+        perceptualThreshold: 0.2,
+        ignoreRegions: [{ x: 2, y: 2, width: 1, height: 1 }],
+      },
+    );
+    expect(result).toMatchObject({
+      changedPixels: 0,
+      ignoredPixels: 1,
+      comparedPixels: 15,
+      perceptualThreshold: 0.2,
+      similarity: 1,
+    });
+  });
 });

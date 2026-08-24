@@ -35,6 +35,7 @@ const createCore = (
   );
   return new ObserverCore({
     projectRoot: root,
+    trustActiveConfig: true,
     ...(selectedDeviceId ? { deviceId: selectedDeviceId } : {}),
     onWarning: () => {},
   });

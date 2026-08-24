@@ -5,7 +5,7 @@ Tài liệu này là **bộ tham chiếu chuẩn (golden test battery)** để t
 - Phiên bản blueprint: **1.8.0** (áp dụng observer 2.4.0, Android + Windows)
 - App tham chiếu vàng (golden AUT): `apps/demo-expo` (`dev.rnagentobserver.demo`)
 - App ngoài repo tham chiếu chế độ read-only: Vshop (`com.android.vshop`)
-- Thiết bị xác minh gần nhất: `45218ba` — Xiaomi 23013PC75G, Android 15, 1080×2400, 120Hz
+- Thiết bị xác minh gần nhất: serial được lược — Xiaomi 23013PC75G, Android 15, 1080×2400, 120Hz
 - Yêu cầu riêng cho DTL (từ 1.1.0): Metro chạy cho đúng app + `adb reverse tcp:8081 tcp:8081` (hoặc `RN_OBSERVER_METRO_URL` khi Metro dùng port khác); không mở React Native DevTools song song
 
 ---
@@ -75,7 +75,7 @@ Tài liệu này là **bộ tham chiếu chuẩn (golden test battery)** để t
 ```powershell
 # Từ repo observer
 $env:RN_OBSERVER_PROJECT_ROOT = '<app-duoc-test>'   # demo: <repo>\apps\demo-expo
-$env:RN_OBSERVER_DEVICE_ID   = '<serial>'           # VD: 45218ba
+$env:RN_OBSERVER_DEVICE_ID   = '<serial-tu-adb-devices>'
 # RN_OBSERVER_APP_ID chỉ cần khi app.json không có expo.android.package
 pnpm build   # CLI/MCP chạy thẳng dist — bắt buộc sau khi sửa source
 adb devices -l
@@ -500,7 +500,7 @@ Tổng: **~170 case** (tính cả biến thể).
 
 #### PERF-010 — display_refresh_hz (T1)
 
-- **PASS**: khớp.device thật (VD 120 trên 45218ba); fallback 60 chỉ khi dumpsys không có renderFrameRate.
+- **PASS**: khớp device thật (VD 120Hz trên fixture đã chọn); fallback 60 chỉ khi dumpsys không có renderFrameRate.
 
 #### PERF-011 — Animation không chặn JS (T1)
 

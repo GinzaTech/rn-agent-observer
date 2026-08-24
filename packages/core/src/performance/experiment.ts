@@ -155,6 +155,7 @@ const summaryFor = (
     standardDeviation,
     coefficientOfVariation,
     sources: [...new Set(observed.map((metric) => metric.source))].sort(),
+    ...(values.length > 0 ? { sampleValues: values } : {}),
     ...(timestamps[0] ? { firstTimestamp: timestamps[0] } : {}),
     ...(timestamps.at(-1) ? { lastTimestamp: timestamps.at(-1) } : {}),
     unavailableReasons: [...reasons].sort(),
@@ -165,6 +166,57 @@ const statisticValue = (
   summary: PerformanceMetricSummary,
   statistic: PerformanceStatistic,
 ): number | null => summary[statistic];
+
+/**
+ * Deterministic bootstrap (fixed seed LCG, 1000 resamples) over the paired
+ * per-sample differences between the current run and the baseline. Returns a
+ * 95% confidence interval for the mean difference; when zero lies inside the
+ * interval a mean-only regression verdict is too weak to trust.
+ */
+export function bootstrapMeanDifference(
+  current: readonly number[],
+  baseline: readonly number[],
+  options: { resamples?: number; seed?: number } = {},
+): {
+  meanDifference: number;
+  confidenceLow: number;
+  confidenceHigh: number;
+} | null {
+  const paired = Math.min(current.length, baseline.length);
+  if (paired < 2) return null;
+  const resamples = options.resamples ?? 1_000;
+  let state = (options.seed ?? 0x2545f491) >>> 0;
+  const random = (): number => {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+  const differences: number[] = [];
+  for (let index = 0; index < paired; index += 1) {
+    const left = current[index];
+    const right = baseline[index];
+    if (left === undefined || right === undefined) continue;
+    differences.push(left - right);
+  }
+  if (differences.length < 2) return null;
+  const meanDifference =
+    differences.reduce((sum, value) => sum + value, 0) / differences.length;
+  const means: number[] = [];
+  for (let resample = 0; resample < resamples; resample += 1) {
+    let sum = 0;
+    for (let pick = 0; pick < differences.length; pick += 1) {
+      sum += differences[Math.floor(random() * differences.length)] ?? 0;
+    }
+    means.push(sum / differences.length);
+  }
+  means.sort((left, right) => left - right);
+  const lowIndex = Math.floor(means.length * 0.025);
+  const highIndex = Math.ceil(means.length * 0.975) - 1;
+  return {
+    meanDifference,
+    confidenceLow: means[lowIndex] ?? meanDifference,
+    confidenceHigh: means[highIndex] ?? meanDifference,
+  };
+}
 
 const resultOutcome = (
   findings: readonly AssuranceFinding[],
@@ -389,16 +441,45 @@ export const analyzePerformanceSamples = (
           budget.operator === 'lte'
             ? ((observed - baselineValue) / Math.abs(baselineValue)) * 100
             : ((baselineValue - observed) / Math.abs(baselineValue)) * 100;
-        const passedRegression =
-          signedRegression <= budget.maxRegressionPercent;
+        // Paired bootstrap CI over per-sample values: when the CI of the
+        // mean difference straddles zero, a mean-only verdict is reported as
+        // NOT_VERIFIED instead of PASS/FAIL.
+        const pairedInterval = bootstrapMeanDifference(
+          summary.sampleValues ?? [],
+          baselineSummary?.sampleValues ?? [],
+        );
+        const intervalStraddlesZero =
+          pairedInterval !== null &&
+          pairedInterval.confidenceLow <= 0 &&
+          pairedInterval.confidenceHigh >= 0;
+        const outcome = intervalStraddlesZero
+          ? 'NOT_VERIFIED'
+          : signedRegression <= budget.maxRegressionPercent
+            ? 'PASS'
+            : 'FAIL';
         findings.push(
           budgetFinding({
             budget,
             suffix: 'regression',
-            outcome: passedRegression ? 'PASS' : 'FAIL',
-            title: `${budget.metric} ${passedRegression ? 'met' : 'exceeded'} regression policy`,
-            description: `Regression=${signedRegression.toFixed(2)}%; policy lte ${budget.maxRegressionPercent}%.`,
+            outcome,
+            title:
+              outcome === 'NOT_VERIFIED'
+                ? `${budget.metric} regression is within noise`
+                : `${budget.metric} ${outcome === 'PASS' ? 'met' : 'exceeded'} regression policy`,
+            description:
+              outcome === 'NOT_VERIFIED' && pairedInterval
+                ? `Mean difference=${pairedInterval.meanDifference.toFixed(2)} with 95% CI [${pairedInterval.confidenceLow.toFixed(2)}, ${pairedInterval.confidenceHigh.toFixed(2)}] containing zero; collect more samples before trusting the direction.`
+                : `Regression=${signedRegression.toFixed(2)}%; policy lte ${budget.maxRegressionPercent}%.` +
+                  (pairedInterval
+                    ? ` Paired 95% CI of mean difference [${pairedInterval.confidenceLow.toFixed(2)}, ${pairedInterval.confidenceHigh.toFixed(2)}].`
+                    : ''),
             evidence,
+            ...(outcome === 'NOT_VERIFIED'
+              ? {
+                  limitation:
+                    'Paired bootstrap confidence interval contains zero',
+                }
+              : {}),
           }),
         );
       }

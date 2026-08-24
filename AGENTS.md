@@ -1,6 +1,7 @@
 # RN Agent Observer instructions
 
-Observer runtime cục bộ cho React Native/Expo, target Android + Windows. Yêu cầu Node >= 22.12, pnpm 9.6, `adb` khả dụng.
+Observer runtime cục bộ cho React Native/Expo, built-in target Android; Windows là
+host phát triển đã verify. Yêu cầu Node >= 22.12, pnpm 9.6, `adb` khả dụng.
 
 ## Lệnh chính
 

@@ -49,6 +49,7 @@ Usage:
   rn-observe run NAME|SUITE.{json,yaml} [...same options]
   rn-observe ci [--suite NAME[,NAME]] [--reporter json,html,junit,sarif,github] [--output DIR] [--confirm-persistent-permission] [--allow-not-verified]
   rn-observe security audit [--manifest PATH] [--network-config PATH] [--text PATH] [--no-artifacts] [--strict]
+    # prints selected manifest/text/artifact scope; NOT_VERIFIED if no manifest is available
   rn-observe security sbom [--lockfile pnpm-lock.yaml]
   rn-observe security dependencies [--lockfile pnpm-lock.yaml] [--strict]
   rn-observe security active deep-link --scenario ID --base-uri URI --probe ID:MUTATION:PARAM --allow-state STATE [--max-errors N] [--timeout MS] [--settle MS] [--strict]
@@ -80,7 +81,7 @@ Usage:
   rn-observe session start | session stop [SESSION_ID] | session list [--limit N] | session get SESSION_ID | session graph SESSION_ID | session share SESSION_ID [--output shares/name.rnobs] [--include-text] [--strict]
   rn-observe bundle verify BUNDLE.rnobs [--sha256 HEX]
   rn-observe diagnose [--ui-fps-low N --ui-fps-critical N --js-blocking N --js-blocking-high N --slow-request N --very-slow-request N --render-count N]
-  rn-observe compare BEFORE.png AFTER.png [--before-ui TREE.json --after-ui TREE.json]
+  rn-observe compare BEFORE.png AFTER.png [--before-ui TREE.json --after-ui TREE.json] [--pixel-threshold N] [--ignore-region X,Y,WIDTH,HEIGHT]
   rn-observe devtools-export [--duration MS] [--metro URL]
   rn-observe devtools-profile [--duration MS] [--metro URL]
 
@@ -1062,13 +1063,37 @@ export async function runCli(
       const testId = flag(args, '--test-id');
       const text = flag(args, '--text');
       const visible = flag(args, '--visible');
+      const textEquals = flag(args, '--text-equals');
       print(
         io,
         await core.assertElement({
           ...(testId ? { testId } : {}),
           ...(text ? { text } : {}),
           ...(visible !== undefined ? { visible: visible === 'true' } : {}),
+          ...(textEquals !== undefined ? { textEquals } : {}),
         }),
+      );
+    } else if (command === 'wait-for') {
+      const testId = flag(args, '--test-id');
+      const text = flag(args, '--text');
+      const textEquals = flag(args, '--text-equals');
+      if (!testId && !text)
+        throw new Error('wait-for requires --test-id or --text');
+      const timeout = numberFlag(args, '--timeout');
+      const interval = numberFlag(args, '--interval');
+      print(
+        io,
+        await core.waitForElement(
+          {
+            ...(testId ? { testId } : {}),
+            ...(text ? { text } : {}),
+            ...(textEquals !== undefined ? { textEquals } : {}),
+          },
+          {
+            ...(timeout !== undefined ? { timeoutMs: timeout } : {}),
+            ...(interval !== undefined ? { intervalMs: interval } : {}),
+          },
+        ),
       );
     } else if (command === 'a11y-audit') {
       print(io, await core.accessibilityAudit());
@@ -1197,6 +1222,26 @@ export async function runCli(
       if ((beforeUi && !afterUi) || (!beforeUi && afterUi)) {
         throw new Error('--before-ui and --after-ui must be provided together');
       }
+      const perceptualThreshold = numberFlag(args, '--pixel-threshold');
+      const ignoreRegions = repeatedFlags(args, '--ignore-region').map(
+        (entry) => {
+          const values = entry.split(',').map((value) => Number(value));
+          const [x, y, width, height] = values;
+          if (
+            values.length !== 4 ||
+            [x, y, width, height].some((value) => !Number.isInteger(value)) ||
+            x === undefined ||
+            y === undefined ||
+            width === undefined ||
+            height === undefined
+          ) {
+            throw new TypeError(
+              '--ignore-region must use integer X,Y,WIDTH,HEIGHT values',
+            );
+          }
+          return { x, y, width, height };
+        },
+      );
       print(
         io,
         core.compareScreens(
@@ -1205,6 +1250,12 @@ export async function runCli(
           beforeUi && afterUi
             ? { before: beforeUi, after: afterUi }
             : undefined,
+          {
+            ...(perceptualThreshold !== undefined
+              ? { perceptualThreshold }
+              : {}),
+            ...(ignoreRegions.length > 0 ? { ignoreRegions } : {}),
+          },
         ),
       );
     } else {

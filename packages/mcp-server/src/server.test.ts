@@ -74,6 +74,7 @@ const EXPECTED_TOOL_NAMES = [
   'understand_screen',
   'verify_fix',
   'verify_session_share_bundle',
+  'wait_for_element',
 ] as const;
 
 describe('MCP server', () => {
@@ -233,6 +234,7 @@ describe('MCP server', () => {
     const core = new ObserverCore({
       projectRoot,
       deviceId: 'emulator-5554',
+      trustActiveConfig: true,
       onWarning: () => {},
     });
     const setPermission = vi

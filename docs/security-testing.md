@@ -88,6 +88,26 @@ Một OSV match được báo severity bảo thủ ở mức medium cho tới kh
 reachability, exploitability và context. Không dùng danh sách advisory như kết luận
 tự động rằng app có thể bị khai thác.
 
+### Override bảo mật đang được kiểm soát
+
+Workspace 2.4.0 pin hai transitive dependency bằng hook `readPackage` trong
+`.pnpmfile.cjs`. Cách này được chọn để cùng hoạt động với pnpm 9.6 được pin trong
+repo và pnpm wrapper mới hơn; `pack:check` fail nếu lockfile còn package cũ:
+
+- `metro@0.84.4 -> 0.84.5`: patch Metro thay `image-size` bằng parser vendored và
+  loại hai DoS advisory không có bản `image-size` đã publish để nâng;
+- `uuid@7.0.3 -> 11.1.1`: nhánh CommonJS đã vá buffer-bounds advisory; dependency
+  `xcode@3.0.1` chỉ gọi `uuid.v4()`.
+
+Nguồn quyết định: [Metro 0.84.5](https://github.com/react/metro/releases/tag/v0.84.5),
+[GHSA-5p2g-fcmc-qvqq](https://github.com/advisories/GHSA-5p2g-fcmc-qvqq),
+[GHSA-w3rx-r6r6-pgpr](https://github.com/advisories/GHSA-w3rx-r6r6-pgpr) và
+[GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq).
+Mọi thay đổi Expo/Metro/xcode hoặc `.pnpmfile.cjs` phải regenerate lockfile, chạy
+lại frozen install, toàn bộ
+`release:check`, Android export và `security dependencies --strict`; không bỏ
+hook chỉ để giảm khác biệt manifest nếu lockfile lại đưa advisory trở lại.
+
 ## Outcome và CI policy
 
 | Outcome        | Cách đọc                                                                 |
@@ -103,6 +123,12 @@ tự động rằng app có thể bị khai thác.
 theo dõi limitation. JSON/HTML/JUnit/SARIF/GitHub reporter giữ nguyên outcome;
 JUnit map `NA`/`NOT_VERIFIED` thành skipped để tương thích format nhưng report JSON
 vẫn là nguồn phân biệt hai trạng thái.
+
+Kết quả `security audit` luôn có trường `scope`, liệt kê số manifest, network
+config, text path và artifact text thực sự được chọn. Nếu
+`scope.manifests.found` bằng 0 thì audit là `NOT_VERIFIED`: secret scan artifact
+(nếu có) không phải là Android source/manifest audit. Truyền `--manifest` sau
+Expo prebuild hoặc chạy lệnh từ Android project đích để có evidence manifest.
 
 ## Active action policy
 

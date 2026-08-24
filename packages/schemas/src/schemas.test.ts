@@ -97,6 +97,7 @@ describe('shared schemas', () => {
       RuntimeUiModelSchema.safeParse({
         timestamp: '2026-08-22T00:00:00.000Z',
         source: 'typescript-ast+rn-instrumentation+android-uiautomator+logcat',
+        availability: { status: 'available', reason: null },
         route: '/home',
         nodes: [],
         interactions: [],

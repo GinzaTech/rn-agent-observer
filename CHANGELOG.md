@@ -2,6 +2,33 @@
 
 ## Unreleased — screen understanding cho Codex/agent
 
+### Physical acceptance, telemetry integrity và reproducibility
+
+- Runtime telemetry đã parse/redact được giữ trong bounded session cache, pin theo
+  PID và được dùng lại khi logcat rollover; PID đổi sẽ xóa toàn bộ process-owned
+  route/network/render/JS-task/app-data/UI evidence để tránh attribution sai.
+- Instrumentation thêm HMAC-SHA-256 integrity path; active config cần thêm
+  process-side trust, nên file trong repo không thể tự cấp quyền mutation.
+- `ui-model` kiểm tra target running/foreground trước source/native correlation;
+  target app khác ở foreground trả unavailable thay vì ghép UI sai.
+- Physical Android 15 demo acceptance đã chạy performance/network/render/UI,
+  negative foreground path, replay/session stop và visual compare. Status text tối
+  được sửa contrast mà không đổi semantic UI tree. Evidence chỉ áp dụng exact
+  development fixture, không phải production/device-matrix claim.
+- Dependency hook `.pnpmfile.cjs` pin Metro security patch và CommonJS-compatible
+  UUID; frozen install, 5 public tarball clean-consumer smoke, Android/Hermes export,
+  352/352 tests và OSV strict 673/673 components đều pass ở gate 2026-08-24.
+
+### Documentation và onboarding
+
+- Thêm hướng dẫn riêng cho installation, repository structure và upgrading; README,
+  package README, usage, architecture, testing, compatibility và contributing cùng
+  trỏ về một workflow source/device/MCP thống nhất.
+- Tài liệu phân biệt source path hiện dùng được với npm commands chỉ dùng sau lần
+  publish đầu; registry check 2026-08-24 xác nhận package scoped chưa được publish.
+- `.gitignore` bao phủ live observer policy, `.rnobs`, native keys/build state,
+  reports và IDE-local files; example config đã review vẫn được phép commit.
+
 ### Community và public distribution
 
 - Năm package `schemas`, `core`, `rn-instrumentation`, `cli` và `mcp-server` đã bỏ
@@ -79,7 +106,9 @@
 - Quality gate của phần screen-understanding trước runtime UI model pass **68 tests**; kết quả tổng mới được ghi ở mục verification phía trên sau khi chạy lại full gate.
 - Unit test bao phủ content summary/action refs, route instrumentation, visible error, blank screen từ semantic + pixel evidence, loading → loading-stuck, pixel statistics và text-field/PII redaction.
 - Device thật Xiaomi 23013PC75G / Android 15 / Vshop: content nhận đúng headline `Vshop`, 144 visible elements, 16 actions và 6 small touch targets; cold dev-client nhận `loading` rồi cùng fingerprint chuyển `loading-stuck`, sau khi load xong chuyển về `content` với fingerprint mới.
-- Session evidence: `C:\Users\kona\Desktop\Vshop\.artifacts\sessions\06911da4-9703-4be0-aff5-302cb59bc050\summaries\summary.json`.
+- Session evidence được giữ local dưới
+  `<external-app-root>/.artifacts/sessions/<session-id>/summaries/summary.json`; path
+  máy và session ID không được commit.
 - Final contract được chạy lại từ build cuối trong session `7dd5dd63-00e6-4384-81b9-48a5b7c361ac`: `state: content`, `route: null` (Vshop không instrumentation), headline `Vshop`, 156 visible elements, 19 actions, 0 runtime error và 9 small touch targets. Agent cũng mở screenshot artifact để review trực quan thay vì chỉ tin semantic tree.
 
 ### Giới hạn còn lại
@@ -152,7 +181,7 @@ Xử lý các điểm yếu ưu tiên đã thừa nhận, kèm runtime verificat
 - RN 0.86 bridgeless (Hermes) hiện **không expose CDP Network domain** (`metro-network` attach thành công nhưng 0 events) và **không hỗ trợ `Profiler.enable`** (`devtools-profile` lỗi tường minh). Cả hai kênh vẫn hữu ích với runtime RN hỗ trợ (0.83+ docs) và fallback instrumentation network vẫn hoạt động.
 - `exceptions[]` của `devtools-export` rỗng trên runtime này (unhandled error đi redbox/logcat, không qua `Runtime.exceptionThrown`).
 
-### Runtime verification đã chạy (device thật 45218ba)
+### Runtime verification đã chạy (device thật, serial được lược)
 
 - Vshop 4.1.1, `com.android.vshop`, perf mode: cảnh báo thiếu session xuất hiện; 16/16 element chung giữ ref qua scroll; auto replay 30 step chạy lại 30/30; recording 1,286,509 bytes và Perfetto trace đều attach session; hai `devtools-export` 2s chạy đồng thời hoàn thành nối tiếp trong 4.98s; custom diagnosis trả threshold + `confidenceBasis`.
 - Demo/device verification từ các lượt trước vẫn chỉ được công nhận theo từng case đã có artifact; không suy rộng thành toàn bộ blueprint 2.2–2.4.

@@ -18,6 +18,10 @@ CLI và MCP là adapter mỏng. Readiness, authorization, collection, redaction,
 outcome aggregation và report generation nằm trong core để hai adapter không tạo
 ra hai định nghĩa chất lượng khác nhau.
 
+Để tìm file/thư mục và quyết định đặt thay đổi ở đâu, xem
+[cấu trúc repository](project-structure.md). Tài liệu này tập trung vào control,
+data, assurance và security boundary khi hệ thống chạy.
+
 ## Trách nhiệm package
 
 | Package                                 | Trách nhiệm                                                                                                            |

@@ -23,6 +23,10 @@ export const NetworkSummarySchema = z.object({
   p50Ms: z.number().nonnegative().nullable(),
   p95Ms: z.number().nonnegative().nullable(),
   p99Ms: z.number().nonnegative().nullable(),
+  /** Latency samples the percentiles were computed from. */
+  latencySampleCount: z.number().int().nonnegative().default(0),
+  /** True when the sample count was too small for the requested percentile. */
+  percentileLowConfidence: z.boolean().default(false),
   totalBytes: z.number().int().nonnegative(),
   slowestEndpoints: z.array(
     z.object({

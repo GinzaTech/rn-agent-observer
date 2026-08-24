@@ -40,6 +40,8 @@ export const PerformanceMetricSummarySchema = z.object({
   standardDeviation: z.number().nonnegative().nullable(),
   coefficientOfVariation: z.number().nonnegative().nullable(),
   sources: z.array(z.string().min(1)),
+  /** Raw per-sample values enabling paired before/after statistics. */
+  sampleValues: z.array(z.number().finite()).max(50).optional(),
   firstTimestamp: z.iso.datetime().optional(),
   lastTimestamp: z.iso.datetime().optional(),
   unavailableReasons: z.array(z.string().min(1)).default([]),

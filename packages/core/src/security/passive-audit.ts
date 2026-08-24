@@ -36,6 +36,16 @@ export interface PassiveSecurityAuditOptions {
 
 export interface PassiveSecurityAuditResult extends SecurityAnalysisResult {
   projectRoot: string;
+  scope: {
+    manifests: { explicit: boolean; candidates: number; found: number };
+    networkSecurityConfigs: {
+      explicit: boolean;
+      candidates: number;
+      found: number;
+    };
+    text: { explicit: boolean; found: number };
+    artifacts: { enabled: boolean; found: number };
+  };
   filesAnalyzed: string[];
   manifestAnalyses: SecurityAnalysisResult[];
   networkSecurityAnalyses: SecurityAnalysisResult[];
@@ -335,6 +345,26 @@ export const runPassiveSecurityAudit = (
       ]),
     ],
     projectRoot,
+    scope: {
+      manifests: {
+        explicit: options.manifestPaths !== undefined,
+        candidates: manifestCandidates.length,
+        found: manifests.length,
+      },
+      networkSecurityConfigs: {
+        explicit: options.networkSecurityConfigPaths !== undefined,
+        candidates: networkCandidates.length,
+        found: networkConfigs.length,
+      },
+      text: {
+        explicit: options.textPaths !== undefined,
+        found: uniqueExistingFiles(explicitTextPaths).length,
+      },
+      artifacts: {
+        enabled: options.scanArtifacts !== false,
+        found: artifactPaths.length,
+      },
+    },
     filesAnalyzed,
     manifestAnalyses,
     networkSecurityAnalyses,

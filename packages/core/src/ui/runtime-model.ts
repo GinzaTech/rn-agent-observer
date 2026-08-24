@@ -273,6 +273,7 @@ export function buildRuntimeUiModel(
   return {
     timestamp: input.now ?? new Date().toISOString(),
     source: 'typescript-ast+rn-instrumentation+android-uiautomator+logcat',
+    availability: { status: 'available', reason: null },
     route: input.route,
     nodes,
     interactions: input.interactions,
