@@ -89,6 +89,13 @@ adb -s $env:RN_OBSERVER_DEVICE_ID reverse tcp:8081 tcp:8081
 Không dùng một serial mẫu trong tài liệu cho active action. Nếu model/codename trả
 về khác thiết bị dự kiến, dừng workflow và chọn lại target.
 
+Nếu chưa có target, có thể tạo AVD tạm và chạy ma trận owned demo. Quy trình phải
+inventory AVD trước, đặt AVD trên ổ đủ dung lượng, pin exact serial/API, rồi xóa đúng
+AVD và system image cài riêng cho run. Xem
+[Android emulator verification matrix](android-device-matrix.md) để có lệnh
+PowerShell đầy đủ, acceptance scenario và cleanup đã được kiểm chứng trên API
+24/30/36.
+
 ## 5. Khởi tạo cấu hình read-only
 
 Từ root Observer đã clone:

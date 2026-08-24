@@ -2,7 +2,8 @@
 
 > Snapshot: **2026-08-24**, workspace version **2.4.0**.
 >
-> Kết luận hiện tại: **9.0/10, đã nghiệm thu end-to-end trên Android vật lý**.
+> Kết luận hiện tại: **9.1/10, đã nghiệm thu end-to-end trên Android vật lý và
+> ba API tier emulator**.
 > Thiết bị: Xiaomi `23013PC75G` / `mondrian`, Android 15 API 35; serial và local
 > session ID được lược khỏi tài liệu public. Session đã hoàn tất.
 
@@ -17,11 +18,12 @@
 | Release và supply chain          |           9.2 | Frozen lock, 5 tarball smoke, SBOM/OSV, Android/Hermes export nằm trong `release:check`      |
 | Performance methodology          |           9.1 | Sampling/budget/baseline/compatibility có contract và fixture 100ms đã chạy trên device      |
 | Developer experience và tài liệu |           9.0 | CLI/MCP/docs/fixtures, compatibility matrix, Maestro integration example                     |
-| Community và ecosystem           |           8.8 | Apache-2.0, issue/RFC/security templates, provider/plugin SDK; chưa có conformance farm      |
-| Platform/device coverage         |           8.5 | Android physical API 35 verified; iOS/web/Windows vẫn target extension-only                  |
+| Community và ecosystem           |           8.9 | Apache-2.0, templates/provider SDK và runbook AVD tái lập; chưa có conformance farm          |
+| Platform/device coverage         |           8.9 | Physical API 35/arm64 + emulator API 24/30/36 x86_64; chưa có broad OEM matrix               |
 
-Điểm tổng có trọng số: **9.0/10**. Điểm này bao gồm source/release gate và runtime
-device hiện tại; không suy rộng thành hỗ trợ mọi OEM/API hay production benchmark.
+Điểm tổng có trọng số: **9.1/10**. Điểm này bao gồm source/release gate và bốn exact
+runtime fixtures hiện tại; không suy rộng thành hỗ trợ mọi OEM/ABI hay production
+benchmark.
 
 ## 2. So sánh với các nhóm dự án tương tự
 
@@ -121,6 +123,7 @@ Trạng thái evidence gần nhất:
 | OSV dependency audit                   | `PASS`, 673 queried, 0 advisory               |
 | Full `release:check` sau thay đổi cuối | `PASS`, 352/352 tests + MCP/package/export    |
 | Physical Android positive flow         | `PASS`, exact target pinned, session complete |
+| Emulator API 24/30/36 positive flow    | `PASS`, ba AVD/session tạm đã cleanup         |
 
 ## 5. Cấu hình demo và giới hạn an toàn
 
@@ -141,7 +144,9 @@ Không chạy active flow trên app/tài khoản production. PerformanceLab ch�
 và NetworkLab trả fixture 0/500/2000ms + 503 là regression fixture có chủ đích,
 không được "tối ưu" khỏi demo.
 
-## 6. Acceptance đã chạy trên thiết bị Android vật lý
+## 6. Acceptance đã chạy trên Android
+
+### 6.1 Thiết bị vật lý
 
 | Evidence                    | Kết quả                                                                    |
 | --------------------------- | -------------------------------------------------------------------------- |
@@ -166,15 +171,36 @@ evidence graph và screenshot contrast được tạo tự động khi stop; pub
 giữ số liệu tổng hợp đã review.
 
 Giới hạn: pin còn 34%, nhiệt độ battery service 40.0 C, app là development build,
-mẫu frame/network nhỏ và chỉ có một OEM/API. Vì vậy số đo xác nhận pipeline hoạt
-động và finding có evidence; không phải benchmark production hay device matrix.
+mẫu frame/network nhỏ và chỉ có một physical OEM. Vì vậy số đo xác nhận pipeline
+hoạt động và finding có evidence; không phải benchmark production.
+
+### 6.2 Ma trận emulator API 24/30/36
+
+Ba AVD mới, tạm thời đã chạy cùng APK/kịch bản trên Google x86_64 images:
+
+- cài/launch/foreground và `observe` PASS ở cả ba tier;
+- `understand-screen` nhận Home/NetworkLab `content`; `ui-model` cuối có 7 action
+  visible/pressable, 0 interaction error;
+- fixture JS trả lần lượt `100.0103ms`, `100.0002ms`, `100.0003ms` và diagnosis
+  long-task đúng source;
+- mỗi tier có 2 network request/1 failure, token query redacted và percentile
+  low-confidence;
+- mỗi session `complete`, replay 21 bước;
+- API 24/30 giữ gfx row unavailable; API 24 giữ CPU unavailable, không điền 0;
+- toàn bộ AVD tạm, image API 24/30 cài riêng, data root và active config đã cleanup;
+  AVD API 36.1 có sẵn trước run được giữ nguyên.
+
+Chi tiết fixture, lệnh tái lập và cleanup ở
+[`docs/android-device-matrix.md`](docs/android-device-matrix.md). Đây mới là ba API
+tier trên một host/emulator engine, chưa phải 2 OEM mỗi tier hay cloud device farm.
 
 ## 7. Giá trị nên cung cấp tiếp cho cộng đồng sau mốc 9/10
 
 Ưu tiên theo tác động:
 
-1. Android device-farm conformance: 3 API tiers × ít nhất 2 OEM, cùng fixture và
-   compatibility fingerprint; công khai aggregate report, không public raw UI data.
+1. Duy trì Android device-farm conformance: lấy ba API tier local hiện có làm
+   baseline, mở rộng tới ít nhất 2 OEM/tier và chạy định kỳ; công khai aggregate
+   report, không public raw UI data.
 2. Provider conformance kit cho iOS/web/Windows: golden JSON-RPC fixtures, timeout /
    cancellation/path/privacy contract và badge chỉ khi provider vượt test suite.
 3. Adapter chính thức cho Maestro/Detox/Appium: liên kết runner result với session /

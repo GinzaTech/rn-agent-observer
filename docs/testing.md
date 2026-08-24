@@ -6,8 +6,9 @@ Thiết bị của bằng chứng active-security mới: Android AVD do nhóm s�
 development fixture `SecurityLab` của demo.
 Thiết bị của bằng chứng runtime mới: Xiaomi `23013PC75G`/`mondrian`, physical
 Android 15 API 35, arm64, development fixture. Serial và local session IDs được
-lược khỏi tài liệu public. Kết quả này xác minh scenario ghi riêng bên dưới, không
-suy rộng thành production benchmark hay device matrix.
+lược khỏi tài liệu public. Ma trận emulator mới chạy cùng demo trên API 24, 30 và
+36 x86_64; mỗi AVD/session là tạm thời và đã cleanup. Các kết quả chỉ xác minh
+scenario ghi riêng bên dưới, không suy rộng thành production benchmark hay mọi OEM.
 
 ## Contract trạng thái
 
@@ -97,6 +98,37 @@ Evidence của đúng run này:
 Đây là development-build pipeline evidence trên một OEM/API với sample nhỏ, không
 phải performance benchmark production, pentest hoặc compatibility wildcard. Raw
 `.artifacts`, device serial và session ID vẫn local.
+
+## Android emulator API-tier acceptance — 2026-08-24
+
+Ba AVD tạm do nhóm sở hữu đã chạy cùng debug APK 2.4.0 và cùng kịch bản
+PerformanceLab + NetworkLab trên Windows/WHPX, Android Emulator 36.5.10 và ADB
+37.0.0. Mỗi target được pin exact `emulator-5554` trong thời gian run, nhưng serial
+chỉ được tái sử dụng sau khi AVD trước đã disconnect; mỗi AVD dùng session ID riêng.
+
+| Evidence                        | API 24 / Android 7                                  | API 30 / Android 11                                 | API 36 / Android 16                                 |
+| ------------------------------- | --------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
+| System image / ABI              | Google APIs / x86_64                                | Google APIs / x86_64                                | Google APIs Play Store / x86_64                     |
+| Resolution                      | 480×800                                             | 480×800                                             | 1080×2400                                           |
+| App install/foreground          | `PASS`                                              | `PASS`                                              | `PASS`                                              |
+| Home + NetworkLab understanding | `content`, route đúng                               | `content`, route đúng                               | `content`, route đúng                               |
+| Final UI model                  | available, 7 visible/pressable, 0 interaction error | available, 7 visible/pressable, 0 interaction error | available, 7 visible/pressable, 0 interaction error |
+| 100ms fixture                   | `100.0103ms`                                        | `100.0002ms`                                        | `100.0003ms`                                        |
+| Network fixture                 | 2 request / 1 failure, token redacted               | 2 / 1, token redacted                               | 2 / 1, token redacted                               |
+| Session stop                    | `complete`, replay 21 bước                          | `complete`, replay 21 bước                          | `complete`, replay 21 bước                          |
+
+Các availability khác nhau được giữ nguyên: API 24 không có process CPU và gfx
+frame rows; API 30 không có gfx frame rows; API 36 có 39 frame sample trong lần đo
+fixture. Không giá trị unavailable nào bị đổi thành 0. Network percentile cả ba
+tier đều low-confidence vì chỉ có hai sample.
+
+Sau run, exact AVD API 24/30/36 đã bị xóa; hai system image API 24/30 cài cho run
+đã uninstall; data root tạm trên ổ D và active config cục bộ đã xóa; Metro đã dừng.
+Inventory cuối không có device ADB và chỉ còn AVD `Medium_Phone_API_36.1` có sẵn
+trước run. Xem [ma trận và lệnh tái lập](android-device-matrix.md).
+
+Đây là API-tier conformance đầu tiên, không phải device-farm matrix: vẫn chỉ có một
+host/emulator engine, ABI x86_64 và chưa có ít nhất hai OEM cho mỗi tier.
 
 ## Active-security runtime — owned demo AVD (2026-08-23)
 

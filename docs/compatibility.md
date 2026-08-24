@@ -34,13 +34,15 @@ system. CI jobs without an attached target cannot expand runtime support.
 
 | Surface                        | Exact fixture / boundary                      | Current evidence                                                                   | Status               |
 | ------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------- |
-| Demo React Native              | 0.86.2 + Hermes                               | Host gates plus physical Android 15 development session                            | `FIXTURE_VERIFIED`   |
-| Demo Expo                      | SDK 57.0.15                                   | Default/opt-in config, export and physical development build                       | `FIXTURE_VERIFIED`   |
+| Demo React Native              | 0.86.2 + Hermes                               | Host gates, physical API 35 and emulator API 24/30/36 development sessions         | `FIXTURE_VERIFIED`   |
+| Demo Expo                      | SDK 57.0.15                                   | Default/opt-in config, export and four exact Android runtime fixtures              | `FIXTURE_VERIFIED`   |
 | Android emulator negative path | Demo app stopped/background, Android emulator | UI model returns `target-not-running`/`target-not-foreground` without false issues | `FIXTURE_VERIFIED`   |
-| Android emulator positive flow | PerformanceLab + NetworkLab                   | No complete current session                                                        | `NOT_VERIFIED`       |
+| Android emulator API 24        | Google APIs x86_64, 480×800                   | Complete PerformanceLab + NetworkLab session on 2026-08-24                         | `FIXTURE_VERIFIED`   |
+| Android emulator API 30        | Google APIs x86_64, 480×800                   | Complete PerformanceLab + NetworkLab session on 2026-08-24                         | `FIXTURE_VERIFIED`   |
+| Android emulator API 36        | Google APIs Play Store x86_64, 1080×2400      | Complete PerformanceLab + NetworkLab session on 2026-08-24                         | `FIXTURE_VERIFIED`   |
 | Physical Android device        | Xiaomi `23013PC75G`, Android 15 API 35, arm64 | 2026-08-24 complete demo session; exact serial kept in local evidence              | `FIXTURE_VERIFIED`   |
-| Android API/device matrix      | Multiple OEMs and API levels                  | No maintained device-farm matrix                                                   | `NOT_VERIFIED`       |
-| Expo development build         | Required for app-owned instrumentation        | Demo 2.4.0 route/network/render/JS/UI telemetry accepted on physical device        | `FIXTURE_VERIFIED`   |
+| Broad OEM/device-farm matrix   | At least two OEMs per maintained API tier     | Three local emulator tiers + one physical OEM are not a maintained device farm     | `NOT_VERIFIED`       |
+| Expo development build         | Required for app-owned instrumentation        | Demo 2.4.0 route/network/render/JS/UI telemetry accepted on four exact fixtures    | `FIXTURE_VERIFIED`   |
 | Expo Go                        | Host-container observation only               | Never treated as app-specific native evidence                                      | `SUPPORTED` boundary |
 | iOS                            | External provider contract only               | No built-in provider or repository runtime evidence                                | `EXTENSION_ONLY`     |
 | Web                            | External provider contract only               | No built-in provider or repository runtime evidence                                | `EXTENSION_ONLY`     |
@@ -76,5 +78,6 @@ version tuple, target fingerprint, scenario, session ID, artifact hashes and dat
 5. Add the tuple only after the same scenario is reproducible from documented
    commands.
 
-See [testing](testing.md), [capability matrix](capability-matrix.md), and the
+See the [Android emulator matrix](android-device-matrix.md), [testing](testing.md),
+[capability matrix](capability-matrix.md), and the
 [Maestro integration example](../examples/maestro/README.md).

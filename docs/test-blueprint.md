@@ -2,10 +2,10 @@
 
 Tài liệu này là **bộ tham chiếu chuẩn (golden test battery)** để test mọi app React Native/Expo bằng RN Agent Observer, đồng thời regression-test chính observer. Mọi phiên làm việc debug/metrics trên app mới đều quy về và ghi nhận theo ID case trong tài liệu này.
 
-- Phiên bản blueprint: **1.8.0** (áp dụng observer 2.4.0, Android + Windows)
+- Phiên bản blueprint: **1.9.0** (áp dụng observer 2.4.0, Android + Windows)
 - App tham chiếu vàng (golden AUT): `apps/demo-expo` (`dev.rnagentobserver.demo`)
 - App ngoài repo tham chiếu chế độ read-only: Vshop (`com.android.vshop`)
-- Thiết bị xác minh gần nhất: serial được lược — Xiaomi 23013PC75G, Android 15, 1080×2400, 120Hz
+- Thiết bị xác minh gần nhất: Xiaomi 23013PC75G, Android 15/arm64; AVD tạm API 24/30/36 x86_64. Serial/session được lược; xem [ma trận Android](android-device-matrix.md)
 - Yêu cầu riêng cho DTL (từ 1.1.0): Metro chạy cho đúng app + `adb reverse tcp:8081 tcp:8081` (hoặc `RN_OBSERVER_METRO_URL` khi Metro dùng port khác); không mở React Native DevTools song song
 
 ---
@@ -1566,3 +1566,4 @@ Quy tắc: mỗi dòng FAIL phải kèm hypothesis nguyên nhân và case tái h
 | 1.6.0     | 2026-08-22 | Unreleased: domain UIM (6 case) cho TypeScript AST source ownership, native viewability/canPress, Babel interaction recording, physical replay và capture-failure honesty; MCP 45 tools                                                       |
 | 1.7.0     | 2026-08-23 | Observer 2.4 assurance expansion: doctor/config + suite/CI/reporters, passive/active security, SBOM/OSV, repeated performance/memory, dashboard/evidence graph, share bundle, route/action coverage và external target-provider; MCP 66 tools |
 | 1.8.0     | 2026-08-23 | Bổ sung battery evidence-honest cho policy guard, passive/active security, experiment/memory, `.rnobs`, coverage, dashboard/graph, plugin/provider và SecurityLab opt-in; giữ runtime chưa chạy fixture là `NOT_VERIFIED`                     |
+| 1.9.0     | 2026-08-24 | Chạy cùng owned demo acceptance trên AVD tạm API 24/30/36; ghi exact availability, semantic interaction, network redaction, session completion và cleanup; không nâng thành broad OEM/device-farm claim                                       |

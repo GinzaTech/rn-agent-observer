@@ -385,7 +385,7 @@ pnpm mcp:check                                # MCP health check
 
 - **Unit/integration**: gate 2026-08-24 pass 352/352 tests; xem breakdown và lịch sử trong `docs/testing.md`
 - **Test blueprint** (`docs/test-blueprint.md`): bộ tham chiếu chuẩn ~190 case (21 domain, 4 tier T0–T3) để test observer trên bất kỳ app RN nào và regression chính observer — golden AUT là `apps/demo-expo`
-- **Runtime verification**: physical Android 15 development fixture đã hoàn tất vòng 2.4.0 ngày 2026-08-24; chỉ đúng một OEM/API/scenario, không phải device matrix
+- **Runtime verification**: physical Android 15/arm64 và AVD API 24/30/36 x86_64 đã hoàn tất vòng demo 2.4.0 ngày 2026-08-24; đây là bốn exact fixtures, chưa phải broad OEM/device-farm matrix — xem `docs/android-device-matrix.md`
 - **Quy tắc**: không tuyên bố runtime Android hoạt động nếu chưa chạy trên device/emulator thật
 
 ## Bảo mật & giới hạn
@@ -779,7 +779,7 @@ pnpm mcp:check                                # MCP health check
 
 - **Unit/integration**: the 2026-08-24 gate passed 352/352 tests; see `docs/testing.md` for the package breakdown and historical records
 - **Test blueprint** (`docs/test-blueprint.md`): ~190 reference cases (21 domains, 4 tiers T0–T3) for testing the observer against any RN app and regression-testing the observer itself — golden AUT is `apps/demo-expo`
-- **Runtime verification**: a physical Android 15 development fixture completed the 2.4.0 workflow on 2026-08-24; this is one OEM/API/scenario, not a device matrix
+- **Runtime verification**: a physical Android 15/arm64 fixture and API 24/30/36 x86_64 AVDs completed the demo 2.4.0 workflow on 2026-08-24; these are four exact fixtures, not yet a broad OEM/device-farm matrix — see `docs/android-device-matrix.md`
 - **Rule**: never claim Android runtime works without running on a real device/emulator
 
 ## Security & Limitations

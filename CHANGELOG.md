@@ -2,6 +2,20 @@
 
 ## Unreleased — screen understanding cho Codex/agent
 
+### Android API-tier emulator acceptance
+
+- Owned demo 2.4.0 đã chạy complete session cùng PerformanceLab + NetworkLab trên
+  AVD tạm API 24, 30 và 36 x86_64: route/screen understanding, semantic tap,
+  runtime UI model, JS-task diagnosis, network redaction và replay/session stop.
+- Availability được giữ đúng theo target: API 24 không có process CPU/gfx rows,
+  API 30 không có gfx rows; không metric thiếu nào bị điền 0. Mọi network percentile
+  đều low-confidence vì chỉ có hai sample.
+- Ba AVD tạm đã xóa; image API 24/30 cài riêng đã uninstall; data root/active config
+  tạm và Metro đã cleanup. AVD API 36.1 có sẵn trước run được giữ nguyên.
+- Thêm `docs/android-device-matrix.md` với exact fixture, acceptance flow, lệnh tạo
+  AVD trên ổ đủ dung lượng và cleanup an toàn. Broad OEM/device-farm matrix vẫn
+  `NOT_VERIFIED`.
+
 ### Physical acceptance, telemetry integrity và reproducibility
 
 - Runtime telemetry đã parse/redact được giữ trong bounded session cache, pin theo
