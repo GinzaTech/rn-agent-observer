@@ -5,7 +5,7 @@ import type {
   PerformanceSnapshot,
   ReactRenderStat,
 } from '@rn-agent-observer/schemas';
-import { isNonActionablePlatformLog } from './runtime-errors.js';
+import { partitionRuntimeErrorLogs } from './runtime-errors.js';
 
 export interface DiagnosisThresholds {
   /** UI FPS below this flags a frame-rate finding. Default 45. */
@@ -280,13 +280,12 @@ export function diagnoseEvidence(
     });
   }
   const ignoredSystemSources = new Set(['FramePredict']);
-  const errors = (input.logs ?? []).filter(
+  const errorCandidates = (input.logs ?? []).filter(
     (entry) =>
       (entry.level === 'error' || entry.level === 'fatal') &&
-      !ignoredSystemSources.has(entry.source) &&
-      !isNonActionablePlatformLog(entry) &&
-      !/^\s*at\s/.test(entry.message),
+      !ignoredSystemSources.has(entry.source),
   );
+  const errors = partitionRuntimeErrorLogs(errorCandidates).actionable;
   if (errors.length) {
     const fatalCount = errors.filter((entry) => entry.level === 'fatal').length;
     const signalStrength = fatalCount > 0 ? 1 : Math.min(errors.length / 5, 1);

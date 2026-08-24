@@ -287,7 +287,16 @@ describe('screen understanding', () => {
     expect(isNonActionablePlatformLog(softException)).toBe(true);
     const result = analyzeScreen(
       input(tree([{ type: 'TextView', text: 'Home' }]), {
-        errorLogs: [softException],
+        errorLogs: [
+          softException,
+          {
+            level: 'error',
+            source: 'ReactHost',
+            timestamp: NOW,
+            message:
+              '  at com.facebook.react.runtime.ReactHostImpl.focus(Host.kt:1)',
+          },
+        ],
       }),
     );
     expect(result.counts.runtimeErrors).toBe(0);

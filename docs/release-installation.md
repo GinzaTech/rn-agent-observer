@@ -154,6 +154,33 @@ The check retries bounded registry propagation, installs into a safety-checked O
 temporary directory, runs the public CLI version and MCP health check, prints only
 registry metadata, and removes the temporary consumer.
 
+## Registry authorization preflight
+
+Complete this before creating a release tag. The exact `@rn-agent-observer` scope
+must already exist on npm, and the publishing account or automation team must have
+write access to it. Verify identity and scope membership without printing tokens:
+
+```sh
+npm whoami
+npm org ls rn-agent-observer
+pnpm view @rn-agent-observer/cli version
+```
+
+The final command is expected to return 404 only before the first publication. A
+missing scope is different from a missing package: create the npm organization and
+grant access instead of silently renaming all packages, because changing to another
+scope changes every public import, command example and internal dependency.
+
+Enable npm 2FA and bootstrap the protected GitHub `npm` environment with a
+least-privilege granular access token that may publish this scope and is explicitly
+configured for automation. Never store an npm password, one-time code, token or
+generated `.npmrc` in the repository. The release workflow publishes from GitHub
+Actions with provenance; after the initial package pages exist, migrate them to
+[npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) where available
+and revoke the bootstrap token. See npm's requirements for
+[scoped public packages](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/)
+and [provenance statements](https://docs.npmjs.com/generating-provenance-statements/).
+
 ## Verify release artifacts
 
 For npm, compare the installed version with the GitHub release tag and inspect npm
@@ -255,6 +282,23 @@ sau khi kiểm tra an toàn đường dẫn. Gate này cũng export Android/Herm
 tạm của hệ điều hành, kiểm tra metadata và đúng một bundle, rồi dọn đúng thư mục đó.
 Archive kiểm tra nằm trong
 `.artifacts/package-smoke/` và không được commit.
+
+## Preflight quyền npm
+
+Trước khi tạo tag release, scope `@rn-agent-observer` phải tồn tại trên npm và tài
+khoản/team publish phải có quyền ghi. Kiểm tra bằng `npm whoami`,
+`npm org ls rn-agent-observer` và `pnpm view @rn-agent-observer/cli version`; package
+có thể trả 404 trước lần publish đầu, nhưng scope không được thiếu. Không tự đổi sang
+scope khác vì sẽ đổi toàn bộ public import và dependency nội bộ.
+
+Bật 2FA cho npm, sau đó bootstrap protected GitHub environment `npm` bằng granular
+access token ít quyền, chỉ cho phép publish scope này và được cấu hình rõ cho CI.
+Không commit password, OTP, token hoặc `.npmrc` sinh ra. Workflow GitHub publish kèm
+provenance; sau khi package page đầu tiên tồn tại, chuyển sang npm trusted publishing
+nếu khả dụng rồi revoke token bootstrap. Xem tài liệu npm về
+[scoped public package](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/),
+[trusted publishing](https://docs.npmjs.com/trusted-publishers/) và
+[provenance](https://docs.npmjs.com/generating-provenance-statements/).
 
 Maintainer phải cập nhật changelog, đồng bộ version toàn workspace, chạy scenario
 runtime liên quan trên device, tạo tag `v<version>` khớp tuyệt đối với manifest, rồi

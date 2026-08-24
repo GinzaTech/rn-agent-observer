@@ -16,3 +16,51 @@ export function isNonActionablePlatformLog(entry: LogEntry): boolean {
     )
   );
 }
+
+export interface RuntimeErrorLogPartition {
+  actionable: LogEntry[];
+  platformWarnings: LogEntry[];
+  continuations: LogEntry[];
+}
+
+const isStackContinuation = (message: string): boolean =>
+  /^\s*(?:at\s|Caused by:|Suppressed:|\.\.\.\s+\d+\s+more\b)/.test(message);
+
+/**
+ * Logcat emits one row per Java stack line. Partition an ordered window so a
+ * single ReactHost soft exception is not inflated into many application errors.
+ * Orphan stack continuations remain preserved separately but are not treated as
+ * independent causal errors.
+ */
+export function partitionRuntimeErrorLogs(
+  entries: readonly LogEntry[],
+): RuntimeErrorLogPartition {
+  const partition: RuntimeErrorLogPartition = {
+    actionable: [],
+    platformWarnings: [],
+    continuations: [],
+  };
+  let softExceptionSource: string | null = null;
+
+  for (const entry of entries) {
+    if (entry.level !== 'error' && entry.level !== 'fatal') continue;
+    if (isNonActionablePlatformLog(entry)) {
+      partition.platformWarnings.push(entry);
+      softExceptionSource = entry.source;
+      continue;
+    }
+    if (isStackContinuation(entry.message)) {
+      if (softExceptionSource === entry.source) {
+        partition.platformWarnings.push(entry);
+      } else {
+        partition.continuations.push(entry);
+        softExceptionSource = null;
+      }
+      continue;
+    }
+    partition.actionable.push(entry);
+    softExceptionSource = null;
+  }
+
+  return partition;
+}

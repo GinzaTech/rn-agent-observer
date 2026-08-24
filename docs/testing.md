@@ -52,8 +52,8 @@ lẫn `NOT_VERIFIED`. Hai lệnh không thay thế nhau.
 Đã chạy trên workspace này:
 
 - `pnpm check`: PASS — ESLint, Prettier, TypeScript build và Vitest; schemas
-  19 tests, instrumentation 17, demo Expo 10, core 294, CLI 15, MCP 6 (tổng
-  **361 tests**);
+  19 tests, instrumentation 17, demo Expo 10, core 295, CLI 15, MCP 6 (tổng
+  **362 tests**);
 - `pnpm mcp:check`: PASS; server MCP khởi tạo được;
 - `pnpm rn-observe --version`: `2.4.0`;
 - `pnpm pack:check`: PASS cho 5 package public;
@@ -240,7 +240,7 @@ Kết quả Unreleased screen-understanding: `pnpm check` pass lint, Prettier, T
 - Focused tests pass cho TypeScript AST source scanner, generated/explicit testID Babel transform, instrumentation privacy, source/native/telemetry correlation, view-flattening state và physical-interaction replay export.
 - Static scan Vshop: 115 actionable source element, 22 conditional, chỉ 1 explicit testID. Scanner trả được file/line thật; phần lớn source/runtime ownership sẽ ở trạng thái chưa correlate cho tới khi app bật Babel plugin hoặc thêm testID.
 - Physical demo acceptance 2026-08-24 đã đóng positive path hiện tại: model correlate route/source/native interaction, giữ evidence qua logcat rollover, không có capture failure và auto-capture khi stop thành công. Kết quả chỉ áp dụng exact demo fixture/device ở mục trên.
-- Full gate hiện tại là 361/361 tests + MCP/package/Android export; các con số 77 test bên dưới chỉ còn là record lịch sử của milestone UI-model đầu tiên.
+- Full gate hiện tại là 362/362 tests + MCP/package/Android export; các con số 77 test bên dưới chỉ còn là record lịch sử của milestone UI-model đầu tiên.
 
 ## Demo Expo native dogfood
 

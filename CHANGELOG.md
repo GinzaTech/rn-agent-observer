@@ -7,11 +7,14 @@
 - `understand-screen`, diagnosis và passive resilience tách ReactHost non-fatal
   soft-exception thành platform warning: evidence vẫn được giữ nhưng không tăng app
   runtime-error count; fatal ReactHost, `BadToken` và lỗi độc lập không bị hạ cấp.
+  Java stack continuation của cùng soft exception được nhóm với root log thay vì
+  tăng sai runtime-error count; orphan stack row không được coi là causal error.
 - Accessibility phân biệt intrinsic target nhỏ với bounds bị cắt ở mép viewport.
   Case clipped trả info/`NOT_VERIFIED` và yêu cầu scroll vào trọn màn trước khi fail.
 - CI thêm Ubuntu/KVM API 30 x86_64 smoke: build/install owned demo, nối Metro, kiểm
   foreground/content, screenshot/UI tree, source/native runtime UI model, complete
-  session và không có runtime capture failure. Đây không phải device-farm claim.
+  session, không có actionable runtime error hoặc runtime capture failure. Đây
+  không phải device-farm claim.
 - Thêm `pnpm registry:check` để chờ registry propagation có giới hạn, xác minh
   sha512/tarball metadata của năm package, cài exact version trong consumer tạm rồi
   chạy public CLI version + MCP health check và cleanup an toàn.
@@ -56,7 +59,7 @@
   development fixture, không phải production/device-matrix claim.
 - Dependency hook `.pnpmfile.cjs` pin Metro security patch và CommonJS-compatible
   UUID; frozen install, 5 public tarball clean-consumer smoke, Android/Hermes export,
-  361/361 tests và OSV strict 673/673 components đều pass ở gate 2026-08-24.
+  362/362 tests và OSV strict 673/673 components đều pass ở gate 2026-08-24.
 
 ### Documentation và onboarding
 

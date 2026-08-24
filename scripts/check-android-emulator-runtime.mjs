@@ -129,6 +129,14 @@ try {
     existsSync(understanding.artifacts?.uiTreePath),
     'screen-understanding UI tree artifact is missing',
   );
+  assert(
+    understanding.counts?.runtimeErrors === 0,
+    `screen understanding reported ${String(understanding.counts?.runtimeErrors)} actionable runtime errors: ${JSON.stringify(
+      understanding.issues?.filter(
+        (issue) => issue.code === 'runtime-log-error',
+      ) ?? [],
+    )}`,
+  );
 
   const model = observer(['ui-model'], session.id);
   assert(

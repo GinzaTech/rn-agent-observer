@@ -10,7 +10,7 @@ import type {
   UITree,
 } from '@rn-agent-observer/schemas';
 import { flattenUiTree } from '../adb/parsers.js';
-import { isNonActionablePlatformLog } from '../diagnosis/runtime-errors.js';
+import { partitionRuntimeErrorLogs } from '../diagnosis/runtime-errors.js';
 import type { UiSnapshot } from '../refs/snapshot.js';
 
 export { isNonActionablePlatformLog } from '../diagnosis/runtime-errors.js';
@@ -464,12 +464,10 @@ export function analyzeScreen(input: AnalyzeScreenInput): ScreenUnderstanding {
     const age = new Date(now).getTime() - new Date(entry.timestamp).getTime();
     return age >= 0 && age <= 60_000;
   });
-  const recentPlatformWarnings = recentErrors.filter(
-    isNonActionablePlatformLog,
-  );
-  const recentActionableErrors = recentErrors.filter(
-    (entry) => !isNonActionablePlatformLog(entry),
-  );
+  const {
+    platformWarnings: recentPlatformWarnings,
+    actionable: recentActionableErrors,
+  } = partitionRuntimeErrorLogs(recentErrors);
   if (recentActionableErrors.length > 0) {
     const labels = recentActionableErrors
       .map((entry) => sanitizeUiText(entry.message.split(/\r?\n/)[0] ?? ''))
