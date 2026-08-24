@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.4.1 — 2026-08-24
+
+### Public npm release and trusted provenance
+
+- `2.4.0` bootstrap-publish đủ năm namespace public `@rn-agent-observer/*` bằng
+  passkey/2FA nhưng direct npm publish giữ `workspace:*`; version này không phải
+  consumer release và sẽ được deprecate. `2.4.1` là public release cài đặt được đầu
+  tiên. Không password, passkey, OTP hoặc token nào được lưu trong repo/GitHub.
+- Cấu hình npm Trusted Publishing cho exact repository, workflow `publish.yml` và
+  protected environment `npm`; workflow dùng GitHub OIDC + npm provenance, không
+  còn phụ thuộc `NPM_TOKEN` dài hạn.
+- Registry clean-consumer gate bỏ qua negative-cache cũ và chờ tối đa 20 phút để
+  tương thích publish-time malware scanning của npm; vẫn fail nếu thiếu
+  name/version/sha512/tarball, dependency public còn `workspace:`/`link:`/`file:`,
+  internal version không lockstep, hoặc CLI/MCP không chạy được sau cài đặt sạch.
+- Chuẩn hóa executable metadata thành `dist/index.js` và `dist/server.js` theo npm
+  11; tarball consumer gate xác nhận `rn-observe` và `rn-observer-mcp` được tạo.
+- Runtime code không đổi so với 2.4.0. Device evidence API 24/30/36 và physical
+  Android 15 của 2.4.0 vẫn là phạm vi runtime hiện có; 2.4.1 chỉ thay đổi release
+  metadata, authorization và tài liệu phân phối.
+
 ## 2.4.0 — 2026-08-24
 
 ### Host-only fixes và automated Android runtime gate

@@ -27,6 +27,8 @@ const rootManifest = JSON.parse(
 );
 const expectedVersion = process.argv[2] ?? rootManifest.version;
 const consumerPrefix = 'rn-agent-observer-registry-smoke-';
+const registryAttempts = 120;
+const registryRetryDelayMs = 10_000;
 const packages = [
   '@rn-agent-observer/schemas',
   '@rn-agent-observer/core',
@@ -62,7 +64,9 @@ function run(command, args, options = {}) {
   return result.stdout.trim();
 }
 
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+function npm(args) {
+  return run('npm', args, { shell: process.platform === 'win32' });
+}
 
 function pnpm(args, cwd = repositoryRoot) {
   const executable = process.env.npm_execpath;
@@ -98,17 +102,19 @@ function cleanupConsumer(directory) {
 
 async function waitForRegistry(packageName) {
   let lastError = null;
-  for (let attempt = 1; attempt <= 18; attempt += 1) {
+  for (let attempt = 1; attempt <= registryAttempts; attempt += 1) {
     try {
       const metadata = JSON.parse(
-        run(npmCommand, [
+        npm([
           'view',
           `${packageName}@${expectedVersion}`,
           'name',
           'version',
           'dist.integrity',
           'dist.tarball',
+          'dependencies',
           '--json',
+          '--prefer-online',
         ]),
       );
       assert(
@@ -129,10 +135,43 @@ async function waitForRegistry(packageName) {
           metadata['dist.tarball'].startsWith('https://registry.npmjs.org/'),
         `${packageName} returned an unexpected tarball URL`,
       );
+      const dependencies = metadata.dependencies ?? {};
+      assert(
+        typeof dependencies === 'object' && !Array.isArray(dependencies),
+        `${packageName} returned invalid dependency metadata`,
+      );
+      for (const [dependencyName, dependencyRange] of Object.entries(
+        dependencies,
+      )) {
+        assert(
+          typeof dependencyRange === 'string' &&
+            !/^(?:workspace|link|file):/.test(dependencyRange),
+          `${packageName} exposes non-registry dependency ${dependencyName}@${String(dependencyRange)}`,
+        );
+        if (dependencyName.startsWith('@rn-agent-observer/')) {
+          assert(
+            dependencyRange === expectedVersion,
+            `${packageName} depends on ${dependencyName}@${dependencyRange} instead of ${expectedVersion}`,
+          );
+        }
+      }
       return metadata;
     } catch (error) {
       lastError = error;
-      if (attempt < 18) await delay(5_000);
+      if (
+        error instanceof Error &&
+        error.message.startsWith('Published package check failed:')
+      ) {
+        throw error;
+      }
+      if (attempt < registryAttempts) {
+        const reason =
+          error instanceof Error ? error.message.split('\n')[0] : String(error);
+        console.error(
+          `registry wait: ${packageName}@${expectedVersion} attempt ${attempt}/${registryAttempts}: ${reason}`,
+        );
+        await delay(registryRetryDelayMs);
+      }
     }
   }
   throw lastError;

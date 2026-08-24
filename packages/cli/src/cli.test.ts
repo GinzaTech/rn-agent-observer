@@ -32,7 +32,7 @@ describe('rn-observe CLI', () => {
   it('prints help', async () => {
     const result = capture();
     expect(await runCli(['--help'], result.io)).toBe(0);
-    expect(result.out[0]).toContain('rn-observe 2.4.0');
+    expect(result.out[0]).toContain('rn-observe 2.4.1');
     expect(result.out[0]).toContain('devtools-export');
     expect(result.out[0]).toContain('rn-observe status');
     expect(result.out[0]).toContain('metro-network');

@@ -1,10 +1,12 @@
 # Release installation and publication
 
-The intended primary distribution is the five npm packages below. They are
-release-ready but were **not present in the npm registry at the 2026-08-24
-verification snapshot**; until the first publication, use the source-checkout path
-in [installation.md](installation.md). GitHub release attachments may additionally
-contain source or Windows portable archives, but those attachments are optional.
+The primary distribution is the five public npm packages below. Version 2.4.0 only
+bootstrapped the package names on 2026-08-24 and retained invalid `workspace:*`
+dependency ranges; do not install it. Version 2.4.1 is the first consumer release,
+published from GitHub Actions through npm Trusted Publishing with OIDC provenance.
+The source-checkout path in [installation.md](installation.md) remains available
+for contributors. GitHub release attachments may additionally contain source or
+Windows portable archives, but those attachments are optional.
 
 All public packages use the same version:
 
@@ -171,13 +173,12 @@ missing scope is different from a missing package: create the npm organization a
 grant access instead of silently renaming all packages, because changing to another
 scope changes every public import, command example and internal dependency.
 
-Enable npm 2FA and bootstrap the protected GitHub `npm` environment with a
-least-privilege granular access token that may publish this scope and is explicitly
-configured for automation. Never store an npm password, one-time code, token or
-generated `.npmrc` in the repository. The release workflow publishes from GitHub
-Actions with provenance; after the initial package pages exist, migrate them to
-[npm trusted publishing](https://docs.npmjs.com/trusted-publishers/) where available
-and revoke the bootstrap token. See npm's requirements for
+Enable npm 2FA. Every package is bound to the exact `GinzaTech/rn-agent-observer`
+repository, `.github/workflows/publish.yml`, and protected GitHub environment `npm`
+through [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/). The
+workflow exchanges GitHub OIDC for short-lived publication authority and does not
+require a stored `NPM_TOKEN`. Never store an npm password, one-time code, passkey,
+token or generated `.npmrc` in the repository. See npm's requirements for
 [scoped public packages](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/)
 and [provenance statements](https://docs.npmjs.com/generating-provenance-statements/).
 
@@ -212,8 +213,7 @@ must be regenerated.
    GitHub release from that tag.
 5. The protected npm workflow validates the tag and package manifests again, then
    publishes the five packages in dependency order with public access and npm
-   provenance. The repository must provide an npm publishing credential through its
-   protected `npm` environment.
+   provenance through the package's exact Trusted Publisher binding.
 6. Verify the package pages, provenance, executable names, and a clean install in a
    new temporary project with `pnpm registry:check` before announcing the release.
 
@@ -225,10 +225,12 @@ to the changelog and compatibility policy.
 
 # Cài đặt và phát hành
 
-Năm package npm là kênh phân phối dự kiến. Tại snapshot kiểm tra 2026-08-24, chúng
-**chưa tồn tại trên npm registry**; trước lần publish đầu, dùng source checkout theo
-[hướng dẫn cài đặt](installation.md). Attachment GitHub Release có thể bổ sung source
-hoặc portable bundle cho Windows nhưng là tùy chọn.
+Năm package npm public là kênh phân phối chính. Version 2.4.0 chỉ bootstrap tên
+package ngày 2026-08-24 nhưng còn dependency `workspace:*`, không được dùng để cài.
+Version 2.4.1 là consumer release đầu tiên, chạy từ GitHub Actions qua npm Trusted
+Publishing với OIDC provenance. Source checkout theo
+[hướng dẫn cài đặt](installation.md) vẫn dành cho contributor. Attachment GitHub
+Release có thể bổ sung source hoặc portable bundle cho Windows nhưng là tùy chọn.
 
 Năm package công khai luôn dùng cùng một version:
 
@@ -291,11 +293,11 @@ khoản/team publish phải có quyền ghi. Kiểm tra bằng `npm whoami`,
 có thể trả 404 trước lần publish đầu, nhưng scope không được thiếu. Không tự đổi sang
 scope khác vì sẽ đổi toàn bộ public import và dependency nội bộ.
 
-Bật 2FA cho npm, sau đó bootstrap protected GitHub environment `npm` bằng granular
-access token ít quyền, chỉ cho phép publish scope này và được cấu hình rõ cho CI.
-Không commit password, OTP, token hoặc `.npmrc` sinh ra. Workflow GitHub publish kèm
-provenance; sau khi package page đầu tiên tồn tại, chuyển sang npm trusted publishing
-nếu khả dụng rồi revoke token bootstrap. Xem tài liệu npm về
+Bật 2FA cho npm. Mỗi package phải bind đúng repository
+`GinzaTech/rn-agent-observer`, workflow `.github/workflows/publish.yml` và protected
+environment `npm` bằng Trusted Publishing. Workflow dùng GitHub OIDC, không cần lưu
+`NPM_TOKEN`. Không commit password, OTP, passkey, token hoặc `.npmrc` sinh ra. Xem tài
+liệu npm về
 [scoped public package](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/),
 [trusted publishing](https://docs.npmjs.com/trusted-publishers/) và
 [provenance](https://docs.npmjs.com/generating-provenance-statements/).

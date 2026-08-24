@@ -64,7 +64,7 @@ lẫn `NOT_VERIFIED`. Hai lệnh không thay thế nhau.
   19 tests, instrumentation 17, demo Expo 10, core 295, CLI 15, MCP 6 (tổng
   **362 tests**);
 - `pnpm mcp:check`: PASS; server MCP khởi tạo được;
-- `pnpm rn-observe --version`: `2.4.0`;
+- `pnpm rn-observe --version`: `2.4.1`;
 - `pnpm pack:check`: PASS cho 5 package public;
 - Expo Android/Hermes export: PASS, 581 modules, 2 files và đúng một Hermes bundle;
   output local ở temporary directory;

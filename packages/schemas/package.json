@@ -1,6 +1,6 @@
 {
   "name": "@rn-agent-observer/schemas",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Shared Zod schemas and TypeScript contracts for RN Agent Observer.",
   "license": "Apache-2.0",
   "repository": {

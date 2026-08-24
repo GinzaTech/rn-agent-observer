@@ -4,6 +4,14 @@
 > are Node hosts. Start read-only. Active actions require exact policy binding and
 > process trust; CDP commands require the correct Metro target and ADB reverse.
 
+## npm install 2.4.0 fails with `workspace:*`
+
+`2.4.0` chỉ là lần bootstrap namespace và không phải consumer release. Nâng đồng bộ
+cả năm package `@rn-agent-observer/*` lên `2.4.1` hoặc mới hơn; không dùng override
+để che dependency range sai. Từ `2.4.1`, registry gate từ chối mọi dependency public
+còn giao thức `workspace:`, `link:` hoặc `file:` và chạy lại CLI/MCP trong consumer
+tạm trước khi release được coi là hoàn tất.
+
 ## Không tìm thấy pnpm/workspace package
 
 ```powershell

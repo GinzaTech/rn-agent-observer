@@ -19,7 +19,7 @@ function createExpoProject(
         expo: '~57.0.0',
         'react-native': '0.86.2',
         ...(options.instrumentation
-          ? { '@rn-agent-observer/rn-instrumentation': '2.4.0' }
+          ? { '@rn-agent-observer/rn-instrumentation': '2.4.1' }
           : {}),
       },
     }),

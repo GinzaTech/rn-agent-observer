@@ -147,9 +147,7 @@ nó đứng chờ client là hành vi bình thường, không phải treo.
 
 ## 7. Thêm instrumentation vào app
 
-Instrumentation chỉ dành cho development build. Khi package npm chưa publish,
-dùng workspace/source checkout hoặc tarball local đã qua `pnpm pack:check`; sau khi
-publish, cài bằng:
+Instrumentation chỉ dành cho development build. Cài release public từ npm bằng:
 
 ```powershell
 pnpm add --save-dev @rn-agent-observer/rn-instrumentation
@@ -188,10 +186,9 @@ thành số 0. Network body capture mặc định tắt; không bật cho dữ l
 Thay đổi Babel plugin hoặc native dependency cần development build mới, không chỉ
 OTA/fast reload.
 
-## 8. Cài package npm sau lần publish đầu
+## 8. Cài package npm
 
-Chỉ dùng phần này khi `pnpm view @rn-agent-observer/cli version` trả version thay vì
-`404`:
+Xác minh registry trả cùng version lockstep trước khi cài:
 
 ```powershell
 pnpm add --save-dev @rn-agent-observer/cli @rn-agent-observer/mcp-server

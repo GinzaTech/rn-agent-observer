@@ -54,7 +54,6 @@ jobs:
       - name: Publish packages in workspace dependency order
         run: pnpm publish -r --filter "./packages/**" --access public --no-git-checks --report-summary
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
       - name: Verify registry metadata and clean consumer install
