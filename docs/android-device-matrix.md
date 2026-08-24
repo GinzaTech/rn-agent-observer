@@ -1,6 +1,7 @@
 # Android emulator verification matrix
 
-Snapshot: **2026-08-24**, RN Agent Observer **2.4.0**.
+Snapshot: **2026-08-24**, repository **2.4.1**; exact runtime fixture and APK
+remain demo **2.4.0** because 2.4.1 changed release metadata rather than runtime.
 
 Tài liệu này ghi lại ma trận AVD tạm đã chạy thật trên host Windows. Mục tiêu là
 chứng minh đường chạy built-in Android ở ba tier API, đồng thời giữ ranh giới rõ:

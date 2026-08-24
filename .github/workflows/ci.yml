@@ -65,6 +65,67 @@ jobs:
       - name: Pack and inspect all public packages
         run: pnpm pack:check
 
+  assurance:
+    name: Coverage and dependency assurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.6.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.12
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build public packages
+        run: pnpm build
+
+      - name: Enforce source coverage thresholds
+        run: pnpm coverage:check
+
+      - name: Query OSV for every locked dependency
+        run: pnpm security:dependencies
+
+  node-next:
+    name: Node 24 compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.6.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run the complete source gate on the next Node LTS
+        run: pnpm check
+
+  dependency-review:
+    name: Dependency review
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
   mcp:
     name: MCP server initialization (no device)
     runs-on: windows-latest

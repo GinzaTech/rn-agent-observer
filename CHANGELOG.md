@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Reliability, governance and onboarding
+
+- Đồng bộ README/installation/troubleshooting/project/audit với public npm release
+  `2.4.1`; giữ `2.4.0` là historical bootstrap không dùng cho consumer.
+- Thêm V8 source coverage gate với ngưỡng statements/branches/functions/lines
+  `70/60/70/70`; coverage chạy trên toàn bộ `packages/*/src` thay vì chỉ file được
+  import tình cờ.
+- Cô lập MCP handshake test khỏi `.artifacts` của workspace và thêm bounded,
+  deterministic fuzz regression cho ADB text parsers; extreme numeric input giờ
+  fail closed thay vì có thể tạo timestamp/bounds/PSS không hữu hạn.
+- Thêm CodeQL, dependency review, strict OSV CI, Node 24 compatibility, Dependabot
+  config, CODEOWNERS, issue/RFC forms và PR evidence checklist.
+- Thêm `ROADMAP.md`, `MAINTAINERS.md`, `SUPPORT.md`; công khai bus factor 1 và giữ
+  iOS/web/Windows/broad OEM/device-farm ở trạng thái chưa verify.
+
 ## 2.4.1 — 2026-08-24
 
 ### Public npm release and trusted provenance
@@ -90,8 +107,8 @@
 - Thêm hướng dẫn riêng cho installation, repository structure và upgrading; README,
   package README, usage, architecture, testing, compatibility và contributing cùng
   trỏ về một workflow source/device/MCP thống nhất.
-- Tài liệu phân biệt source path hiện dùng được với npm commands chỉ dùng sau lần
-  publish đầu; registry check 2026-08-24 xác nhận package scoped chưa được publish.
+- Tài liệu của gate source ban đầu phân biệt source path với registry chưa publish;
+  trạng thái này đã được supersede bởi public consumer release `2.4.1` ở trên.
 - `.gitignore` bao phủ live observer policy, `.rnobs`, native keys/build state,
   reports và IDE-local files; example config đã review vẫn được phép commit.
 

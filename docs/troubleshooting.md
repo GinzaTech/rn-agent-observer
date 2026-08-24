@@ -34,10 +34,11 @@ Kiểm tra trực tiếp:
 pnpm view @rn-agent-observer/cli version
 ```
 
-Tại snapshot 2026-08-24, package scoped chưa được publish. Dùng
-[source installation](installation.md) thay vì đổi registry hoặc cài package cùng
-tên không thuộc scope. Sau lần publish đầu, chỉ tin exact package
-`@rn-agent-observer/*` và verify version/provenance.
+Các package scoped đã public từ `2.4.1`. Nếu lệnh vẫn trả 404, kiểm tra registry
+đang dùng bằng `pnpm config get registry`, scope phải là chính xác
+`@rn-agent-observer/*`, rồi thử `pnpm view ... --prefer-online`. Không đổi sang
+package không thuộc scope. Với lỗi registry tạm thời, dùng
+[source installation](installation.md) và xác minh lại version/integrity sau.
 
 ## ADB không thấy device hoặc có nhiều device
 

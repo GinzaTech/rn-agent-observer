@@ -7,18 +7,35 @@ bản đã cài dùng [hướng dẫn cập nhật](upgrading.md).
 
 ## 1. Chọn cách cài
 
-| Nhu cầu                                | Cách dùng                                            | Trạng thái hiện tại                  |
-| -------------------------------------- | ---------------------------------------------------- | ------------------------------------ |
-| Thử hoặc phát triển Observer           | Clone source và chạy script ở root                   | Dùng được ngay                       |
-| Kết nối AI agent qua MCP               | Clone source, build, trỏ client vào `dist/server.js` | Dùng được ngay                       |
-| Cài CLI/MCP từ npm                     | Cài package scoped sau khi release được publish      | Chưa dùng được trước lần publish đầu |
-| Thu route/fetch/render/JS-task của app | Thêm `rn-instrumentation` vào development build      | Không dùng trong production          |
+| Nhu cầu                                | Cách dùng                                            | Trạng thái hiện tại             |
+| -------------------------------------- | ---------------------------------------------------- | ------------------------------- |
+| Thử hoặc phát triển Observer           | Clone source và chạy script ở root                   | Dùng được ngay                  |
+| Kết nối AI agent qua MCP               | Clone source, build, trỏ client vào `dist/server.js` | Dùng được ngay                  |
+| Cài CLI/MCP từ npm                     | Cài package scoped `2.4.1` hoặc mới hơn              | Public, clean-consumer verified |
+| Thu route/fetch/render/JS-task của app | Thêm `rn-instrumentation` vào development build      | Không dùng trong production     |
 
-Tại snapshot 2026-08-24, registry npm chưa có các package
-`@rn-agent-observer/*`; lệnh npm sẽ trả `404` cho tới khi maintainer hoàn tất lần
-publish đầu. Source workspace là đường cài có thể kiểm chứng hiện tại.
+Tại snapshot 2026-08-24, năm package `@rn-agent-observer/*` đã public ở `2.4.1`
+với npm provenance. `2.4.0` chỉ bootstrap namespace và giữ dependency
+`workspace:*` không hợp lệ; không cài hoặc pin version đó.
 
-## 2. Yêu cầu hệ thống
+## 2. Cài CLI/MCP từ npm
+
+```powershell
+corepack enable
+corepack prepare pnpm@9.6.0 --activate
+pnpm add --save-dev @rn-agent-observer/cli @rn-agent-observer/mcp-server
+pnpm exec rn-observe --version
+pnpm exec rn-observer-mcp --check
+```
+
+Xác minh registry trước khi pin một release cụ thể:
+
+```powershell
+pnpm view @rn-agent-observer/cli version dist.integrity
+pnpm view @rn-agent-observer/mcp-server version dist.integrity
+```
+
+## 3. Yêu cầu hệ thống
 
 - Node.js `>=22.12.0`;
 - pnpm `9.6.0`, được pin bởi `packageManager` ở root;
@@ -41,7 +58,7 @@ USB debugging trên điện thoại; `offline` chưa đủ điều kiện quan s
 target, luôn ghi lại serial chính xác và pin mọi lệnh bằng
 `RN_OBSERVER_DEVICE_ID`.
 
-## 3. Cài từ source trên Windows
+## 4. Cài từ source trên Windows
 
 ```powershell
 git clone https://github.com/GinzaTech/rn-agent-observer.git
@@ -66,7 +83,7 @@ trước khi dùng `pnpm rn-observe`, `pnpm mcp:check` hoặc `pnpm mcp:start`.
 Trên bash/zsh, các lệnh tương đương; thay `Set-Location` bằng `cd` và cách đặt biến
 môi trường PowerShell bằng `export NAME=value`.
 
-## 4. Chuẩn bị app và thiết bị Android
+## 5. Chuẩn bị app và thiết bị Android
 
 1. Cài/mở đúng development build của app cần quan sát.
 2. Chạy `adb devices -l` và xác nhận model/codename đúng target.
@@ -96,7 +113,7 @@ AVD và system image cài riêng cho run. Xem
 PowerShell đầy đủ, acceptance scenario và cleanup đã được kiểm chứng trên API
 24/30/36.
 
-## 5. Khởi tạo cấu hình read-only
+## 6. Khởi tạo cấu hình read-only
 
 Từ root Observer đã clone:
 
@@ -120,7 +137,7 @@ owner phải dùng đúng development fixture, pin exact app/device/risk allowli
 đặt process opt-in `RN_OBSERVER_TRUST_ACTIVE_CONFIG=1`. Xem
 [security testing](security-testing.md) trước khi đổi khỏi read-only.
 
-## 6. Kết nối MCP từ source
+## 7. Kết nối MCP từ source
 
 Build workspace trước, sau đó trỏ MCP client vào entrypoint tuyệt đối:
 
@@ -145,7 +162,7 @@ Build workspace trước, sau đó trỏ MCP client vào entrypoint tuyệt đ�
 Kiểm tra hữu hạn bằng `pnpm mcp:check`. `pnpm mcp:start` là stdio server nên việc
 nó đứng chờ client là hành vi bình thường, không phải treo.
 
-## 7. Thêm instrumentation vào app
+## 8. Thêm instrumentation vào app
 
 Instrumentation chỉ dành cho development build. Cài release public từ npm bằng:
 
@@ -186,7 +203,7 @@ thành số 0. Network body capture mặc định tắt; không bật cho dữ l
 Thay đổi Babel plugin hoặc native dependency cần development build mới, không chỉ
 OTA/fast reload.
 
-## 8. Cài package npm
+## 9. Cài package npm
 
 Xác minh registry trả cùng version lockstep trước khi cài:
 
@@ -206,7 +223,7 @@ pnpm add --save-dev @rn-agent-observer/rn-instrumentation
 Năm package public dùng cùng version. Không trộn version CLI/Core/Schemas/MCP /
 instrumentation nếu một project cài trực tiếp nhiều package.
 
-## 9. Definition of done sau cài đặt
+## 10. Definition of done sau cài đặt
 
 - `node --version` thỏa engine và `pnpm --version` là 9.6.0;
 - frozen install/build/check pass với source checkout;

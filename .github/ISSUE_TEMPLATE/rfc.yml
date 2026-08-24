@@ -3,6 +3,7 @@ description: Propose a material contract, architecture, platform, security, or g
 title: '[RFC]: '
 labels:
   - rfc
+  - needs-discussion
 body:
   - type: markdown
     attributes:
@@ -26,14 +27,14 @@ body:
     id: contract
     attributes:
       label: Proposed contract and architecture
-      description: Include data flow, versioning, availability semantics, and dependency boundaries.
+      description: Include data flow, versioning, availability semantics, dependency boundaries, and provider/process isolation where relevant.
     validations:
       required: true
 
   - type: textarea
     id: safety
     attributes:
-      label: Privacy and security analysis
+      label: Privacy, security, and active-action analysis
     validations:
       required: true
 
@@ -48,7 +49,7 @@ body:
     id: verification
     attributes:
       label: Verification plan
-      description: Define evidence that would prove the design works, including device/runtime coverage where needed.
+      description: Define PASS/FAIL/NA/NOT_VERIFIED evidence, including exact device/runtime coverage where needed.
     validations:
       required: true
 

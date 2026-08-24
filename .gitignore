@@ -9,6 +9,10 @@ dist/
 coverage/
 !packages/core/src/coverage/
 !packages/core/src/coverage/**
+*.lcov
+.scannerwork/
+.semgrep/
+.trivy/
 *.tsbuildinfo
 
 # ---- Observer runtime artifacts (root + any workspace app) ----
