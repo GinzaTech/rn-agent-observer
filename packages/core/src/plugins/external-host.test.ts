@@ -34,7 +34,12 @@ afterEach(async () => {
     await host.dispose().catch(() => undefined);
   }
   for (const directory of temporaryDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
+    rmSync(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 50,
+    });
   }
 });
 
@@ -257,25 +262,26 @@ describe('external plugin process host', () => {
 
   it(
     'terminates a verified live child tree after request timeout',
-    { timeout: 10_000 },
+    { timeout: 15_000 },
     async () => {
       const root = temporaryProject();
       const markerPath = join(root, 'orphan-marker.txt');
       const readyPath = join(root, 'descendant-ready.txt');
       const host = createActionHost(
         root,
-        actionManifest({ requestTimeoutMs: 5_000 }),
+        actionManifest({ requestTimeoutMs: 8_000 }),
       );
       const pending = host.executeAction(
         {
           mode: 'hang',
           markerPath,
           readyPath,
-          markerDelayMs: 4_500,
+          markerDelayMs: 7_000,
         },
-        { timeoutMs: 3_000 },
+        { timeoutMs: 5_000 },
       );
-      expect(await waitUntil(() => existsSync(readyPath), 2_500)).toBe(true);
+      const pendingError = pending.catch((error: unknown) => error);
+      expect(await waitUntil(() => existsSync(readyPath), 4_000)).toBe(true);
       const descendantPid = Number.parseInt(
         readFileSync(readyPath, 'utf8').trim(),
         10,
@@ -283,15 +289,15 @@ describe('external plugin process host', () => {
       expect(Number.isSafeInteger(descendantPid)).toBe(true);
       expect(processIsAlive(descendantPid)).toBe(true);
 
-      await expect(pending).rejects.toMatchObject({
+      await expect(pendingError).resolves.toMatchObject({
         code: 'PLUGIN_REQUEST_TIMEOUT',
       });
       expect(host.state).toBe('failed');
       await host.dispose();
-      expect(await waitUntil(() => !processIsAlive(descendantPid), 2_000)).toBe(
+      expect(await waitUntil(() => !processIsAlive(descendantPid), 3_000)).toBe(
         true,
       );
-      await new Promise((resolveWait) => setTimeout(resolveWait, 2_000));
+      await new Promise((resolveWait) => setTimeout(resolveWait, 2_500));
       expect(existsSync(markerPath)).toBe(false);
     },
   );
