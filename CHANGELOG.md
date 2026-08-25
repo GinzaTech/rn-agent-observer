@@ -30,6 +30,9 @@
   variations-seed warning ở platform evidence thay vì đếm thành app error; exact
   `BadTokenException` và lỗi React Native độc lập vẫn actionable. Regression được
   phát hiện và sửa bằng owned AVD API 36 x86_64 runtime smoke.
+- Windows native CI đặt pnpm virtual store tạm ở drive-root ngắn để CMake/Ninja
+  không vượt object-path limit của hosted runner; source workspace và lockfile
+  vẫn giữ layout pnpm chuẩn trên các job còn lại.
 - Tách TypeScript/React/React Native khỏi group production Dependabot và chặn riêng
   TypeScript major cho tới khi typescript-eslint hỗ trợ compiler API 7.x; patch 6.x
   vẫn được cập nhật, một major không còn làm block cả nhóm runtime.

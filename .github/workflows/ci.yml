@@ -218,7 +218,10 @@ jobs:
           java-version: 17
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        # Native CMake object paths exceed Windows' safe limit when pnpm's virtual
+        # store inherits the hosted runner's long checkout path. Keep this job's
+        # ephemeral virtual store on a short drive-root path.
+        run: pnpm install --frozen-lockfile --virtual-store-dir D:\rnobs-pnpm
 
       - name: Build packages
         run: pnpm build
