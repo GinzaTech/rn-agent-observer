@@ -3,6 +3,7 @@ export * from './assurance.js';
 export * from './artifact.js';
 export * from './device.js';
 export * from './evidence-graph.js';
+export * from './external-runner.js';
 export * from './devtools.js';
 export * from './diagnosis.js';
 export * from './log.js';

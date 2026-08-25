@@ -20,6 +20,34 @@ describe('runtime error classification', () => {
     ).toBe(true);
   });
 
+  it('classifies the Android ashmem pinning deprecation as platform noise', () => {
+    const warning = {
+      level: 'error' as const,
+      source: 'ashmem',
+      timestamp,
+      message:
+        'Pinning is deprecated since Android Q. Please use trim or other methods.',
+    };
+    expect(isNonActionablePlatformLog(warning)).toBe(true);
+    expect(partitionRuntimeErrorLogs([warning])).toEqual({
+      actionable: [],
+      platformWarnings: [warning],
+      continuations: [],
+    });
+  });
+
+  it('classifies the Chromium variations seed warning as platform noise', () => {
+    expect(
+      isNonActionablePlatformLog({
+        level: 'error',
+        source: 'chromium',
+        timestamp,
+        message:
+          '[0825/084431.198279:ERROR:variations_seed_loader.cc(39)] Seed missing signature.',
+      }),
+    ).toBe(true);
+  });
+
   it('never downgrades fatal or independent window errors', () => {
     expect(
       isNonActionablePlatformLog({

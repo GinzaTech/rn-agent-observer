@@ -32,7 +32,7 @@ describe('rn-observe CLI', () => {
   it('prints help', async () => {
     const result = capture();
     expect(await runCli(['--help'], result.io)).toBe(0);
-    expect(result.out[0]).toContain('rn-observe 2.4.1');
+    expect(result.out[0]).toContain('rn-observe 2.5.0');
     expect(result.out[0]).toContain('devtools-export');
     expect(result.out[0]).toContain('rn-observe status');
     expect(result.out[0]).toContain('metro-network');
@@ -44,8 +44,12 @@ describe('rn-observe CLI', () => {
     expect(result.out[0]).toContain('doctor');
     expect(result.out[0]).toContain('init [--dry-run]');
     expect(result.out[0]).toContain('suite run');
+    expect(result.out[0]).toContain('suite init');
+    expect(result.out[0]).toContain('suite validate');
+    expect(result.out[0]).toContain('runner import');
     expect(result.out[0]).toContain('rn-observe ci');
     expect(result.out[0]).toContain('performance memory');
+    expect(result.out[0]).toContain('performance tti');
     expect(result.out[0]).toContain('plugin check');
     expect(result.out[0]).toContain(
       'performance experiment --scenario ID (--replay SCRIPT.json | --idle | --startup) [--samples N] [--warmup N] [--interval MS]',
@@ -57,6 +61,45 @@ describe('rn-observe CLI', () => {
     expect(result.out[0]).toContain('session share');
     expect(result.out[0]).toContain('bundle verify');
     expect(result.out[0]).toContain('--confirm-persistent-permission');
+  });
+
+  it('maps startup timing availability to strict CLI policy', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'rn-observer-cli-tti-'));
+    const core = new ObserverCore({ projectRoot, onWarning: () => {} });
+    try {
+      vi.spyOn(core, 'startupTiming').mockResolvedValue({
+        schemaVersion: '1.0',
+        capturedAt: '2026-08-25T00:00:00.000Z',
+        outcome: 'NOT_VERIFIED',
+        startupId: null,
+        startupType: null,
+        foreground: null,
+        startMark: null,
+        interactiveMark: null,
+        metric: {
+          name: 'react_native_tti_ms',
+          value: null,
+          unit: 'ms',
+          source: 'fixture',
+          timestamp: '2026-08-25T00:00:00.000Z',
+          available: false,
+          reason: 'missing marks',
+        },
+        limitations: ['missing marks'],
+      });
+      const relaxed = capture();
+      expect(await runCli(['performance', 'tti'], relaxed.io, core)).toBe(0);
+      expect(JSON.parse(relaxed.out[0] ?? '{}')).toMatchObject({
+        outcome: 'NOT_VERIFIED',
+      });
+      const strict = capture();
+      expect(
+        await runCli(['performance', 'tti', '--strict'], strict.io, core),
+      ).toBe(1);
+    } finally {
+      core.close();
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 
   it('prints structured status', async () => {
@@ -183,6 +226,132 @@ describe('rn-observe CLI', () => {
         created: true,
       });
       expect(existsSync(join(projectRoot, '.rn-observer.json'))).toBe(true);
+    } finally {
+      core.close();
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('scaffolds and validates a project suite without requiring a device', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'rn-observer-cli-suite-'));
+    const core = new ObserverCore({ projectRoot, onWarning: () => {} });
+    try {
+      const initialized = capture();
+      expect(
+        await runCli(
+          [
+            'suite',
+            'init',
+            '.rn-observer/suites/project.yaml',
+            '--profile',
+            'smoke',
+          ],
+          initialized.io,
+          core,
+        ),
+      ).toBe(0);
+      expect(JSON.parse(initialized.out[0] ?? '{}')).toMatchObject({
+        valid: true,
+        suite: { id: 'project.smoke', steps: 3, assertions: 4 },
+      });
+
+      const validated = capture();
+      expect(
+        await runCli(
+          ['suite', 'validate', '.rn-observer/suites/project.yaml'],
+          validated.io,
+          core,
+        ),
+      ).toBe(0);
+      expect(JSON.parse(validated.out[0] ?? '{}')).toMatchObject({
+        valid: true,
+        suite: {
+          risks: ['read'],
+          requiredCapabilities: ['device', 'screen-understanding', 'ui-tree'],
+        },
+      });
+    } finally {
+      core.close();
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('imports privacy-reduced JUnit evidence into the active session', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'rn-observer-cli-junit-'));
+    const reportPath = join(projectRoot, 'maestro.xml');
+    writeFileSync(
+      reportPath,
+      '<testsuite><testcase classname="home" name="opens home" time="0.1" /></testsuite>',
+    );
+    const core = new ObserverCore({
+      projectRoot,
+      onWarning: () => {},
+      captureRuntimeUiOnStop: false,
+    });
+    try {
+      const session = core.startSession();
+      const imported = capture();
+      expect(
+        await runCli(
+          ['runner', 'import', 'maestro.xml', '--runner', 'maestro'],
+          imported.io,
+          core,
+        ),
+      ).toBe(0);
+      const result = JSON.parse(imported.out[0] ?? '{}');
+      expect(result).toMatchObject({
+        result: {
+          runner: 'maestro',
+          outcome: 'PASS',
+          counts: { total: 1, passed: 1 },
+        },
+        artifact: { kind: 'runner-result' },
+        evidenceRecorded: true,
+      });
+      expect(JSON.stringify(result)).not.toContain('opens home');
+      expect(core.getSession(session.id).timeline.at(-1)?.type).toBe(
+        'external_runner_result',
+      );
+
+      writeFileSync(
+        join(projectRoot, 'maestro-current.xml'),
+        '<testsuite><testcase classname="home" name="opens home" time="0.2"><failure>private body</failure></testcase></testsuite>',
+      );
+      const currentImport = capture();
+      expect(
+        await runCli(
+          ['runner', 'import', 'maestro-current.xml', '--runner', 'maestro'],
+          currentImport.io,
+          core,
+        ),
+      ).toBe(1);
+      const currentResult = JSON.parse(currentImport.out[0] ?? '{}');
+      const compared = capture();
+      expect(
+        await runCli(
+          [
+            'runner',
+            'compare',
+            result.artifact.path as string,
+            currentResult.artifact.path as string,
+          ],
+          compared.io,
+          core,
+        ),
+      ).toBe(1);
+      const comparison = JSON.parse(compared.out[0] ?? '{}');
+      expect(comparison).toMatchObject({
+        comparison: {
+          outcome: 'FAIL',
+          changes: { newFailures: [expect.stringMatching(/^sha256:/u)] },
+        },
+        artifact: { kind: 'runner-comparison' },
+        evidenceRecorded: true,
+      });
+      expect(JSON.stringify(comparison)).not.toContain('private body');
+      expect(core.getSession(session.id).timeline.at(-1)?.type).toBe(
+        'external_runner_comparison',
+      );
     } finally {
       core.close();
       rmSync(projectRoot, { recursive: true, force: true });

@@ -6,8 +6,7 @@ and visual/structural comparison.
 
 ## Install
 
-Before the first npm publication, consume Core from a source workspace or a
-reviewed local tarball. Check registry availability before using the command below.
+The current public consumer release is `2.5.0`.
 
 ```sh
 pnpm add @rn-agent-observer/core
@@ -19,6 +18,11 @@ import { ObserverCore } from '@rn-agent-observer/core';
 const observer = new ObserverCore({ projectRoot: '/path/to/app' });
 const status = observer.getStatus();
 ```
+
+Core also owns suite authoring/inspection, bounded external-runner import, and
+privacy-reduced regression comparison, so CLI and MCP do not implement separate
+parsing or evidence rules. JUnit imports and comparisons keep only aggregate
+counts/deltas, duration, source SHA-256, and stable case hashes.
 
 `ObserverCore` also accepts explicit `deviceId`, `appId`, `sessionId`,
 `adbExecutable`, and artifact-root options. Prefer project config/environment for

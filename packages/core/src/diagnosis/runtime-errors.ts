@@ -9,6 +9,22 @@ import type { LogEntry } from '@rn-agent-observer/schemas';
 export function isNonActionablePlatformLog(entry: LogEntry): boolean {
   if (entry.level === 'fatal') return false;
   const sourceAndMessage = `${entry.source} ${entry.message}`;
+  if (
+    entry.source.toLowerCase() === 'ashmem' &&
+    /^Pinning is deprecated since Android Q\. Please use trim or other methods\.$/i.test(
+      entry.message.trim(),
+    )
+  ) {
+    return true;
+  }
+  if (
+    entry.source.toLowerCase() === 'chromium' &&
+    /^\[\d{4}\/\d{6}\.\d+:ERROR:variations_seed_loader\.cc\(\d+\)\] Seed missing signature\.$/i.test(
+      entry.message.trim(),
+    )
+  ) {
+    return true;
+  }
   return (
     /\bReactHost\b/i.test(sourceAndMessage) &&
     /(?:Unhandled SoftException|ReactNoCrashSoftException|onWindowFocusChange)/i.test(

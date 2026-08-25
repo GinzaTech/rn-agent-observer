@@ -1,8 +1,8 @@
 # Đánh giá và nghiệm thu RN Agent Observer ở mốc 9/10
 
-> Snapshot: **2026-08-24**, workspace version **2.4.1**.
+> Snapshot: **2026-08-25**, workspace version **2.5.0**.
 >
-> Kết luận hiện tại: **9.0/10 cho source/release readiness** sau coverage gate,
+> Kết luận hiện tại: **9.1/10 cho source/release readiness** sau coverage gate,
 > fuzz regression, CodeQL/dependency automation, npm consumer release và repository
 > protection. **Ecosystem maturity vẫn khoảng 8.6/10** vì mới có một maintainer,
 > chưa có adoption độc lập và chưa có broad OEM/device farm; các giới hạn này không
@@ -17,14 +17,14 @@
 | Kiến trúc và khả năng mở rộng    |           9.2 | Core provider-neutral, schema versioned, CLI/MCP adapter mỏng, external provider fail-closed |
 | Tính trung thực của evidence     |           9.5 | Availability rõ; PID-pinned telemetry sống qua logcat rollover; không ghép UI app khác       |
 | Security, privacy và safety      |           9.1 | Active trust hai lớp, allowlist app/device/risk, redaction/HMAC, OSV strict hiện `PASS`      |
-| Chất lượng code và regression    |           9.4 | Strict TS, 363 tests, bounded fuzz, coverage threshold, package-consumer smoke               |
+| Chất lượng code và regression    |           9.5 | Strict TS, 382 tests, bounded fuzz, coverage threshold, package-consumer smoke               |
 | Release và supply chain          |           9.5 | Trusted publish/provenance, frozen lock, package smoke, SBOM/OSV, CodeQL/dependency review   |
-| Performance methodology          |           8.8 | Contract tốt; JS FPS/TTI/heap và automatic Perfetto analysis vẫn chưa có                     |
-| Developer experience và tài liệu |           9.0 | CLI/MCP/docs/fixtures, compatibility matrix, Maestro integration example                     |
-| Community và ecosystem           |           8.4 | Templates/roadmap/support rõ; bus factor 1 và chưa có adoption/contributor độc lập           |
+| Performance methodology          |           9.0 | Cold-start TTI app-owned; JS FPS/heap và automatic Perfetto analysis vẫn chưa có             |
+| Developer experience và tài liệu |           9.4 | Offline suite authoring, CLI/70 MCP tools, GitHub Action, runner guides                      |
+| Community và ecosystem           |           8.5 | Action/JUnit interchange đã có; bus factor 1 và chưa có adoption/contributor độc lập         |
 | Platform/device coverage         |           8.5 | Physical API 35/arm64 + emulator API 24/30/36 x86_64; Android-only, chưa broad OEM matrix    |
 
-Điểm source/release có trọng số: **9.0/10**. Điểm này bao gồm gate và bốn exact
+Điểm source/release có trọng số: **9.1/10**. Điểm này bao gồm gate và bốn exact
 runtime fixtures hiện tại; ecosystem/adoption được báo riêng và không suy rộng thành
 hỗ trợ mọi OEM/ABI, production benchmark hay community validation.
 
@@ -72,7 +72,7 @@ evidence trong cùng session.
 - `uuid` transitively từ `xcode` được nâng 7.0.3 lên CommonJS-compatible 11.1.1.
 - Hook `.pnpmfile.cjs` áp hai pin trên cho cả pnpm 9.6 của repo và wrapper pnpm
   mới hơn; `pack:check` chặn release nếu lockfile tái xuất hiện bản dễ tổn thương.
-- Audit OSV strict ngày 2026-08-24: **654/654 components queried, 0 advisory,
+- Audit OSV strict ngày 2026-08-25: **683/683 components queried, 0 advisory,
   `PASS`**. SBOM và report nằm trong `.artifacts/sessions/standalone/`.
 - GitHub `main` bắt buộc PR, 11 status checks, linear history và conversation
   resolution; admin cũng chịu rule, force-push/xóa nhánh bị tắt. npm environment
@@ -85,6 +85,8 @@ evidence trong cùng session.
   public tarball/clean-consumer smoke và Android/Hermes export.
 - Android export dùng OS temp directory, kiểm `metadata.json` và đúng một Hermes
   bundle, rồi chỉ xóa path có prefix an toàn do script tự tạo.
+- CI build release APK/AAB arm64 của owned fixture, chặn vượt size budget, APK thiếu
+  signature hoặc không pass alignment 16 KB. Đây không phải chứng nhận mọi consumer app.
 - CI prebuild/check default manifest, SecurityLab opt-in, rồi regenerate/check
   default lần nữa để phát hiện config contamination.
 - Export cũ được chuyển khỏi source tree vào
@@ -99,6 +101,16 @@ evidence trong cùng session.
 - README định vị rõ giới hạn với Maestro/Detox/Appium/device farm.
 - GitHub đã có issue/feature/RFC templates, private security reporting,
   Dependabot và protected provenance publication workflow.
+- CLI có `suite init`/`suite validate`; MCP có cùng read-only validation contract.
+- JUnit từ Maestro/Detox/Appium/generic được nhập qua một bounded privacy contract:
+  aggregate, duration, source hash và case hash; raw XML/name/failure body không
+  được persist.
+- Normalized runner artifacts có thể compare bằng case hash để tách regression mới,
+  recovery và failure còn tái diễn; test biến mất/incomplete evidence không được
+  nâng thành PASS.
+- Root `action.yml` tạo session, chạy strict suite, ghi GitHub summary và upload
+  report. Runtime action ở consumer độc lập vẫn `NOT_VERIFIED` tới khi workflow của
+  commit đã push chạy thành công.
 
 ### Device UX phát hiện trong nghiệm thu
 
@@ -127,8 +139,9 @@ Trạng thái evidence gần nhất:
 | Frozen lockfile                        | `PASS`                                                  |
 | Build                                  | `PASS`                                                  |
 | Android/Hermes export                  | `PASS`, 2 files, 1 Hermes bundle                        |
-| OSV dependency audit                   | `PASS`, 654 queried, 0 advisory                         |
-| Full `release:check` sau thay đổi cuối | `PASS`, 363/363 tests + coverage/OSV/MCP/package/export |
+| Android arm64 APK/AAB release          | `PASS`, signed APK, 16 KB aligned, size gate            |
+| OSV dependency audit                   | `PASS`, 683 queried, 0 advisory                         |
+| Full `release:check` sau thay đổi cuối | `PASS`, 382/382 tests + coverage/OSV/MCP/package/export |
 | Physical Android positive flow         | `PASS`, exact target pinned, session complete           |
 | Emulator API 24/30/36 positive flow    | `PASS`, ba AVD/session tạm đã cleanup                   |
 

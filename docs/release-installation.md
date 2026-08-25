@@ -168,7 +168,7 @@ npm org ls rn-agent-observer
 pnpm view @rn-agent-observer/cli version
 ```
 
-For this established project the final command must return `2.4.1` or newer; a 404
+For this established project the final command must return `2.5.0` or newer; a 404
 is now a release blocker. Only a brand-new scope bootstrap can legitimately return 404. A missing scope is different from a missing package: create the npm
 organization and grant access instead of silently renaming all packages, because
 changing scope changes every public import, command example and internal dependency.
@@ -290,7 +290,7 @@ Archive kiểm tra nằm trong
 Trước khi tạo tag release, scope `@rn-agent-observer` phải tồn tại trên npm và tài
 khoản/team publish phải có quyền ghi. Kiểm tra bằng `npm whoami`,
 `npm org ls rn-agent-observer` và `pnpm view @rn-agent-observer/cli version`; với
-project hiện tại lệnh cuối phải trả `2.4.1` hoặc mới hơn, còn 404 là blocker. Chỉ
+project hiện tại lệnh cuối phải trả `2.5.0` hoặc mới hơn, còn 404 là blocker. Chỉ
 bootstrap một scope hoàn toàn mới mới có thể chấp nhận package chưa tồn tại. Không
 tự đổi sang scope khác vì sẽ đổi toàn bộ public import và dependency nội bộ.
 

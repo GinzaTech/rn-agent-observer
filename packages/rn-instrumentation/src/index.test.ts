@@ -11,6 +11,7 @@ import {
   reportAppData,
   reportJsTask,
   reportNetworkRequest,
+  reportPerformanceMark,
   reportRoute,
   reportUiElement,
 } from './index.js';
@@ -71,6 +72,12 @@ describe('runtime instrumentation', () => {
     ).toBe('SAFE');
     reportAppData('production', { route: 'ProductionRoute' });
     reportJsTask(4, 'production');
+    reportPerformanceMark({
+      name: 'screenInteractive',
+      startupId: 'production',
+      startupType: 'cold',
+      foreground: true,
+    });
     reportNetworkRequest({
       method: 'GET',
       url: 'https://example.test/health',
@@ -176,6 +183,13 @@ describe('runtime instrumentation', () => {
     observeInteraction({ elementId: 'save' }, () => undefined)();
     reportAppData('screen', { route: 'Home' });
     reportJsTask(12, 'fixture');
+    reportPerformanceMark({
+      name: 'screenInteractive',
+      startupId: 'cold-1',
+      startupType: 'cold',
+      foreground: true,
+      monotonicMs: 1500,
+    });
     reportNetworkRequest({
       method: 'GET',
       url: 'https://example.test/health',
@@ -184,10 +198,45 @@ describe('runtime instrumentation', () => {
     });
     createRenderTracker('Fixture')('fixture', 'mount', 1);
 
-    expect(info.mock.calls).toHaveLength(8);
+    expect(info.mock.calls).toHaveLength(9);
     for (const [line] of info.mock.calls) {
       expect(String(line)).toContain('"telemetryVersion":1');
     }
+    info.mockRestore();
+  });
+
+  it('emits bounded startup marks and rejects invalid marker input', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    reportPerformanceMark({
+      name: 'nativeLaunchStart',
+      startupId: 'cold-1',
+      startupType: 'cold',
+      foreground: true,
+      timestamp: '2026-08-25T00:00:00.000Z',
+      monotonicMs: 100,
+      source: 'native-fixture',
+    });
+    const output = info.mock.calls.flat().join('\n');
+    expect(output).toContain('RN_AGENT_OBSERVER_PERFORMANCE_MARK');
+    expect(output).toContain('"startupId":"cold-1"');
+    expect(output).toContain('"telemetryVersion":1');
+    expect(() =>
+      reportPerformanceMark({
+        name: 'screenInteractive',
+        startupId: '',
+        startupType: 'cold',
+        foreground: true,
+      }),
+    ).toThrow(/startupId/u);
+    expect(() =>
+      reportPerformanceMark({
+        name: 'screenInteractive',
+        startupId: 'cold-1',
+        startupType: 'cold',
+        foreground: true,
+        monotonicMs: -1,
+      }),
+    ).toThrow(/monotonicMs/u);
     info.mockRestore();
   });
 

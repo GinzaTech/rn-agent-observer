@@ -2,7 +2,7 @@
 
 Tài liệu này là **bộ tham chiếu chuẩn (golden test battery)** để test mọi app React Native/Expo bằng RN Agent Observer, đồng thời regression-test chính observer. Mọi phiên làm việc debug/metrics trên app mới đều quy về và ghi nhận theo ID case trong tài liệu này.
 
-- Phiên bản blueprint: **1.9.1** (áp dụng observer 2.4.1, Android + Windows)
+- Phiên bản blueprint: **2.0.0** (áp dụng observer 2.5.0, Android + Windows)
 - App tham chiếu vàng (golden AUT): `apps/demo-expo` (`dev.rnagentobserver.demo`)
 - App ngoài repo tham chiếu chế độ read-only: Vshop (`com.android.vshop`)
 - Thiết bị xác minh gần nhất: Xiaomi 23013PC75G, Android 15/arm64; AVD tạm API 24/30/36 x86_64. Serial/session được lược; xem [ma trận Android](android-device-matrix.md)
@@ -927,7 +927,7 @@ Tổng: **~170 case** (tính cả biến thể).
 #### MCP-001 — Handshake + đủ tools (T0)
 
 - **Chạy**: `pnpm mcp:check`; test in-memory (`server.test.ts`) hoặc client thật
-- **PASS**: khởi tạo OK; `listTools` trả đúng inventory public hiện hành (66 tools
+- **PASS**: khởi tạo OK; `listTools` trả đúng inventory public hiện hành (70 tools
   cho 2.4.0), tên `verb_noun` chuẩn và khớp bảng trong `docs/protocol.md`.
 - **Mirror 2.4**: security/passive-active, performance experiment/memory, coverage,
   dashboard/graph và share bundle dùng tool names trong `docs/protocol.md`; plugin
@@ -1402,6 +1402,15 @@ Tổng: **~170 case** (tính cả biến thể).
   Growth là regression signal, không phải JS heap hay bằng chứng leak; sample/cancel
   bất toàn là `NOT_VERIFIED`.
 
+#### PERF-016 — Cold-start TTI có app-owned boundary (T1/T2)
+
+- **Chạy**: development fixture phát `nativeLaunchStart` và `screenInteractive`
+  cùng `startupId`, timestamp/monotonic clock thật, `startupType=cold` và
+  `foreground=true`; gọi `performance tti --strict` và MCP mirror.
+- **PASS**: metric `react_native_tti_ms` dùng monotonic delta khi đủ hai mốc. Thiếu
+  mark, sai startupId, warm/hot/background hoặc duration bất hợp lệ phải
+  `NOT_VERIFIED`; Observer không tự đoán interactive boundary.
+
 #### SES-014 — Share bundle portable (T1/T2)
 
 - **Chạy**: chỉ sau review session và `artifacts.allowShare: true`, chạy
@@ -1567,3 +1576,4 @@ Quy tắc: mỗi dòng FAIL phải kèm hypothesis nguyên nhân và case tái h
 | 1.7.0     | 2026-08-23 | Observer 2.4 assurance expansion: doctor/config + suite/CI/reporters, passive/active security, SBOM/OSV, repeated performance/memory, dashboard/evidence graph, share bundle, route/action coverage và external target-provider; MCP 66 tools |
 | 1.8.0     | 2026-08-23 | Bổ sung battery evidence-honest cho policy guard, passive/active security, experiment/memory, `.rnobs`, coverage, dashboard/graph, plugin/provider và SecurityLab opt-in; giữ runtime chưa chạy fixture là `NOT_VERIFIED`                     |
 | 1.9.0     | 2026-08-24 | Chạy cùng owned demo acceptance trên AVD tạm API 24/30/36; ghi exact availability, semantic interaction, network redaction, session completion và cleanup; không nâng thành broad OEM/device-farm claim                                       |
+| 2.0.0     | 2026-08-25 | Observer 2.5.0: suite authoring, JUnit/HMAC runner comparison, GitHub Action, app-owned cold-start TTI, signed arm64 release APK/AAB và 16 KB alignment gate; MCP 70 tools                                                                    |

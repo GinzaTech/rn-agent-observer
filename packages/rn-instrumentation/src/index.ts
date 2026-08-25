@@ -749,6 +749,44 @@ export function reportJsTask(durationMs: number, label = 'anonymous'): void {
   });
 }
 
+export function reportPerformanceMark(input: {
+  name:
+    | 'nativeLaunchStart'
+    | 'nativeLaunchEnd'
+    | 'runJSBundleStart'
+    | 'runJSBundleEnd'
+    | 'contentAppeared'
+    | 'screenInteractive';
+  startupId: string;
+  startupType: 'cold' | 'warm' | 'hot' | 'unknown';
+  foreground: boolean;
+  timestamp?: string;
+  monotonicMs?: number;
+  source?: string;
+}): void {
+  if (!isDevelopmentInstrumentationEnabled()) return;
+  if (!input.startupId || input.startupId.length > 80) {
+    throw new RangeError('startupId must contain 1 to 80 characters');
+  }
+  if (
+    input.monotonicMs !== undefined &&
+    (!Number.isFinite(input.monotonicMs) || input.monotonicMs < 0)
+  ) {
+    throw new RangeError('monotonicMs must be a finite non-negative number');
+  }
+  emit('RN_AGENT_OBSERVER_PERFORMANCE_MARK', {
+    name: input.name,
+    startupId: input.startupId,
+    timestamp: input.timestamp ?? new Date().toISOString(),
+    ...(input.monotonicMs === undefined
+      ? {}
+      : { monotonicMs: input.monotonicMs }),
+    startupType: input.startupType,
+    foreground: input.foreground,
+    source: input.source ?? 'rn-instrumentation',
+  });
+}
+
 export function reportNetworkRequest(input: {
   method: string;
   url: string;

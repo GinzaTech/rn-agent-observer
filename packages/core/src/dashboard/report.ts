@@ -64,6 +64,8 @@ const EVENT_TYPES = [
   'devtools_export',
   'devtools_profile',
   'diagnosis',
+  'external_runner_result',
+  'external_runner_comparison',
   'launch',
   'logs',
   'metro_network',
@@ -112,6 +114,8 @@ const ARTIFACT_KINDS = [
   'suite-report',
   'security-report',
   'coverage-report',
+  'runner-result',
+  'runner-comparison',
   'share-bundle',
 ] as const satisfies readonly Artifact['kind'][];
 

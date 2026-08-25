@@ -6,7 +6,7 @@
 
 RN Agent Observer là cầu nối quan sát và kiểm định cục bộ cho React Native/Expo. Công cụ dùng cùng một core TypeScript cho CLI và MCP, điều khiển Android qua ADB/UIAutomator, nhận telemetry từ instrumentation phát triển, chạy quality suite có evidence, kiểm tra bảo mật thụ động/supply chain và active scenario bị ràng buộc, lặp performance experiment, tạo dashboard offline đã lược dữ liệu nhạy cảm, chia sẻ `.rnobs` metadata-first, kiểm coverage route/action semantic, và lưu session bằng SQLite trong khi giữ binary lớn ở dạng artifact trên đĩa.
 
-Bề mặt public hiện có CLI, 66 MCP tools, 6 MCP resources và 2 workflow prompts. Các gate host và bằng chứng runtime Android được báo riêng trong [tài liệu kiểm thử](docs/testing.md), [ma trận AVD API 24/30/36](docs/android-device-matrix.md) và [compatibility matrix](docs/compatibility.md). CI có API 30 emulator smoke read-only cho exact demo fixture; tính năng hoặc API/OEM khác chưa chạy đúng fixture vẫn giữ `NOT_VERIFIED`, không được suy rộng từ unit test, export hay một AVD. Ví dụ [Maestro + Observer](examples/maestro/README.md) minh hoạ cách runner E2E điều khiển flow còn Observer thu evidence, thay vì cố thay thế toàn bộ Maestro/Detox/Appium hoặc device farm.
+Bề mặt public hiện có CLI, 70 MCP tools, 6 MCP resources và 2 workflow prompts. Các gate host và bằng chứng runtime Android được báo riêng trong [tài liệu kiểm thử](docs/testing.md), [ma trận AVD API 24/30/36](docs/android-device-matrix.md) và [compatibility matrix](docs/compatibility.md). CI có API 30 emulator smoke read-only cho exact demo fixture; tính năng hoặc API/OEM khác chưa chạy đúng fixture vẫn giữ `NOT_VERIFIED`, không được suy rộng từ unit test, export hay một AVD. Ví dụ [Maestro + Observer](examples/maestro/README.md) minh hoạ cách runner E2E điều khiển flow còn Observer thu evidence, thay vì cố thay thế toàn bộ Maestro/Detox/Appium hoặc device farm.
 
 ## Yêu cầu
 
@@ -18,7 +18,7 @@ Bề mặt public hiện có CLI, 66 MCP tools, 6 MCP resources và 2 workflow p
 
 ## Cài đặt
 
-Người dùng CLI/MCP nên cài public release `2.4.1` hoặc mới hơn:
+Người dùng CLI/MCP nên cài public release `2.5.0` hoặc mới hơn:
 
 ```powershell
 pnpm add --save-dev @rn-agent-observer/cli @rn-agent-observer/mcp-server
@@ -26,8 +26,8 @@ pnpm exec rn-observe --version
 pnpm exec rn-observer-mcp --check
 ```
 
-Năm package public đã được publish đồng bộ ở `2.4.1` với npm provenance và đã qua
-clean-consumer install. Không cài `2.4.0`: đó là bản bootstrap namespace có
+Năm package public được phát hành lockstep ở `2.5.0` qua npm Trusted Publishing và
+được workflow kiểm tra clean-consumer sau publish. Không cài `2.4.0`: đó là bản bootstrap namespace có
 dependency `workspace:*` không hợp lệ. Contributor phát triển từ source bằng:
 
 ```powershell
@@ -87,6 +87,8 @@ pnpm rn-observe doctor
 pnpm rn-observe init --dry-run
 pnpm rn-observe init
 pnpm rn-observe suite list
+pnpm rn-observe suite init .rn-observer/suites/project.yaml --profile smoke
+pnpm rn-observe suite validate .rn-observer/suites/project.yaml
 pnpm rn-observe suite run smoke --reporter json,html,junit,sarif,github
 pnpm rn-observe ci --suite smoke,security
 pnpm rn-observe security audit --strict
@@ -95,15 +97,26 @@ pnpm rn-observe security dependencies --lockfile pnpm-lock.yaml --strict
 pnpm rn-observe target support
 pnpm rn-observe target support --manifest PROVIDER_MANIFEST.json
 pnpm rn-observe coverage analyze ROUTE_ACTION_COVERAGE.json --strict
+pnpm rn-observe runner import test-results/mobile.xml --runner maestro --strict
+pnpm rn-observe runner compare BASELINE_RUNNER_RESULT.json CURRENT_RUNNER_RESULT.json --strict
 $bundle = pnpm rn-observe session share SESSION_ID --output shares/review.rnobs | ConvertFrom-Json
 pnpm rn-observe bundle verify $bundle.path --sha256 $bundle.sha256
 pnpm rn-observe performance experiment --scenario home-idle --idle --samples 5
 pnpm rn-observe performance experiment --scenario cold-start --startup --samples 5
 pnpm rn-observe performance memory --scenario feed-loop --replay replay.json --cycles 10 --max-growth-mb 16
+pnpm rn-observe performance tti --strict
 pnpm rn-observe dashboard build --limit 20 --output dashboard/latest.html
 pnpm rn-observe open --limit 20
 pnpm rn-observe session graph <session-id>
 ```
+
+`suite init`/`suite validate` là workflow authoring offline, không cần device. Kết
+quả JUnit từ Maestro, Detox hoặc Appium có thể được gắn vào cùng session bằng
+`runner import`; `runner compare` sau đó phân loại lỗi mới, đã hồi phục và còn tái
+diễn. Observer chỉ giữ aggregate, duration, source hash và case hash, không copy raw
+XML, test name hay failure body. Xem [runner integrations](docs/runner-integrations.md)
+và [GitHub Action evidence gate](docs/github-action.md). Đặt cùng secret process-side
+được mask để case identity dùng HMAC-SHA-256 khi artifact đi qua CI.
 
 `doctor` chỉ probe readiness; `init --dry-run` nên được review trước khi tạo
 `.rn-observer.json`. `open` phục vụ report read-only trên numeric loopback và giữ
@@ -178,7 +191,7 @@ pnpm mcp:check
 pnpm mcp:start
 ```
 
-Server dùng stdio. Cấu hình client, 66 tools, 6 resources, 2 prompts và contract
+Server dùng stdio. Cấu hình client, 70 tools, 6 resources, 2 prompts và contract
 progress/cancellation nằm trong [docs/protocol.md](docs/protocol.md).
 
 ## Tích hợp cho AI agent
@@ -276,7 +289,7 @@ Cả 3 cách có thể dùng cùng lúc: skill/AGENTS.md dạy _workflow_, MCP c
 
 RN Agent Observer is a local observability and assurance bridge for React Native/Expo. One TypeScript core powers the CLI and MCP server, drives Android through ADB/UIAutomator, receives development telemetry, runs evidence-backed quality suites, performs passive, supply-chain, and bounded active security checks, repeats performance experiments, builds privacy-reduced offline dashboards, shares metadata-first `.rnobs` bundles, evaluates semantic route/action coverage, and persists sessions in SQLite while keeping large binaries as on-disk artifacts.
 
-The public surface currently includes the CLI, 66 MCP tools, 6 MCP resources, and 2 workflow prompts. Host gates and Android device evidence are reported separately in [the testing record](docs/testing.md), the [API 24/30/36 AVD matrix](docs/android-device-matrix.md), and the [compatibility matrix](docs/compatibility.md); a new feature that has not run against the correct device fixture remains `NOT_VERIFIED` and is not inferred from unit tests or device-free CI.
+The public surface currently includes the CLI, 70 MCP tools, 6 MCP resources, and 2 workflow prompts. Host gates and Android device evidence are reported separately in [the testing record](docs/testing.md), the [API 24/30/36 AVD matrix](docs/android-device-matrix.md), and the [compatibility matrix](docs/compatibility.md); a new feature that has not run against the correct device fixture remains `NOT_VERIFIED` and is not inferred from unit tests or device-free CI.
 
 ## Requirements
 
@@ -288,7 +301,7 @@ The public surface currently includes the CLI, 66 MCP tools, 6 MCP resources, an
 
 ## Installation
 
-CLI/MCP users should install public release `2.4.1` or newer:
+CLI/MCP users should install public release `2.5.0` or newer:
 
 ```powershell
 pnpm add --save-dev @rn-agent-observer/cli @rn-agent-observer/mcp-server
@@ -359,6 +372,8 @@ pnpm rn-observe doctor
 pnpm rn-observe init --dry-run
 pnpm rn-observe init
 pnpm rn-observe suite list
+pnpm rn-observe suite init .rn-observer/suites/project.yaml --profile smoke
+pnpm rn-observe suite validate .rn-observer/suites/project.yaml
 pnpm rn-observe suite run smoke --reporter json,html,junit,sarif,github
 pnpm rn-observe ci --suite smoke,security
 pnpm rn-observe security audit --strict
@@ -367,15 +382,27 @@ pnpm rn-observe security dependencies --lockfile pnpm-lock.yaml --strict
 pnpm rn-observe target support
 pnpm rn-observe target support --manifest PROVIDER_MANIFEST.json
 pnpm rn-observe coverage analyze ROUTE_ACTION_COVERAGE.json --strict
+pnpm rn-observe runner import test-results/mobile.xml --runner maestro --strict
+pnpm rn-observe runner compare BASELINE_RUNNER_RESULT.json CURRENT_RUNNER_RESULT.json --strict
 $bundle = pnpm rn-observe session share SESSION_ID --output shares/review.rnobs | ConvertFrom-Json
 pnpm rn-observe bundle verify $bundle.path --sha256 $bundle.sha256
 pnpm rn-observe performance experiment --scenario home-idle --idle --samples 5
 pnpm rn-observe performance experiment --scenario cold-start --startup --samples 5
 pnpm rn-observe performance memory --scenario feed-loop --replay replay.json --cycles 10 --max-growth-mb 16
+pnpm rn-observe performance tti --strict
 pnpm rn-observe dashboard build --limit 20 --output dashboard/latest.html
 pnpm rn-observe open --limit 20
 pnpm rn-observe session graph <session-id>
 ```
+
+`suite init` and `suite validate` are offline authoring workflows and do not need a
+device. JUnit output from Maestro, Detox, or Appium can be attached to the same
+session with `runner import`; `runner compare` then identifies new, recovered, and
+persistent failures. Observer retains only aggregates, durations, the source hash,
+and case hashes—not raw XML, test names, or failure bodies. Use the same masked
+process-side secret to derive HMAC-SHA-256 case identities across CI runs. See
+[runner integrations](docs/runner-integrations.md) and the
+[GitHub Action evidence gate](docs/github-action.md).
 
 `doctor` probes readiness without proving runtime behavior. Review
 `init --dry-run` before writing `.rn-observer.json`. `open` serves a read-only
@@ -455,7 +482,7 @@ pnpm mcp:check
 pnpm mcp:start
 ```
 
-The server speaks stdio. Client configuration, 66 tools, 6 resources, 2 prompts,
+The server speaks stdio. Client configuration, 70 tools, 6 resources, 2 prompts,
 and progress/cancellation behavior are documented in
 [docs/protocol.md](docs/protocol.md).
 

@@ -6,8 +6,7 @@ evidence that Android system APIs cannot observe directly.
 
 ## Install
 
-Check registry availability first. Before the first npm publication, use the source
-workspace or reviewed tarballs created by `pnpm pack:check`.
+Install the lockstep public release (`2.5.0` or newer):
 
 ```sh
 pnpm add --save-dev @rn-agent-observer/rn-instrumentation
@@ -28,6 +27,24 @@ reportRoute('Home');
 Call the returned uninstall function from lifecycle cleanup. Missing instrumentation
 means route/render/JS/network telemetry is unavailable; consumers must not convert
 missing evidence to zero.
+
+Cold-start TTI needs two app-owned marks with the same startup ID. The launch mark
+must carry the actual native-host timestamp/monotonic clock; do not emit it late
+from JavaScript and call that native startup:
+
+```ts
+reportPerformanceMark(nativeLaunchMark);
+reportPerformanceMark({
+  name: 'screenInteractive',
+  startupId: nativeLaunchMark.startupId,
+  startupType: 'cold',
+  foreground: true,
+  monotonicMs: performance.now(),
+});
+```
+
+`performance tti --strict` remains `NOT_VERIFIED` for missing/mismatched, warm/hot,
+or background marks.
 
 Optional Babel interaction instrumentation:
 

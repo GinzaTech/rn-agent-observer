@@ -19,6 +19,7 @@ import {
   buildDashboardReport,
   createPerformanceBaseline,
   generateSupplyChainInventory,
+  inspectSuiteFile,
   listBuiltinSuites,
   loadPerformanceBaseline,
   loadPerformanceBudgets,
@@ -726,6 +727,57 @@ export function createMcpServer(core = new ObserverCore()): McpServer {
       inputSchema: z.object({ input: z.unknown() }),
     },
     ({ input }) => safe(() => core.analyzeRouteActionCoverage(input)),
+  );
+  server.registerTool(
+    'validate_quality_suite',
+    {
+      description:
+        'Validate and summarize a project-contained Observer JSON/YAML suite without probing a device or executing steps.',
+      inputSchema: z.object({ relative_path: z.string().min(1).max(512) }),
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    ({ relative_path }) =>
+      safe(() => inspectSuiteFile(core.projectRoot, relative_path)),
+  );
+  server.registerTool(
+    'import_runner_result',
+    {
+      description:
+        'Normalize a project-contained JUnit report from Maestro, Detox, Appium, or another runner into privacy-reduced session evidence. Raw XML, test names, paths, and failure bodies are not persisted.',
+      inputSchema: z.object({
+        relative_path: z.string().min(1).max(512),
+        runner: z
+          .enum(['maestro', 'detox', 'appium', 'generic'])
+          .default('generic'),
+      }),
+    },
+    ({ relative_path, runner }) =>
+      safe(() => core.importExternalRunnerResult(relative_path, runner)),
+  );
+  server.registerTool(
+    'compare_runner_results',
+    {
+      description:
+        'Compare two project-contained normalized runner-result JSON artifacts by stable case hash. Reports new failures, recoveries, persistent failures, count/duration deltas, and incomplete evidence without retaining test names or failure bodies.',
+      inputSchema: z.object({
+        baseline_path: z.string().min(1).max(512),
+        current_path: z.string().min(1).max(512),
+      }),
+    },
+    ({ baseline_path, current_path }) =>
+      safe(() =>
+        core.compareExternalRunnerResultFiles(baseline_path, current_path),
+      ),
+  );
+  server.registerTool(
+    'performance_startup_timing',
+    {
+      description:
+        'Measure React Native time-to-interactive only from matching app-provided nativeLaunchStart and screenInteractive marks for a confirmed foreground cold start. Missing, warm, background, or mismatched marks remain NOT_VERIFIED.',
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    () => safe(() => core.startupTiming()),
   );
   server.registerTool(
     'performance_experiment',

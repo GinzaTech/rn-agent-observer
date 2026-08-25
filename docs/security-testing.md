@@ -90,7 +90,7 @@ tự động rằng app có thể bị khai thác.
 
 ### Override bảo mật đang được kiểm soát
 
-Workspace 2.4.1 pin hai transitive dependency bằng hook `readPackage` trong
+Workspace 2.5.0 pin hai transitive dependency bằng hook `readPackage` trong
 `.pnpmfile.cjs`. Cách này được chọn để cùng hoạt động với pnpm 9.6 được pin trong
 repo và pnpm wrapper mới hơn; `pack:check` fail nếu lockfile còn package cũ:
 

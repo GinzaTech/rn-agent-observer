@@ -210,3 +210,33 @@ export function resolveNewArtifactOutputFile(
   }
   return output;
 }
+
+/**
+ * Resolves a new user-authored project file without permitting traversal,
+ * symlink parents, or overwrite. This is intentionally separate from artifact
+ * output because suite definitions are source files that users normally commit.
+ */
+export function resolveNewProjectOutputFile(
+  projectRoot: string,
+  requestedPath: string,
+  label = 'project output path',
+): string {
+  validateRelativeOutputPath(requestedPath, label);
+  const root = existingDirectory(projectRoot, 'project root');
+  const candidate = resolve(root, requestedPath);
+  if (candidate === root || !isContained(root, candidate)) {
+    throw pathError(`${label} must remain inside the project root`);
+  }
+
+  let parent = root;
+  for (const segment of safeRelativeSegments(
+    relative(root, dirname(candidate)),
+  )) {
+    parent = ensureDirectoryChild(parent, segment, label);
+  }
+  const output = join(parent, basename(candidate));
+  if (existingLstat(output)) {
+    throw pathError(`${label} must name a new file and cannot overwrite data`);
+  }
+  return output;
+}

@@ -437,10 +437,26 @@ Lặp performance, dashboard local và coverage semantic:
 pnpm rn-observe performance experiment --scenario home-idle --idle --samples 5
 pnpm rn-observe performance experiment --scenario cold-start --startup --samples 5
 pnpm rn-observe performance memory --scenario feed-loop --replay .\scripts\feed-loop.json --cycles 10 --max-growth-mb 16
+pnpm rn-observe performance tti --strict
 pnpm rn-observe dashboard build --limit 20 --output dashboard\latest.html
 pnpm rn-observe open --limit 20
 pnpm rn-observe coverage analyze .\coverage\route-action.json --strict
 ```
+
+Tạo và kiểm suite của project trước khi boot emulator/device:
+
+```powershell
+pnpm rn-observe suite init .rn-observer\suites\smoke.yaml --profile smoke
+pnpm rn-observe suite validate .rn-observer\suites\smoke.yaml
+```
+
+Để ghép kết quả runner ngoài vào cùng evidence session, export JUnit dưới project
+rồi chạy `runner import`. Dùng hai normalized artifact trả về với `runner compare`
+để tìm failure mới/đã hồi phục/còn tái diễn; xem
+[runner integrations](runner-integrations.md). CI dùng trực tiếp composite action
+trong [GitHub Action guide](github-action.md).
+Đặt cùng `RN_OBSERVER_RUNNER_HASH_SECRET` được mask ở baseline/current để hash
+identity bằng HMAC; bỏ biến chỉ nên dùng cho artifact cục bộ tương thích cũ.
 
 Coverage input chỉ chứa inventory semantic, checkpoint/interaction explicit và target
 fingerprint; không đưa source path, screenshot/base64 hay raw telemetry vào file.
@@ -480,6 +496,7 @@ import {
   createRenderTracker,
   installNetworkObserver,
   reportJsTask,
+  reportPerformanceMark,
   reportRoute,
 } from '@rn-agent-observer/rn-instrumentation';
 import { Profiler, useEffect, useMemo } from 'react';
@@ -491,6 +508,16 @@ reportRoute(currentRoute);
 const started = performance.now();
 expensiveWork();
 reportJsTask(performance.now() - started, 'expensiveWork');
+
+// nativeLaunchMark phải đến từ native host với timestamp/monotonic clock thật.
+reportPerformanceMark(nativeLaunchMark);
+reportPerformanceMark({
+  name: 'screenInteractive',
+  startupId: nativeLaunchMark.startupId,
+  startupType: 'cold',
+  foreground: true,
+  monotonicMs: performance.now(),
+});
 
 return (
   <Profiler id="App" onRender={onRender}>

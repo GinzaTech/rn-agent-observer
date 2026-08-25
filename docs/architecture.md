@@ -29,7 +29,7 @@ data, assurance và security boundary khi hệ thống chạy.
 | `@rn-agent-observer/schemas`            | Zod schemas và shared TypeScript types cho artifact/session, evidence, assurance, suite và performance                 |
 | `@rn-agent-observer/core`               | Config/doctor, ADB/CDP/instrumentation providers, session, suite, security, performance, diagnosis, graph và dashboard |
 | `@rn-agent-observer/cli`                | Parse command/flag, truyền signal cancellation, in JSON/progress và ánh xạ exit code                                   |
-| `@rn-agent-observer/mcp-server`         | Đăng ký 66 tools, 6 resources, 2 prompts; chuyển structured input/output/progress/cancellation sang core               |
+| `@rn-agent-observer/mcp-server`         | Đăng ký 70 tools, 6 resources, 2 prompts; chuyển structured input/output/progress/cancellation sang core               |
 | `@rn-agent-observer/rn-instrumentation` | Dev-only telemetry + Babel transform cho route, fetch, render, UI lifecycle/interaction                                |
 | `@rn-agent-observer/demo-expo`          | Fixture integration xác định để dogfood observer                                                                       |
 
@@ -95,6 +95,14 @@ Built-in suite gồm `smoke`, `visual`, `performance`, `network`, `accessibility
 `rn-observer/v1alpha1`, có requirement, capability/risk per step, timeout, retry,
 assertion, cleanup và reporter. Reporter hiện có JSON, HTML, JUnit, SARIF và GitHub
 Markdown.
+
+External-runner plane chỉ nhận JUnit contained/bounded rồi chuẩn hóa thành aggregate,
+source hash và case hash. Regression comparison chỉ đọc hai normalized artifact,
+không đọc lại raw XML; current failure là `FAIL`, còn runner mismatch, truncated,
+duplicate hash hoặc baseline case biến mất làm comparison `NOT_VERIFIED`.
+Case identity mặc định là SHA-256 để tương thích; deployment chia sẻ artifact nên
+đặt process-side `RN_OBSERVER_RUNNER_HASH_SECRET` để chuyển sang HMAC-SHA-256 mà
+không persist khóa. Baseline/current khác scheme không được so thành `PASS`.
 
 Outcome aggregate theo độ ưu tiên `FAIL > NOT_VERIFIED > NA > PASS`:
 

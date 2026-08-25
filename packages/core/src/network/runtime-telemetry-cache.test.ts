@@ -33,6 +33,10 @@ describe('runtime telemetry cache', () => {
           `RN_AGENT_OBSERVER_JS_TASK {"durationMs":100,"label":"intentional-block","timestamp":"${firstTimestamp}","source":"rn-instrumentation"}`,
           firstTimestamp,
         ),
+        entry(
+          `RN_AGENT_OBSERVER_PERFORMANCE_MARK {"name":"screenInteractive","startupId":"cold-1","timestamp":"${firstTimestamp}","startupType":"cold","foreground":true,"source":"rn-instrumentation"}`,
+          firstTimestamp,
+        ),
       ],
       10,
     );
@@ -44,5 +48,6 @@ describe('runtime telemetry cache', () => {
     expect(restarted.cache.routes).toEqual([]);
     expect(restarted.cache.uiElements).toEqual([]);
     expect(restarted.cache.jsTasks).toEqual([]);
+    expect(restarted.cache.performanceMarks).toEqual([]);
   });
 });
