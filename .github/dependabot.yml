@@ -14,11 +14,22 @@ updates:
       production-dependencies:
         patterns:
           - '*'
+        exclude-patterns:
+          - typescript
+          - react
+          - react-native
         dependency-type: production
       development-tooling:
         patterns:
           - '*'
         dependency-type: development
+    ignore:
+      # TypeScript 7 uses the new native compiler API and is not yet supported
+      # by typescript-eslint. Keep 6.x security/patch updates flowing without
+      # repeatedly opening an impossible grouped major update.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /

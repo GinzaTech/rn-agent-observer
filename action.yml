@@ -1,0 +1,225 @@
+name: RN Agent Observer evidence gate
+description: Run evidence-backed React Native/Expo Android suites and upload privacy-reduced reports.
+author: GinzaTech
+
+branding:
+  icon: activity
+  color: blue
+
+inputs:
+  project-root:
+    description: Path to the React Native or Expo project being observed.
+    required: false
+    default: .
+  suite:
+    description: Comma-separated built-in suite names or suite files.
+    required: false
+    default: smoke
+  observer-version:
+    description: Exact @rn-agent-observer/cli version or dist-tag to execute.
+    required: false
+    default: 2.5.0
+  cli-entrypoint:
+    description: Optional built rn-observe JS entrypoint relative to project-root; used to verify unreleased source without npm.
+    required: false
+    default: ''
+  node-version:
+    description: Node.js version used by the Observer CLI.
+    required: false
+    default: '22.12'
+  pnpm-version:
+    description: pnpm version used to launch the isolated CLI.
+    required: false
+    default: '9.6.0'
+  device-id:
+    description: Exact ADB serial. Required when more than one device is ready.
+    required: false
+    default: ''
+  app-id:
+    description: Android application ID override when it cannot be inferred.
+    required: false
+    default: ''
+  output-directory:
+    description: Report directory relative to project-root.
+    required: false
+    default: .artifacts/ci-reports
+  allow-not-verified:
+    description: Allow NOT_VERIFIED suites. Keep false for required evidence gates.
+    required: false
+    default: 'false'
+  junit-report:
+    description: Optional JUnit XML report relative to project-root from Maestro, Detox, Appium, or another runner.
+    required: false
+    default: ''
+  external-runner:
+    description: Runner that produced junit-report (maestro, detox, appium, or generic).
+    required: false
+    default: generic
+  runner-baseline-result:
+    description: Optional normalized runner-result JSON to compare with the imported junit-report.
+    required: false
+    default: ''
+
+outputs:
+  session-id:
+    description: Observer evidence session ID created for this gate.
+    value: ${{ steps.observe.outputs.session-id }}
+  outcome-code:
+    description: Final CLI exit code (0 means the requested evidence policy passed).
+    value: ${{ steps.observe.outputs.outcome-code }}
+  report-directory:
+    description: Report directory passed to rn-observe ci.
+    value: ${{ inputs.output-directory }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up pnpm
+      uses: pnpm/action-setup@v6
+      with:
+        version: ${{ inputs.pnpm-version }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Run Observer evidence gate
+      id: observe
+      shell: bash
+      working-directory: ${{ inputs.project-root }}
+      env:
+        RN_OBSERVER_ACTION_VERSION: ${{ inputs.observer-version }}
+        RN_OBSERVER_ACTION_CLI_ENTRYPOINT: ${{ inputs.cli-entrypoint }}
+        RN_OBSERVER_ACTION_SUITE: ${{ inputs.suite }}
+        RN_OBSERVER_ACTION_OUTPUT: ${{ inputs.output-directory }}
+        RN_OBSERVER_ACTION_ALLOW_NOT_VERIFIED: ${{ inputs.allow-not-verified }}
+        RN_OBSERVER_ACTION_DEVICE_ID: ${{ inputs.device-id }}
+        RN_OBSERVER_ACTION_APP_ID: ${{ inputs.app-id }}
+        RN_OBSERVER_ACTION_JUNIT: ${{ inputs.junit-report }}
+        RN_OBSERVER_ACTION_RUNNER: ${{ inputs.external-runner }}
+        RN_OBSERVER_ACTION_RUNNER_BASELINE: ${{ inputs.runner-baseline-result }}
+      run: |
+        set -uo pipefail
+        case "$RN_OBSERVER_ACTION_OUTPUT" in
+          ''|/*|*'..'*)
+            echo 'output-directory must be a non-empty relative path without traversal' >&2
+            exit 2
+            ;;
+        esac
+        export RN_OBSERVER_PROJECT_ROOT="$PWD"
+        if [ -n "$RN_OBSERVER_ACTION_DEVICE_ID" ]; then
+          export RN_OBSERVER_DEVICE_ID="$RN_OBSERVER_ACTION_DEVICE_ID"
+        fi
+        if [ -n "$RN_OBSERVER_ACTION_APP_ID" ]; then
+          export RN_OBSERVER_APP_ID="$RN_OBSERVER_ACTION_APP_ID"
+        fi
+
+        observer_package="@rn-agent-observer/cli@$RN_OBSERVER_ACTION_VERSION"
+        if [ -n "$RN_OBSERVER_ACTION_CLI_ENTRYPOINT" ]; then
+          case "$RN_OBSERVER_ACTION_CLI_ENTRYPOINT" in
+            /*|*'..'*)
+              echo 'cli-entrypoint must be a relative project path without traversal' >&2
+              printf 'session-id=\n' >> "$GITHUB_OUTPUT"
+              printf 'outcome-code=2\n' >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          observer_entrypoint="$PWD/$RN_OBSERVER_ACTION_CLI_ENTRYPOINT"
+          if [ ! -f "$observer_entrypoint" ]; then
+            echo "cli-entrypoint does not name a built regular file: $RN_OBSERVER_ACTION_CLI_ENTRYPOINT" >&2
+            printf 'session-id=\n' >> "$GITHUB_OUTPUT"
+            printf 'outcome-code=2\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          run_observer() { node "$observer_entrypoint" "$@"; }
+        else
+          observer_tool_dir="${RUNNER_TEMP:-$PWD/.artifacts}/rn-observer-action-${GITHUB_RUN_ID:-local}-${GITHUB_JOB:-job}-${GITHUB_RUN_ATTEMPT:-1}"
+          mkdir -p "$observer_tool_dir"
+          printf '{"private":true}\n' > "$observer_tool_dir/package.json"
+          pnpm --dir "$observer_tool_dir" add --save-exact "$observer_package"
+          install_code=$?
+          if [ "$install_code" -ne 0 ]; then
+            printf 'session-id=\n' >> "$GITHUB_OUTPUT"
+            printf 'outcome-code=%s\n' "$install_code" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          run_observer() { pnpm --dir "$observer_tool_dir" exec rn-observe "$@"; }
+        fi
+        session_code=0
+        session_json="$(run_observer session start)" || session_code=$?
+        if [ "$session_code" -ne 0 ]; then
+          printf 'session-id=\n' >> "$GITHUB_OUTPUT"
+          printf 'outcome-code=%s\n' "$session_code" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        parse_code=0
+        session_id="$(printf '%s' "$session_json" | node -e "let source=''; process.stdin.setEncoding('utf8'); process.stdin.on('data', chunk => source += chunk); process.stdin.on('end', () => { const id=JSON.parse(source).id; if(typeof id !== 'string' || !id) process.exit(2); process.stdout.write(id); });")" || parse_code=$?
+        if [ "$parse_code" -ne 0 ] || [ -z "$session_id" ]; then
+          printf 'session-id=\n' >> "$GITHUB_OUTPUT"
+          printf 'outcome-code=2\n' >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        export RN_OBSERVER_SESSION_ID="$session_id"
+        printf 'session-id=%s\n' "$session_id" >> "$GITHUB_OUTPUT"
+
+        arguments=(ci --suite "$RN_OBSERVER_ACTION_SUITE" --reporter json,html,junit,sarif,github --output "$RN_OBSERVER_ACTION_OUTPUT")
+        if [ "$RN_OBSERVER_ACTION_ALLOW_NOT_VERIFIED" = 'true' ]; then
+          arguments+=(--allow-not-verified)
+        fi
+
+        outcome_code=0
+        run_observer "${arguments[@]}" || outcome_code=$?
+        if [ -n "$RN_OBSERVER_ACTION_JUNIT" ]; then
+          runner_code=0
+          runner_json="$(run_observer runner import "$RN_OBSERVER_ACTION_JUNIT" --runner "$RN_OBSERVER_ACTION_RUNNER" --strict)" || runner_code=$?
+          printf '%s\n' "$runner_json"
+          if [ "$runner_code" -ne 0 ]; then outcome_code="$runner_code"; fi
+          if [ -n "$RN_OBSERVER_ACTION_RUNNER_BASELINE" ]; then
+            runner_parse_code=0
+            current_runner_path="$(printf '%s' "$runner_json" | node -e "let source=''; process.stdin.setEncoding('utf8'); process.stdin.on('data', chunk => source += chunk); process.stdin.on('end', () => { const path=JSON.parse(source).artifact?.path; if(typeof path !== 'string' || !path) process.exit(2); process.stdout.write(path); });")" || runner_parse_code=$?
+            if [ "$runner_parse_code" -ne 0 ] || [ -z "$current_runner_path" ]; then
+              echo 'Unable to resolve normalized runner-result artifact from JUnit import' >&2
+              outcome_code=2
+            else
+              comparison_code=0
+              run_observer runner compare "$RN_OBSERVER_ACTION_RUNNER_BASELINE" "$current_runner_path" --strict || comparison_code=$?
+              if [ "$comparison_code" -ne 0 ]; then outcome_code="$comparison_code"; fi
+            fi
+          fi
+        elif [ -n "$RN_OBSERVER_ACTION_RUNNER_BASELINE" ]; then
+          echo 'runner-baseline-result requires junit-report' >&2
+          outcome_code=2
+        fi
+        run_observer session stop "$session_id" || outcome_code=$?
+        printf 'outcome-code=%s\n' "$outcome_code" >> "$GITHUB_OUTPUT"
+        exit 0
+
+    - name: Add Observer report to job summary
+      if: ${{ always() }}
+      shell: bash
+      working-directory: ${{ inputs.project-root }}
+      env:
+        RN_OBSERVER_ACTION_OUTPUT: ${{ inputs.output-directory }}
+      run: |
+        report="$(find "$RN_OBSERVER_ACTION_OUTPUT" -type f -name '*.md' 2>/dev/null | sort | head -n 1 || true)"
+        if [ -n "$report" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; fi
+
+    - name: Upload Observer evidence reports
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: rn-agent-observer-${{ github.job }}
+        path: ${{ inputs.project-root }}/${{ inputs.output-directory }}
+        if-no-files-found: warn
+        include-hidden-files: true
+        retention-days: 14
+
+    - name: Enforce Observer outcome
+      if: ${{ steps.observe.outputs.outcome-code != '0' }}
+      shell: bash
+      env:
+        RN_OBSERVER_ACTION_CODE: ${{ steps.observe.outputs.outcome-code }}
+      run: |
+        echo "RN Agent Observer evidence gate failed with exit code $RN_OBSERVER_ACTION_CODE" >&2
+        exit "$RN_OBSERVER_ACTION_CODE"

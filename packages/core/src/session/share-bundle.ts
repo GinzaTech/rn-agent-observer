@@ -71,6 +71,8 @@ const ARTIFACT_KINDS = new Set<Artifact['kind']>([
   'suite-report',
   'security-report',
   'coverage-report',
+  'runner-result',
+  'runner-comparison',
   'share-bundle',
 ]);
 const TEXT_EXTENSIONS = new Set([

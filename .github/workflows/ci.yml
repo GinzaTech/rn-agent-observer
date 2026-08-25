@@ -151,10 +151,12 @@ jobs:
       - name: Initialize MCP server
         run: pnpm mcp:check
 
-  android-export:
-    name: Demo Android bundle export (no device runtime)
-    runs-on: windows-latest
-    timeout-minutes: 30
+  action-smoke:
+    name: Reusable Observer action smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RN_OBSERVER_RUNNER_HASH_SECRET: ci-fixture-only-not-a-secret
     steps:
       - uses: actions/checkout@v7
 
@@ -166,6 +168,54 @@ jobs:
         with:
           node-version: 22.12
           cache: pnpm
+
+      - name: Install and build the action's exact source revision
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Prepare privacy-reduced runner baseline fixture
+        id: runner-baseline
+        shell: bash
+        run: |
+          mkdir -p .artifacts/action-runner
+          printf '%s\n' '<testsuite><testcase classname="action" name="smoke" time="0.1" /></testsuite>' > .artifacts/action-runner/baseline.xml
+          printf '%s\n' '<testsuite><testcase classname="action" name="smoke" time="0.2" /></testsuite>' > .artifacts/action-runner/current.xml
+          baseline_json="$(node packages/cli/dist/index.js runner import .artifacts/action-runner/baseline.xml --runner generic)"
+          baseline_path="$(printf '%s' "$baseline_json" | node -e "let source=''; process.stdin.setEncoding('utf8'); process.stdin.on('data', chunk => source += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(source).artifact.path));")"
+          printf 'path=%s\n' "$baseline_path" >> "$GITHUB_OUTPUT"
+
+      - name: Exercise the repository composite action without a device claim
+        uses: ./
+        with:
+          cli-entrypoint: packages/cli/dist/index.js
+          suite: smoke
+          allow-not-verified: 'true'
+          output-directory: .artifacts/action-smoke
+          junit-report: .artifacts/action-runner/current.xml
+          external-runner: generic
+          runner-baseline-result: ${{ steps.runner-baseline.outputs.path }}
+
+  android-export:
+    name: Demo Android release artifacts (no device runtime)
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.6.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.12
+          cache: pnpm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -196,6 +246,16 @@ jobs:
 
       - name: Export and inspect the Android JavaScript bundle
         run: pnpm android:export:check
+
+      - name: Build release APK and AAB for the owned arm64 fixture
+        shell: pwsh
+        working-directory: apps/demo-expo/android
+        run: |
+          $env:NODE_ENV = 'production'
+          .\gradlew.bat assembleRelease bundleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Enforce release size, signature and 16 KB alignment gates
+        run: pnpm android:release:check
 
   android-emulator-smoke:
     name: Android API 30 runtime smoke

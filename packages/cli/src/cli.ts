@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import {
   OBSERVER_VERSION,
+  STARTER_SUITE_PROFILES,
   ExternalPluginHost,
   ExternalTargetProviderClient,
   ObserverCore,
@@ -14,6 +15,7 @@ import {
   createExternalPluginDescriptor,
   generateSupplyChainInventory,
   initObserverConfig,
+  inspectSuiteFile,
   loadPerformanceBaseline,
   loadPerformanceBudgets,
   listBuiltinSuites,
@@ -26,14 +28,17 @@ import {
   runDoctor,
   startReadOnlyDashboardServer,
   targetProviderSupportMatrix,
+  writeStarterSuite,
   writeOfflineDashboard,
   writePerformanceBaseline,
   type DiagnosisThresholds,
+  type ExternalRunnerName,
   type MalformedDeepLinkMutation,
   type ObserverSuiteWorkflowResult,
   type PluginPermission,
   type TargetPlatform,
   type TargetProviderOperation,
+  type StarterSuiteProfile,
 } from '@rn-agent-observer/core';
 
 export const HELP_TEXT = `rn-observe ${OBSERVER_VERSION}
@@ -45,6 +50,8 @@ Usage:
   rn-observe doctor
   rn-observe init [--dry-run] [--force]
   rn-observe suite list
+  rn-observe suite init [PATH.{json,yaml}] [--profile smoke|performance]
+  rn-observe suite validate SUITE.{json,yaml}
   rn-observe suite run NAME|SUITE.{json,yaml} [--reporter json,html,junit,sarif,github] [--output DIR] [--confirm-persistent-permission] [--strict]
   rn-observe run NAME|SUITE.{json,yaml} [...same options]
   rn-observe ci [--suite NAME[,NAME]] [--reporter json,html,junit,sarif,github] [--output DIR] [--confirm-persistent-permission] [--allow-not-verified]
@@ -56,7 +63,10 @@ Usage:
   rn-observe security active permission --scenario ID --permission NAME --probe ID:grant|revoke --allow-state STATE [--max-errors N] [--timeout MS] [--cleanup-timeout MS] [--settle MS] [--strict]
   rn-observe performance experiment --scenario ID (--replay SCRIPT.json | --idle | --startup) [--samples N] [--warmup N] [--interval MS] [--budget FILE] [--baseline FILE] [--write-baseline FILE] [--strict]
   rn-observe performance memory --scenario ID --replay SCRIPT.json [--cycles N] [--settle MS] [--max-growth-mb N] [--strict]
+  rn-observe performance tti [--strict]
   rn-observe coverage analyze INPUT.json [--strict]
+  rn-observe runner import REPORT.xml [--runner maestro|detox|appium|generic] [--strict]
+  rn-observe runner compare BASELINE.json CURRENT.json [--strict]
   rn-observe plugin check MANIFEST.json
   rn-observe target support [--manifest MANIFEST.json]
   rn-observe target collect --manifest MANIFEST.json --operation NAME --platform NAME [--device-id ID] [--app-id ID] [--grant PERMISSION] [--env NAME] [--cwd DIR] [--host-capability NAME] [--max-evidence N] [--max-payload-bytes N] [--strict]
@@ -524,6 +534,29 @@ export async function runCli(
       }
     } else if (command === 'suite' && subcommand === 'list') {
       print(io, { suites: listBuiltinSuites() });
+    } else if (command === 'suite' && subcommand === 'init') {
+      const profileValue = flag(args, '--profile') ?? 'smoke';
+      if (
+        !STARTER_SUITE_PROFILES.includes(profileValue as StarterSuiteProfile)
+      ) {
+        throw new TypeError(
+          `Unsupported starter suite profile: ${profileValue}`,
+        );
+      }
+      const path = positional ?? `.rn-observer/suites/${profileValue}.yaml`;
+      print(
+        io,
+        await writeStarterSuite(
+          core.projectRoot,
+          path,
+          profileValue as StarterSuiteProfile,
+        ),
+      );
+    } else if (command === 'suite' && subcommand === 'validate') {
+      if (!positional) {
+        throw new TypeError('suite validate requires a suite file path');
+      }
+      print(io, await inspectSuiteFile(core.projectRoot, positional));
     } else if (
       (command === 'suite' && subcommand === 'run') ||
       command === 'run'
@@ -628,6 +661,51 @@ export async function runCli(
         outcomes.includes('FAIL') ||
         (!args.includes('--allow-not-verified') &&
           outcomes.includes('NOT_VERIFIED'))
+      ) {
+        return 1;
+      }
+    } else if (command === 'runner' && subcommand === 'import') {
+      if (!positional) {
+        throw new TypeError('runner import requires a JUnit XML report path');
+      }
+      const runnerValue = flag(args, '--runner') ?? 'generic';
+      const supportedRunners: readonly ExternalRunnerName[] = [
+        'maestro',
+        'detox',
+        'appium',
+        'generic',
+      ];
+      if (!supportedRunners.includes(runnerValue as ExternalRunnerName)) {
+        throw new TypeError(`Unsupported external runner: ${runnerValue}`);
+      }
+      const imported = await core.importExternalRunnerResult(
+        positional,
+        runnerValue as ExternalRunnerName,
+      );
+      print(io, imported);
+      if (
+        imported.result.outcome === 'FAIL' ||
+        (args.includes('--strict') &&
+          imported.result.outcome === 'NOT_VERIFIED')
+      ) {
+        return 1;
+      }
+    } else if (command === 'runner' && subcommand === 'compare') {
+      const currentPath = args[3];
+      if (!positional || !currentPath || currentPath.startsWith('--')) {
+        throw new TypeError(
+          'runner compare requires baseline and current normalized JSON paths',
+        );
+      }
+      const compared = await core.compareExternalRunnerResultFiles(
+        positional,
+        currentPath,
+      );
+      print(io, compared);
+      if (
+        compared.comparison.outcome === 'FAIL' ||
+        (args.includes('--strict') &&
+          compared.comparison.outcome === 'NOT_VERIFIED')
       ) {
         return 1;
       }
@@ -843,6 +921,12 @@ export async function runCli(
         });
       }
       await server.close();
+    } else if (command === 'performance' && subcommand === 'tti') {
+      const result = await core.startupTiming();
+      print(io, result);
+      if (args.includes('--strict') && result.outcome === 'NOT_VERIFIED') {
+        return 1;
+      }
     } else if (command === 'performance' && subcommand === 'memory') {
       const scenarioId = flag(args, '--scenario');
       const replayPath = flag(args, '--replay');

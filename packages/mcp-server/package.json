@@ -1,6 +1,6 @@
 {
   "name": "@rn-agent-observer/mcp-server",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "description": "MCP stdio server exposing RN Agent Observer evidence and Android workflows to AI agents.",
   "license": "Apache-2.0",
   "repository": {

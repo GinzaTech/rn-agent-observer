@@ -23,6 +23,8 @@
 doctor
 init [--dry-run] [--force]
 suite list
+suite init [PATH.{json,yaml}] [--profile smoke|performance]
+suite validate SUITE.{json,yaml}
 suite run NAME|SUITE.{json,yaml} [--reporter json,html,junit,sarif,github] [--output DIR] [--confirm-persistent-permission] [--strict]
 run NAME|SUITE.{json,yaml} [...same options]
 ci [--suite NAME[,NAME]] [--reporter json,html,junit,sarif,github] [--output DIR] [--confirm-persistent-permission] [--allow-not-verified]
@@ -33,7 +35,10 @@ security active deep-link --scenario ID --base-uri URI --probe ID:MUTATION:PARAM
 security active permission --scenario ID --permission NAME --probe ID:grant|revoke --allow-state STATE [--max-errors N] [--timeout MS] [--cleanup-timeout MS] [--settle MS] [--strict]
 performance experiment --scenario ID (--replay SCRIPT.json | --idle | --startup) [--samples N] [--warmup N] [--interval MS] [--budget FILE] [--baseline FILE] [--write-baseline FILE] [--strict]
 performance memory --scenario ID --replay SCRIPT.json [--cycles N] [--settle MS] [--max-growth-mb N] [--strict]
+performance tti [--strict]
 coverage analyze INPUT.json [--strict]
+runner import REPORT.xml [--runner maestro|detox|appium|generic] [--strict]
+runner compare BASELINE.json CURRENT.json [--strict]
 plugin check MANIFEST.json
 target support [--manifest MANIFEST.json]
 target collect --manifest MANIFEST.json --operation NAME --platform NAME [--device-id ID] [--app-id ID] [--grant PERMISSION] [--env NAME] [--cwd DIR] [--host-capability NAME] [--max-evidence N] [--max-payload-bytes N] [--strict]
@@ -79,6 +84,15 @@ vẫn dành cho kết quả cuối. SIGINT/SIGTERM được truyền thành `Abo
 | `2`   | Input, config hoặc runtime error; stderr chứa structured error                                       |
 | `130` | Bị hủy; suite/performance giữ kết quả không hoàn tất là `NOT_VERIFIED` và CLI phát error `CANCELLED` |
 
+`suite init` và `suite validate` không probe device. `runner import` luôn exit 1
+khi JUnit có failure/error; `runner compare` luôn exit 1 khi current có
+failure/error. Với cả hai lệnh, `--strict` còn biến `NOT_VERIFIED` thành exit 1.
+Comparison không nhận raw XML: hai input phải là normalized `runner-result` JSON
+được import trước đó. Raw XML, test name và failure body không được persist.
+Đặt cùng `RN_OBSERVER_RUNNER_HASH_SECRET` (tối thiểu 16 ký tự) khi import baseline
+và current để dùng HMAC-SHA-256; secret không đi vào artifact. Khác scheme giữ
+comparison ở `NOT_VERIFIED`.
+
 `suite run` chỉ biến `NOT_VERIFIED` thành exit 1 khi có `--strict`.
 `security audit`, `security dependencies`, active security, performance, coverage và
 `session share` cũng theo quy tắc này khi có `--strict`. `ci` nghiêm hơn: mặc định
@@ -93,13 +107,13 @@ PASS.
 
 ## MCP stdio
 
-66 tools hiện có:
+70 tools hiện có:
 
 | Nhóm                   | Tools                                                                                                                                                                                                                                  |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Assurance/workflow     | `observer_doctor`, `list_quality_suites`, `run_quality_suite`, `inspect_current_screen`, `verify_fix`, `coverage_analyze`                                                                                                              |
+| Assurance/workflow     | `observer_doctor`, `list_quality_suites`, `validate_quality_suite`, `run_quality_suite`, `inspect_current_screen`, `verify_fix`, `coverage_analyze`, `import_runner_result`, `compare_runner_results`                                  |
 | Security/supply chain  | `security_audit`, `security_sbom`, `security_dependency_audit`, `security_active_deep_link`, `security_active_permission_transition`                                                                                                   |
-| Performance/dashboard  | `performance_experiment`, `performance_memory_growth`, `dashboard_snapshot`, `build_dashboard`                                                                                                                                         |
+| Performance/dashboard  | `performance_experiment`, `performance_memory_growth`, `performance_startup_timing`, `dashboard_snapshot`, `build_dashboard`                                                                                                           |
 | Status/device/app      | `observer_status`, `device_list`, `device_info`, `app_launch`, `app_reload`, `app_state`, `get_device_network`, `list_permissions`, `set_permission`                                                                                   |
 | Screen/action          | `screenshot`, `get_ui_tree`, `snapshot`, `understand_screen`, `runtime_ui_model`, `press`, `tap`, `swipe`, `type_text`, `back`, `open_deep_link`, `assert_element`                                                                     |
 | Evidence/DevTools      | `get_logs`, `performance_snapshot`, `start_trace`, `stop_trace`, `get_react_render_stats`, `get_network_requests`, `get_network_summary`, `get_app_data`, `observe_screen`, `get_metro_network`, `devtools_export`, `devtools_profile` |

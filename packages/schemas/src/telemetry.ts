@@ -36,6 +36,26 @@ export const JsTaskTelemetryPayloadSchema = z.object({
   source: z.string().min(1),
 });
 
+export const PerformanceMarkNameSchema = z.enum([
+  'nativeLaunchStart',
+  'nativeLaunchEnd',
+  'runJSBundleStart',
+  'runJSBundleEnd',
+  'contentAppeared',
+  'screenInteractive',
+]);
+
+export const PerformanceMarkTelemetryPayloadSchema = z.object({
+  telemetryVersion: legacyCompatibleVersion,
+  name: PerformanceMarkNameSchema,
+  startupId: z.string().min(1).max(80),
+  timestamp: z.iso.datetime(),
+  monotonicMs: z.number().finite().nonnegative().optional(),
+  startupType: z.enum(['cold', 'warm', 'hot', 'unknown']),
+  foreground: z.boolean(),
+  source: z.string().min(1).max(80),
+});
+
 export const AppDataPrivacySchema = z.object({
   policy: z.enum(['default-safe-allowlist', 'explicit-safe-allowlist']),
   redacted: z.boolean(),
@@ -85,6 +105,10 @@ export type RenderTelemetryPayload = z.infer<
 export type RouteTelemetryPayload = z.infer<typeof RouteTelemetryPayloadSchema>;
 export type JsTaskTelemetryPayload = z.infer<
   typeof JsTaskTelemetryPayloadSchema
+>;
+export type PerformanceMarkName = z.infer<typeof PerformanceMarkNameSchema>;
+export type PerformanceMarkTelemetryPayload = z.infer<
+  typeof PerformanceMarkTelemetryPayloadSchema
 >;
 export type AppDataPrivacy = z.infer<typeof AppDataPrivacySchema>;
 export type AppDataTelemetryPayload = z.infer<

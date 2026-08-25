@@ -11,11 +11,13 @@ import {
   jsTasksFromLogs,
   networkRequestsFromLogs,
   renderStatsFromLogs,
+  performanceMarksFromLogs,
   routeEventsFromLogs,
   uiElementsFromLogs,
   uiInteractionsFromLogs,
   type AppDataEvent,
   type JsTaskEvent,
+  type PerformanceMarkEvent,
   type RouteEvent,
   type UiElementTelemetry,
 } from './network.js';
@@ -28,6 +30,7 @@ export interface RuntimeTelemetryCache {
   renderStats: ReactRenderStat[];
   routes: RouteEvent[];
   jsTasks: JsTaskEvent[];
+  performanceMarks: PerformanceMarkEvent[];
   appData: AppDataEvent[];
   uiElements: UiElementTelemetry[];
   interactions: UiInteractionEvent[];
@@ -41,6 +44,7 @@ export interface RuntimeTelemetryMergeResult {
     renderStats: number;
     routes: number;
     jsTasks: number;
+    performanceMarks: number;
     appData: number;
     uiElements: number;
     interactions: number;
@@ -53,6 +57,7 @@ const CACHE_LIMITS = {
   renderStats: 10_000,
   routes: 1_000,
   jsTasks: 2_000,
+  performanceMarks: 1_000,
   appData: 1_000,
   uiElements: 5_000,
   interactions: 10_000,
@@ -67,6 +72,7 @@ function emptyRuntimeTelemetryCache(): RuntimeTelemetryCache {
     renderStats: [],
     routes: [],
     jsTasks: [],
+    performanceMarks: [],
     appData: [],
     uiElements: [],
     interactions: [],
@@ -103,6 +109,7 @@ function isRuntimeTelemetryCache(
     value.renderStats,
     value.routes,
     value.jsTasks,
+    value.performanceMarks,
     value.appData,
     value.uiElements,
     value.interactions,
@@ -122,6 +129,15 @@ function isRuntimeTelemetryCache(
       (entry) =>
         hasStrings(entry, ['label', 'timestamp', 'source']) &&
         typeof entry.durationMs === 'number',
+    ) &&
+    (value.performanceMarks as unknown[]).every((entry) =>
+      hasStrings(entry, [
+        'name',
+        'startupId',
+        'timestamp',
+        'startupType',
+        'source',
+      ]),
     ) &&
     (value.appData as unknown[]).every((entry) =>
       hasStrings(entry, ['namespace', 'timestamp']),
@@ -188,6 +204,7 @@ export function mergeRuntimeTelemetry(
     renderStats: renderStatsFromLogs(logs),
     routes: routeEventsFromLogs(logs),
     jsTasks: jsTasksFromLogs(logs),
+    performanceMarks: performanceMarksFromLogs(logs),
     appData: appDataFromLogs(logs),
     uiElements: uiElementsFromLogs(logs),
     interactions: uiInteractionsFromLogs(logs),
@@ -232,6 +249,12 @@ export function mergeRuntimeTelemetry(
         `${entry.label}:${entry.durationMs}:${entry.timestamp}:${entry.source}`,
       CACHE_LIMITS.jsTasks,
     ),
+    performanceMarks: mergeLatestByKey(
+      currentProcess.performanceMarks,
+      incoming.performanceMarks,
+      (entry) => `${entry.startupId}:${entry.name}`,
+      CACHE_LIMITS.performanceMarks,
+    ),
     appData: mergeLatestByKey(
       currentProcess.appData,
       incoming.appData,
@@ -260,6 +283,7 @@ export function mergeRuntimeTelemetry(
       renderStats: incoming.renderStats.length,
       routes: incoming.routes.length,
       jsTasks: incoming.jsTasks.length,
+      performanceMarks: incoming.performanceMarks.length,
       appData: incoming.appData.length,
       uiElements: incoming.uiElements.length,
       interactions: incoming.interactions.length,

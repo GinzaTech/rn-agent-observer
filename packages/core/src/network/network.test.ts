@@ -4,6 +4,7 @@ import {
   appDataFromLogs,
   invalidTelemetryFromLogs,
   networkRequestsFromLogs,
+  performanceMarksFromLogs,
   summarizeNetwork,
 } from './network.js';
 
@@ -240,6 +241,29 @@ describe('network evidence', () => {
       },
     ]);
     expect(invalidTelemetryFromLogs(logs)).toEqual([]);
+  });
+
+  it('parses bounded React Native startup performance marks', () => {
+    const marks = performanceMarksFromLogs([
+      {
+        level: 'info',
+        source: 'ReactNativeJS',
+        timestamp: '2026-08-25T00:00:00.000Z',
+        message:
+          'RN_AGENT_OBSERVER_PERFORMANCE_MARK {"name":"screenInteractive","startupId":"cold-1","timestamp":"2026-08-25T00:00:01.500Z","monotonicMs":1500,"startupType":"cold","foreground":true,"source":"rn-instrumentation","telemetryVersion":1}',
+      },
+    ]);
+    expect(marks).toEqual([
+      {
+        name: 'screenInteractive',
+        startupId: 'cold-1',
+        timestamp: '2026-08-25T00:00:01.500Z',
+        monotonicMs: 1500,
+        startupType: 'cold',
+        foreground: true,
+        source: 'rn-instrumentation',
+      },
+    ]);
   });
 
   it('rejects invalid telemetry and exposes validation failures without raw data', () => {

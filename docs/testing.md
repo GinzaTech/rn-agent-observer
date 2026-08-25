@@ -1,6 +1,6 @@
 # Báo cáo kiểm thử và runtime verification
 
-Ngày xác minh host gần nhất: **2026-08-24**
+Ngày xác minh host gần nhất: **2026-08-25**
 Host của runtime verification hiện tại: Windows, Node.js 22.19, pnpm 9.6.0
 Thiết bị của bằng chứng active-security mới: Android AVD do nhóm sở hữu, chạy
 development fixture `SecurityLab` của demo.
@@ -59,24 +59,54 @@ phải chứng nhận mọi Android device.
 workflow: nó chạy suite được cấu hình trên target và mặc định exit 1 cho cả `FAIL`
 lẫn `NOT_VERIFIED`. Hai lệnh không thay thế nhau.
 
-## Host verification hiện tại — 2026-08-24
+## Host verification hiện tại — 2026-08-25
 
 Đã chạy trên workspace này:
 
+Owned AVD tạm API 36 x86_64 đã chạy lại sau release build work: app `Home` có 25
+visible/7 interactive elements, 0 actionable runtime error; UI model có 18 source
+actions/7 native actions; session `complete` với 19 events/10 artifacts. Lần chạy
+đầu bắt được hai platform log Android 16 bị phân loại sai (`ashmem` pinning và
+Chromium variations seed); classifier exact-source/message đã được thêm regression
+test, sau đó cùng smoke PASS. Emulator và AVD tạm đã bị xóa, AVD cá nhân không đổi.
+
 - `pnpm check`: PASS — ESLint, Prettier, TypeScript build và Vitest; schemas
-  19 tests, instrumentation 17, demo Expo 10, core 296, CLI 15, MCP 6 (tổng
-  **363 tests**);
-- `pnpm coverage:check`: PASS — statements 71.35%, branches 62.68%, functions
-  70.88%, lines 73.10%; ngưỡng bắt buộc tương ứng 70/60/70/70;
+  19 tests, instrumentation 18, demo Expo 10, core 311, CLI 18, MCP 6 (tổng
+  **382 tests**);
+- `pnpm coverage:check`: PASS — statements 71.95%, branches 63.45%, functions
+  71.58%, lines 73.65%; ngưỡng bắt buộc tương ứng 70/60/70/70;
 - `pnpm mcp:check`: PASS; server MCP khởi tạo được;
-- `pnpm rn-observe --version`: `2.4.1`;
+- `pnpm rn-observe --version`: `2.5.0`;
 - `pnpm pack:check`: PASS cho 5 package public;
 - Expo Android/Hermes export: PASS, 581 modules, 2 files và đúng một Hermes bundle;
   output local ở temporary directory;
+- Android arm64 release build: PASS cho APK 24.60 MiB và AAB 17.90 MiB; APK có
+  chữ ký và pass `zipalign -c -P 16`;
 - `pnpm install --frozen-lockfile`: PASS với checksum `.pnpmfile.cjs`;
 - OSV strict: PASS, 683/683 locked component queried và 0 advisory.
 
-Lượt này còn khóa exact inventory 66 MCP tools, policy action fail-closed ở
+Gate này còn xác minh offline suite authoring, JUnit normalization/privacy,
+case-hash regression comparison, CLI/MCP inventory 70 tools và YAML syntax của
+composite GitHub Action. Action smoke source còn chuẩn bị baseline/current JUnit
+fixture và bắt buộc normalized comparison PASS. Job
+`Reusable Observer action smoke` đã được thêm vào CI nhưng chỉ được coi là runtime
+evidence sau khi GitHub chạy workflow trên commit đã push; local YAML/build/test
+không được đổi thành action-runtime PASS.
+
+Manual source-entrypoint rehearsal của cùng orchestration đã PASS trên Windows:
+session start, `ci --suite smoke --allow-not-verified`, 5 report
+JSON/HTML/JUnit/SARIF/GitHub, session stop và evidence graph đều exit 0. Vì không có
+ADB device/app ID, suite đúng contract trả `NOT_VERIFIED` và capture cuối ghi
+`APP_ID_NOT_FOUND`; đây là host/action-flow evidence, không phải Android PASS.
+
+Registry clean-consumer `2.5.0` được workflow publish kiểm lại sau Trusted
+Publishing; `2.4.1` là baseline public gần nhất trước release này. Một direct
+`pnpm dlx` trên host này gặp stale/missing `better-sqlite3@11.10.0` binding trong
+global dlx store; vì vậy composite action không dùng dlx nữa mà cài một lần vào
+runner-temp project. Điều này là action isolation fix, không được diễn giải thành
+registry package failure vì fresh consumer install đã PASS độc lập.
+
+Lượt này còn khóa exact inventory 70 MCP tools, policy action fail-closed ở
 Core/CLI, redaction deep-link xuyên response/session/replay và SecurityLab
 build-time opt-in. CI và local gate chạy Expo prebuild ở cả default lẫn opt-in rồi
 inspect Android manifest: default không có custom scheme, `VIEW` intent filter hay
@@ -254,7 +284,7 @@ Kết quả Unreleased screen-understanding: `pnpm check` pass lint, Prettier, T
 - Focused tests pass cho TypeScript AST source scanner, generated/explicit testID Babel transform, instrumentation privacy, source/native/telemetry correlation, view-flattening state và physical-interaction replay export.
 - Static scan Vshop: 115 actionable source element, 22 conditional, chỉ 1 explicit testID. Scanner trả được file/line thật; phần lớn source/runtime ownership sẽ ở trạng thái chưa correlate cho tới khi app bật Babel plugin hoặc thêm testID.
 - Physical demo acceptance 2026-08-24 đã đóng positive path hiện tại: model correlate route/source/native interaction, giữ evidence qua logcat rollover, không có capture failure và auto-capture khi stop thành công. Kết quả chỉ áp dụng exact demo fixture/device ở mục trên.
-- Full gate hiện tại là 363/363 tests + coverage/OSV/MCP/package/Android export; các con số 77 test bên dưới chỉ còn là record lịch sử của milestone UI-model đầu tiên.
+- Full gate hiện tại là 382/382 tests + coverage/OSV/MCP/package/Android export/release; các con số 77 test bên dưới chỉ còn là record lịch sử của milestone UI-model đầu tiên.
 
 ## Demo Expo native dogfood
 

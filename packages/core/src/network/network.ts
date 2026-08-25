@@ -3,6 +3,7 @@ import {
   AppDataTelemetryPayloadSchema,
   JsTaskTelemetryPayloadSchema,
   NetworkTelemetryPayloadSchema,
+  PerformanceMarkTelemetryPayloadSchema,
   RenderTelemetryPayloadSchema,
   RouteTelemetryPayloadSchema,
   UiElementTelemetryPayloadSchema,
@@ -12,6 +13,7 @@ import {
   type LogEntry,
   type NetworkRequest,
   type NetworkSummary,
+  type PerformanceMarkTelemetryPayload,
   type ReactRenderStat,
   type UiInteractionEvent,
 } from '@rn-agent-observer/schemas';
@@ -20,6 +22,7 @@ const NETWORK_PREFIX = 'RN_AGENT_OBSERVER_NETWORK ';
 const RENDER_PREFIX = 'RN_AGENT_OBSERVER_RENDER ';
 const ROUTE_PREFIX = 'RN_AGENT_OBSERVER_ROUTE ';
 const JS_TASK_PREFIX = 'RN_AGENT_OBSERVER_JS_TASK ';
+const PERFORMANCE_MARK_PREFIX = 'RN_AGENT_OBSERVER_PERFORMANCE_MARK ';
 const APP_DATA_PREFIX = 'RN_AGENT_OBSERVER_APP_DATA ';
 const UI_ELEMENT_PREFIX = 'RN_AGENT_OBSERVER_UI_ELEMENT ';
 const UI_INTERACTION_PREFIX = 'RN_AGENT_OBSERVER_UI_INTERACTION ';
@@ -166,11 +169,17 @@ export interface RouteEvent {
   source: string;
 }
 
+export type PerformanceMarkEvent = Omit<
+  PerformanceMarkTelemetryPayload,
+  'telemetryVersion'
+>;
+
 export type TelemetryKind =
   | 'network'
   | 'render'
   | 'route'
   | 'js-task'
+  | 'performance-mark'
   | 'app-data'
   | 'ui-element'
   | 'ui-interaction';
@@ -292,6 +301,11 @@ const TELEMETRY_DEFINITIONS: readonly {
     kind: 'js-task',
     prefix: JS_TASK_PREFIX,
     schema: JsTaskTelemetryPayloadSchema,
+  },
+  {
+    kind: 'performance-mark',
+    prefix: PERFORMANCE_MARK_PREFIX,
+    schema: PerformanceMarkTelemetryPayloadSchema,
   },
   {
     kind: 'app-data',
@@ -464,6 +478,27 @@ export function jsTasksFromLogs(logs: LogEntry[]): JsTaskEvent[] {
       ),
     )
     .filter((event): event is JsTaskTelemetryPayload => event !== null)
+    .map((event) => {
+      const output = { ...event };
+      delete output.telemetryVersion;
+      return output;
+    });
+}
+
+export function performanceMarksFromLogs(
+  logs: LogEntry[],
+): PerformanceMarkEvent[] {
+  return expandBatchedEntries(logs)
+    .map((entry) =>
+      validPayload(
+        parsePayload(
+          entry.message,
+          PERFORMANCE_MARK_PREFIX,
+          PerformanceMarkTelemetryPayloadSchema,
+        ),
+      ),
+    )
+    .filter((event): event is PerformanceMarkTelemetryPayload => event !== null)
     .map((event) => {
       const output = { ...event };
       delete output.telemetryVersion;

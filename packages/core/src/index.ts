@@ -6,7 +6,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   dirname,
   isAbsolute,
@@ -32,6 +32,7 @@ import {
   type NetworkSummary,
   type Observation,
   type PerformanceSnapshot,
+  type StartupTiming,
   type ReactRenderStat,
   type RuntimeUiModel,
   type ScreenComparison,
@@ -78,9 +79,17 @@ import {
 import { ObserverError, asObserverError } from './errors.js';
 import { buildEvidenceGraph } from './evidence/graph.js';
 import {
+  compareExternalRunnerResultFiles,
+  importJunitRunnerResult,
+  type ExternalRunnerComparison,
+  type ExternalRunnerName,
+  type ExternalRunnerResult,
+} from './integrations/external-runner.js';
+import {
   networkRequestsFromLogs,
   appDataFromLogs,
   jsTasksFromLogs,
+  performanceMarksFromLogs,
   renderStatsFromLogs,
   routeFromLogs,
   summarizeNetwork,
@@ -95,6 +104,7 @@ import {
   type RuntimeTelemetryCache,
 } from './network/runtime-telemetry-cache.js';
 import { TraceManager } from './performance/trace-manager.js';
+import { summarizeStartupTiming } from './performance/startup-mark.js';
 import {
   frameMetricSignature,
   markFrameMetricsStale,
@@ -158,8 +168,10 @@ export * from './diagnosis/rules.js';
 export * from './errors.js';
 export * from './evidence/graph.js';
 export * from './filesystem/path-authority.js';
+export * from './integrations/external-runner.js';
 export * from './coverage/action-coverage.js';
 export * from './network/network.js';
+export * from './performance/startup-mark.js';
 export * from './privacy/deep-link.js';
 export * from './refs/snapshot.js';
 export * from './replay/replay.js';
@@ -852,6 +864,23 @@ export class ObserverCore {
     }
     this.record('performance', snapshot);
     return snapshot;
+  }
+
+  async startupTiming(): Promise<StartupTiming> {
+    const logs = await this.getLogs({ limit: 5_000 });
+    const marks = this.activeSessionId
+      ? this.runtimeTelemetryCache().performanceMarks
+      : performanceMarksFromLogs(logs);
+    const result = summarizeStartupTiming(marks);
+    this.record('startup_timing', {
+      outcome: result.outcome,
+      startupId: result.startupId,
+      startupType: result.startupType,
+      foreground: result.foreground,
+      metric: result.metric,
+      limitations: result.limitations,
+    });
+    return result;
   }
 
   async startTrace(durationMs = 10_000): Promise<Trace> {
@@ -2124,6 +2153,114 @@ export class ObserverCore {
     return this.sessions.list(options);
   }
 
+  /**
+   * Imports a bounded JUnit report from an external E2E runner. Raw XML,
+   * failure messages, paths, and test names are not copied into Observer
+   * storage; stable case hashes make repeated failures correlatable.
+   */
+  async importExternalRunnerResult(
+    requestedPath: string,
+    runner: ExternalRunnerName,
+  ): Promise<{
+    result: ExternalRunnerResult;
+    artifact: Artifact;
+    evidenceRecorded: boolean;
+  }> {
+    const result = await importJunitRunnerResult(
+      this.projectRoot,
+      requestedPath,
+      runner,
+      {
+        ...(process.env.RN_OBSERVER_RUNNER_HASH_SECRET
+          ? {
+              caseHashSecret: process.env.RN_OBSERVER_RUNNER_HASH_SECRET,
+            }
+          : {}),
+      },
+    );
+    const artifact = this.artifacts.write(
+      'runner-result',
+      JSON.stringify(result, null, 2),
+      {
+        ...(this.activeSessionId ? { sessionId: this.activeSessionId } : {}),
+        extension: '.json',
+        mimeType: 'application/json',
+      },
+    );
+    this.sessions.artifact(this.activeSessionId, artifact);
+    this.record('external_runner_result', {
+      schemaVersion: result.schemaVersion,
+      runner: result.runner,
+      format: result.format,
+      outcome: result.outcome,
+      counts: result.counts,
+      durationMs: result.durationMs,
+      source: result.source,
+      caseIdentityScheme: result.caseIdentityScheme,
+      truncated: result.truncated,
+      limitations: result.limitations,
+      artifact: {
+        id: artifact.id,
+        kind: artifact.kind,
+        sha256: createHash('sha256')
+          .update(JSON.stringify(result))
+          .digest('hex'),
+      },
+    });
+    return {
+      result,
+      artifact,
+      evidenceRecorded: this.activeSessionId !== undefined,
+    };
+  }
+
+  /**
+   * Compares two project-contained, normalized runner-result JSON artifacts.
+   * The comparison remains privacy-reduced because the inputs contain only
+   * stable case hashes and aggregate evidence.
+   */
+  async compareExternalRunnerResultFiles(
+    baselinePath: string,
+    currentPath: string,
+  ): Promise<{
+    comparison: ExternalRunnerComparison;
+    artifact: Artifact;
+    evidenceRecorded: boolean;
+  }> {
+    const comparison = await compareExternalRunnerResultFiles(
+      this.projectRoot,
+      baselinePath,
+      currentPath,
+    );
+    const serialized = JSON.stringify(comparison, null, 2);
+    const artifact = this.artifacts.write('runner-comparison', serialized, {
+      ...(this.activeSessionId ? { sessionId: this.activeSessionId } : {}),
+      extension: '.json',
+      mimeType: 'application/json',
+    });
+    this.sessions.artifact(this.activeSessionId, artifact);
+    this.record('external_runner_comparison', {
+      schemaVersion: comparison.schemaVersion,
+      runners: comparison.runners,
+      outcome: comparison.outcome,
+      baseline: comparison.baseline,
+      current: comparison.current,
+      delta: comparison.delta,
+      changes: comparison.changes,
+      limitations: comparison.limitations,
+      artifact: {
+        id: artifact.id,
+        kind: artifact.kind,
+        sha256: createHash('sha256').update(serialized).digest('hex'),
+      },
+    });
+    return {
+      comparison,
+      artifact,
+      evidenceRecorded: this.activeSessionId !== undefined,
+    };
+  }
+
   getArtifact(artifactId: string): StoredArtifact {
     return this.sessions.getArtifact(artifactId);
   }
@@ -2673,6 +2810,14 @@ export {
   type LoadedSuiteDefinition,
   type SuiteFileFormat,
 } from './suite/loader.js';
+export {
+  STARTER_SUITE_PROFILES,
+  createStarterSuite,
+  inspectSuiteFile,
+  writeStarterSuite,
+  type StarterSuiteProfile,
+  type SuiteInspection,
+} from './suite/authoring.js';
 export { observerSuiteCapabilities } from './suite/capabilities.js';
 export {
   OBSERVER_SUITE_COMMANDS,

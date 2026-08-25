@@ -18,6 +18,8 @@ export const ArtifactSchema = z.object({
     'suite-report',
     'security-report',
     'coverage-report',
+    'runner-result',
+    'runner-comparison',
     'share-bundle',
   ]),
   path: z.string().min(1),

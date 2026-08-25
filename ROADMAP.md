@@ -5,7 +5,7 @@ community claims that require independent runtime evidence. Dates are targets, n
 support promises. An item is complete only when its acceptance evidence is linked
 from `docs/testing.md`.
 
-## Current baseline — 2.4.1
+## Current baseline — 2.5.0
 
 - Five public npm packages install from a clean consumer and carry registry
   integrity plus npm provenance.
@@ -67,6 +67,25 @@ confidence/sample count and known limitations.
 
 An external-provider manifest or a unit test is `EXTENSION_ONLY`; it never proves
 runtime support. Platform status changes only after exact runtime evidence exists.
+
+## Milestone E — runner and CI interoperability
+
+- [x] Add offline `suite init` and `suite validate` authoring commands with safe,
+      non-overwriting project paths.
+- [x] Normalize bounded JUnit from Maestro, Detox, Appium, or generic runners into
+      privacy-reduced aggregate/case-hash evidence inside an Observer session.
+- [x] Compare normalized runner artifacts by case hash, distinguish new/recovered/
+      persistent failures, and fail closed when comparison completeness differs.
+- [x] Add a reusable composite GitHub Action with strict outcome enforcement,
+      report upload, job summary, and optional external-runner import.
+- [ ] Validate the action from an independent consumer repository after the next
+      npm release and pin that consumer workflow to the exact release tag.
+- [ ] Add native runner plugins only when they provide evidence beyond the shared
+      JUnit contract; avoid duplicating their automation engines.
+
+Acceptance: action source passes repository checks, an independent consumer run is
+linked from `docs/testing.md`, raw external reports remain under the runner's own
+retention policy, and missing/truncated evidence never becomes PASS.
 
 ## Good first contributions
 

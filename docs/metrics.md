@@ -29,18 +29,19 @@ Không có tín hiệu thì trả rõ ràng:
 
 ## Metrics Android v1
 
-| Tên                  | Unit   | Source                | Cách hiểu                                                               |
-| -------------------- | ------ | --------------------- | ----------------------------------------------------------------------- |
-| `ui_fps`             | fps    | `adb-dumpsys-gfxinfo` | `min(refreshHz, 1000 / averageFrameMs)` trong tối đa 240 frame gần nhất |
-| `frame_time_ms`      | ms     | gfx framestats        | Trung bình frame hoàn tất hợp lệ                                        |
-| `worst_frame_ms`     | ms     | gfx framestats        | Frame chậm nhất trong sample                                            |
-| `dropped_frames`     | frames | gfx framestats        | Số frame vượt budget `1000 / refreshHz`                                 |
-| `frame_sample_count` | frames | gfx framestats        | Mẫu dùng để diễn giải dropped/average                                   |
-| `display_refresh_hz` | Hz     | `adb-dumpsys-display` | Refresh rate Android đang báo                                           |
-| `memory_mb`          | MB     | `adb-dumpsys-meminfo` | TOTAL PSS của process app                                               |
-| `cpu_percent`        | %      | `adb-top`             | Snapshot process; có thể trên 100% khi dùng nhiều CPU core              |
-| `js_blocking_ms`     | ms     | RN instrumentation    | Long task gần nhất trong cửa sổ 5 phút; nếu không có thì unavailable    |
-| `js_fps`             | fps    | unavailable           | Không suy diễn từ ADB                                                   |
+| Tên                   | Unit   | Source                | Cách hiểu                                                               |
+| --------------------- | ------ | --------------------- | ----------------------------------------------------------------------- |
+| `ui_fps`              | fps    | `adb-dumpsys-gfxinfo` | `min(refreshHz, 1000 / averageFrameMs)` trong tối đa 240 frame gần nhất |
+| `frame_time_ms`       | ms     | gfx framestats        | Trung bình frame hoàn tất hợp lệ                                        |
+| `worst_frame_ms`      | ms     | gfx framestats        | Frame chậm nhất trong sample                                            |
+| `dropped_frames`      | frames | gfx framestats        | Số frame vượt budget `1000 / refreshHz`                                 |
+| `frame_sample_count`  | frames | gfx framestats        | Mẫu dùng để diễn giải dropped/average                                   |
+| `display_refresh_hz`  | Hz     | `adb-dumpsys-display` | Refresh rate Android đang báo                                           |
+| `memory_mb`           | MB     | `adb-dumpsys-meminfo` | TOTAL PSS của process app                                               |
+| `cpu_percent`         | %      | `adb-top`             | Snapshot process; có thể trên 100% khi dùng nhiều CPU core              |
+| `js_blocking_ms`      | ms     | RN instrumentation    | Long task gần nhất trong cửa sổ 5 phút; nếu không có thì unavailable    |
+| `react_native_tti_ms` | ms     | RN performance marks  | Cold foreground: `nativeLaunchStart` -> app-defined `screenInteractive` |
+| `js_fps`              | fps    | unavailable           | Không suy diễn từ ADB                                                   |
 
 `ui_fps` là trung bình trong cửa sổ, vì vậy một long JS task đơn lẻ có thể không kéo sustained FPS xuống. Đọc cùng `worst_frame_ms`, `dropped_frames`, `frame_sample_count` và `js_blocking_ms`.
 
@@ -56,4 +57,6 @@ Không có tín hiệu thì trả rõ ràng:
 - Ngưỡng diagnosis cấu hình được qua core, các flag CLI `diagnose --ui-fps-low/--ui-fps-critical/--js-blocking/--js-blocking-high/--slow-request/--very-slow-request/--render-count`, và MCP `diagnose`; mặc định nằm trong `DEFAULT_THRESHOLDS`.
 - CPU là snapshot, không phải average session.
 - Perfetto trace là artifact thô; snapshot metrics không giả vờ thay thế trace analysis.
+- TTI chỉ `available` khi hai mark cùng `startupId`, đều xác nhận cold foreground;
+  `screenInteractive` là boundary do app định nghĩa, không phải heuristic của Observer.
 - Nếu chữ ký 5 metric frame giống hệt lần đọc trước, observer trả chúng `available: false` với reason `No new gfx frame samples...`; không tái sử dụng cửa sổ gfxinfo cũ như một benchmark mới.

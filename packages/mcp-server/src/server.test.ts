@@ -16,6 +16,7 @@ const EXPECTED_TOOL_NAMES = [
   'back',
   'build_dashboard',
   'cleanup_artifacts',
+  'compare_runner_results',
   'compare_screens',
   'coverage_analyze',
   'dashboard_snapshot',
@@ -37,6 +38,7 @@ const EXPECTED_TOOL_NAMES = [
   'get_session',
   'get_ui_tree',
   'inspect_current_screen',
+  'import_runner_result',
   'list_permissions',
   'list_quality_suites',
   'list_routes',
@@ -48,6 +50,7 @@ const EXPECTED_TOOL_NAMES = [
   'performance_experiment',
   'performance_memory_growth',
   'performance_snapshot',
+  'performance_startup_timing',
   'press',
   'replay_export',
   'replay_run',
@@ -72,6 +75,7 @@ const EXPECTED_TOOL_NAMES = [
   'tap',
   'type_text',
   'understand_screen',
+  'validate_quality_suite',
   'verify_fix',
   'verify_session_share_bundle',
   'wait_for_element',
@@ -310,6 +314,32 @@ describe('MCP server', () => {
         artifacts: { allowShare: true },
       }),
     );
+    writeFileSync(
+      join(projectRoot, 'runner.xml'),
+      '<testsuite><testcase classname="home" name="opens home" time="0.1" /></testsuite>',
+    );
+    writeFileSync(
+      join(projectRoot, 'runner-current.xml'),
+      '<testsuite><testcase classname="home" name="opens home" time="0.2"><failure>private</failure></testcase></testsuite>',
+    );
+    writeFileSync(
+      join(projectRoot, 'suite.yaml'),
+      [
+        'apiVersion: rn-observer/v1alpha1',
+        'kind: Suite',
+        'metadata:',
+        '  id: project.mcp',
+        '  name: MCP project suite',
+        'requirements:',
+        '  platforms: [android]',
+        'steps:',
+        '  - id: app-state',
+        '    title: Inspect app state',
+        '    action:',
+        '      command: app-state',
+        'reporters: [json]',
+      ].join('\n'),
+    );
     const core = new ObserverCore({ projectRoot, onWarning: () => {} });
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
@@ -318,6 +348,35 @@ describe('MCP server', () => {
     try {
       await server.connect(serverTransport);
       await client.connect(clientTransport);
+
+      vi.spyOn(core, 'startupTiming').mockResolvedValue({
+        schemaVersion: '1.0',
+        capturedAt: '2026-08-25T00:00:02.000Z',
+        outcome: 'PASS',
+        startupId: 'cold-1',
+        startupType: 'cold',
+        foreground: true,
+        startMark: '2026-08-25T00:00:00.000Z',
+        interactiveMark: '2026-08-25T00:00:01.500Z',
+        metric: {
+          name: 'react_native_tti_ms',
+          value: 1500,
+          unit: 'ms',
+          source: 'fixture:monotonic',
+          timestamp: '2026-08-25T00:00:01.500Z',
+          available: true,
+          confidence: 0.95,
+        },
+        limitations: ['Exact app-defined interactive boundary'],
+      });
+      const startupTiming = await client.callTool({
+        name: 'performance_startup_timing',
+        arguments: {},
+      });
+      expect(startupTiming.structuredContent).toMatchObject({
+        outcome: 'PASS',
+        metric: { name: 'react_native_tti_ms', value: 1500 },
+      });
 
       const coverage = await client.callTool({
         name: 'coverage_analyze',
@@ -356,7 +415,63 @@ describe('MCP server', () => {
         artifact: { kind: 'coverage-report' },
       });
 
+      const validatedSuite = await client.callTool({
+        name: 'validate_quality_suite',
+        arguments: { relative_path: 'suite.yaml' },
+      });
+      expect(validatedSuite.structuredContent).toMatchObject({
+        valid: true,
+        suite: { id: 'project.mcp', steps: 1 },
+      });
+
       const session = core.startSession();
+      const importedRunner = await client.callTool({
+        name: 'import_runner_result',
+        arguments: { relative_path: 'runner.xml', runner: 'maestro' },
+      });
+      expect(importedRunner.structuredContent).toMatchObject({
+        result: {
+          runner: 'maestro',
+          outcome: 'PASS',
+          counts: { total: 1, passed: 1 },
+        },
+        artifact: { kind: 'runner-result' },
+        evidenceRecorded: true,
+      });
+      expect(JSON.stringify(importedRunner.structuredContent)).not.toContain(
+        'opens home',
+      );
+      const currentRunner = await client.callTool({
+        name: 'import_runner_result',
+        arguments: {
+          relative_path: 'runner-current.xml',
+          runner: 'maestro',
+        },
+      });
+      const baselinePayload = importedRunner.structuredContent as {
+        artifact: { path: string };
+      };
+      const currentPayload = currentRunner.structuredContent as {
+        artifact: { path: string };
+      };
+      const comparedRunner = await client.callTool({
+        name: 'compare_runner_results',
+        arguments: {
+          baseline_path: baselinePayload.artifact.path,
+          current_path: currentPayload.artifact.path,
+        },
+      });
+      expect(comparedRunner.structuredContent).toMatchObject({
+        comparison: {
+          outcome: 'FAIL',
+          changes: { newFailures: [expect.stringMatching(/^sha256:/u)] },
+        },
+        artifact: { kind: 'runner-comparison' },
+        evidenceRecorded: true,
+      });
+      expect(JSON.stringify(comparedRunner.structuredContent)).not.toContain(
+        'private',
+      );
       const exported = await client.callTool({
         name: 'export_session_share_bundle',
         arguments: {

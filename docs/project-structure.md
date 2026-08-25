@@ -22,6 +22,7 @@ rn-agent-observer/
 ├── scripts/                    # Release/package/export/manifest verification
 ├── skills/                     # Workflow instruction cho coding agent
 ├── .github/                    # CI, publish, issue/PR/security community workflow
+├── action.yml                  # Reusable strict evidence gate for consumer CI
 ├── AGENTS.md                   # Quy tắc làm việc bắt buộc trong repository
 ├── package.json                # Root scripts và toolchain contract
 ├── pnpm-workspace.yaml         # Workspace membership
@@ -54,30 +55,31 @@ Core hoặc schema.
 
 ## Bản đồ `packages/core/src`
 
-| Thư mục        | Trách nhiệm                                                       |
-| -------------- | ----------------------------------------------------------------- |
-| `adb/`         | Process-safe ADB client và parser device/UI/logcat/gfx/memory/CPU |
-| `artifacts/`   | Ghi artifact contained trên đĩa, hash và metadata                 |
-| `config/`      | Config parser, defaults, containment và active trust gate         |
-| `comparison/`  | Pixel diff và structural UI-tree comparison                       |
-| `coverage/`    | Route/action inventory, checkpoint, merge/delta                   |
-| `dashboard/`   | Privacy-reduced report và loopback read-only server               |
-| `devtools/`    | Metro discovery, CDP queue/export/network/profile/reload          |
-| `diagnosis/`   | Rule engine heuristic có evidence/confidence basis                |
-| `doctor/`      | Probe readiness/capability, không giả lập runtime pass            |
-| `evidence/`    | Evidence graph và correlation metadata                            |
-| `network/`     | Parse/redact/summarize telemetry và session runtime cache         |
-| `performance/` | Frame/CPU/memory/experiment/statistics/Perfetto orchestration     |
-| `plugins/`     | Trusted analyzer/reporter và external process host boundary       |
-| `privacy/`     | Redaction và content/path safety helper                           |
-| `recording/`   | Android screenrecord lifecycle                                    |
-| `refs/`        | Stable semantic refs cho snapshot/session                         |
-| `replay/`      | Replay schema/export/runner và action policy                      |
-| `security/`    | Passive audit, SBOM/OSV và bounded active scenarios               |
-| `session/`     | SQLite WAL timeline, artifacts, share bundle                      |
-| `suite/`       | Suite loader/runner/assertion/reporter/CI outcome                 |
-| `targets/`     | Built-in/external target provider contract                        |
-| `ui/`          | Screen understanding và source/runtime UI correlation             |
+| Thư mục         | Trách nhiệm                                                       |
+| --------------- | ----------------------------------------------------------------- |
+| `adb/`          | Process-safe ADB client và parser device/UI/logcat/gfx/memory/CPU |
+| `artifacts/`    | Ghi artifact contained trên đĩa, hash và metadata                 |
+| `config/`       | Config parser, defaults, containment và active trust gate         |
+| `comparison/`   | Pixel diff và structural UI-tree comparison                       |
+| `coverage/`     | Route/action inventory, checkpoint, merge/delta                   |
+| `dashboard/`    | Privacy-reduced report và loopback read-only server               |
+| `devtools/`     | Metro discovery, CDP queue/export/network/profile/reload          |
+| `diagnosis/`    | Rule engine heuristic có evidence/confidence basis                |
+| `doctor/`       | Probe readiness/capability, không giả lập runtime pass            |
+| `evidence/`     | Evidence graph và correlation metadata                            |
+| `integrations/` | Privacy-reduced interchange với external E2E runners              |
+| `network/`      | Parse/redact/summarize telemetry và session runtime cache         |
+| `performance/`  | Frame/CPU/memory/experiment/statistics/Perfetto orchestration     |
+| `plugins/`      | Trusted analyzer/reporter và external process host boundary       |
+| `privacy/`      | Redaction và content/path safety helper                           |
+| `recording/`    | Android screenrecord lifecycle                                    |
+| `refs/`         | Stable semantic refs cho snapshot/session                         |
+| `replay/`       | Replay schema/export/runner và action policy                      |
+| `security/`     | Passive audit, SBOM/OSV và bounded active scenarios               |
+| `session/`      | SQLite WAL timeline, artifacts, share bundle                      |
+| `suite/`        | Suite authoring/loader/runner/assertion/reporter/CI outcome       |
+| `targets/`      | Built-in/external target provider contract                        |
+| `ui/`           | Screen understanding và source/runtime UI correlation             |
 
 `packages/core/src/index.ts` là façade `ObserverCore`. Nó wiring các module trên,
 nhưng module chuyên biệt vẫn nên giữ logic và test gần nhau.

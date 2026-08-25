@@ -1,6 +1,6 @@
 {
   "name": "@rn-agent-observer/core",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "description": "Runtime evidence collection, diagnosis, replay, and comparison engine for RN Agent Observer.",
   "license": "Apache-2.0",
   "repository": {

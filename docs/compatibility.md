@@ -1,6 +1,6 @@
 # Compatibility and verification matrix
 
-Snapshot: **2026-08-24**, repository version **2.4.1**. Runtime rows retain the
+Snapshot: **2026-08-25**, repository version **2.5.0**. Runtime rows retain the
 exact demo `2.4.0` fixture version where that is the build that actually ran.
 
 This document separates supported contracts from evidence collected on a specific
@@ -19,14 +19,14 @@ or older device run must never be presented as proof for a different device.
 
 ## Host and toolchain
 
-| Surface                      | Declared range / fixture       | Current evidence                                                     | Status      |
-| ---------------------------- | ------------------------------ | -------------------------------------------------------------------- | ----------- |
-| Node.js                      | `>=22.12.0`                    | Local 22.19; CI pins 22.12                                           | `SUPPORTED` |
-| pnpm                         | 9.6.0                          | Frozen lockfile install gate                                         | `SUPPORTED` |
-| Windows host                 | Current GitHub runner + local  | lint, format, build, unit, MCP, package and Android export gates     | `HOST_ONLY` |
-| Ubuntu host                  | Current GitHub runner          | lint, format, build and unit gates                                   | `HOST_ONLY` |
-| macOS host                   | Current GitHub runner          | lint, format, build and unit gates                                   | `HOST_ONLY` |
-| Android Platform Tools/`adb` | Recent platform-tools required | CLI parses and pins exact serials; no device is inferred from a host | `SUPPORTED` |
+| Surface                      | Declared range / fixture       | Current evidence                                                      | Status      |
+| ---------------------------- | ------------------------------ | --------------------------------------------------------------------- | ----------- |
+| Node.js                      | `>=22.12.0`                    | Local 22.19; CI pins 22.12                                            | `SUPPORTED` |
+| pnpm                         | 9.6.0                          | Frozen lockfile install gate                                          | `SUPPORTED` |
+| Windows host                 | Current GitHub runner + local  | lint, format, build, unit, MCP, package, Android export/release gates | `HOST_ONLY` |
+| Ubuntu host                  | Current GitHub runner          | lint, format, build and unit gates                                    | `HOST_ONLY` |
+| macOS host                   | Current GitHub runner          | lint, format, build and unit gates                                    | `HOST_ONLY` |
+| Android Platform Tools/`adb` | Recent platform-tools required | CLI parses and pins exact serials; no device is inferred from a host  | `SUPPORTED` |
 
 `HOST_ONLY` does not mean device-facing commands were executed on that operating
 system. CI jobs without an attached target cannot expand runtime support.

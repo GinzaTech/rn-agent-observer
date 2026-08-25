@@ -2,10 +2,40 @@
 
 ## Unreleased
 
+## 2.5.0 — 2026-08-25
+
 ### Reliability, governance and onboarding
 
-- Đồng bộ README/installation/troubleshooting/project/audit với public npm release
-  `2.4.1`; giữ `2.4.0` là historical bootstrap không dùng cho consumer.
+- Thêm `suite init`/`suite validate` để scaffold và inspect flow JSON/YAML offline;
+  path output không traversal, không đi qua symlink và không overwrite file có sẵn.
+- Thêm `runner import` cho JUnit của Maestro/Detox/Appium/generic: XML bị giới hạn,
+  cấm DTD/entity, chỉ giữ aggregate/duration/source SHA-256/case hash, không persist
+  raw XML, test name hoặc failure body.
+- Cho phép khóa case identity bằng HMAC-SHA-256 qua
+  `RN_OBSERVER_RUNNER_HASH_SECRET`; secret không được ghi vào artifact. Baseline và
+  current khác scheme giữ `NOT_VERIFIED` để không tạo so sánh sai.
+- Thêm `runner compare` và MCP `compare_runner_results`: so normalized artifact
+  bằng case hash để tách failure mới, đã phục hồi, còn tái diễn, count/duration
+  delta; runner mismatch, duplicate/truncated evidence hoặc test biến mất giữ
+  `NOT_VERIFIED` thay vì tạo PASS giả.
+- Thêm composite `action.yml` để tạo evidence session, chạy strict CI suites, nhập
+  optional JUnit, so với normalized runner baseline khi được cung cấp, ghi job
+  summary và upload report; consumer vẫn tự sở hữu bước provision/install/launch
+  exact emulator hoặc device.
+- Thêm telemetry performance mark và CLI `performance tti`/MCP
+  `performance_startup_timing`. TTI chỉ available khi có cùng `startupId`, cold
+  start foreground và hai mốc `nativeLaunchStart`/`screenInteractive`; warm,
+  background hoặc thiếu instrumentation đều trả `NOT_VERIFIED`.
+- Android 16 runtime classifier giữ `ashmem` pinning deprecation và Chromium
+  variations-seed warning ở platform evidence thay vì đếm thành app error; exact
+  `BadTokenException` và lỗi React Native độc lập vẫn actionable. Regression được
+  phát hiện và sửa bằng owned AVD API 36 x86_64 runtime smoke.
+- Tách TypeScript/React/React Native khỏi group production Dependabot và chặn riêng
+  TypeScript major cho tới khi typescript-eslint hỗ trợ compiler API 7.x; patch 6.x
+  vẫn được cập nhật, một major không còn làm block cả nhóm runtime.
+
+- Đồng bộ README/installation/troubleshooting/project/audit với release `2.5.0`;
+  giữ `2.4.0` là historical bootstrap không dùng cho consumer.
 - Thêm V8 source coverage gate với ngưỡng statements/branches/functions/lines
   `70/60/70/70`; coverage chạy trên toàn bộ `packages/*/src` thay vì chỉ file được
   import tình cờ.
