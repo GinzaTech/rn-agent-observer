@@ -76,7 +76,7 @@ test, sau đó cùng smoke PASS. Emulator và AVD tạm đã bị xóa, AVD cá 
 - `pnpm coverage:check`: PASS — statements 71.95%, branches 63.45%, functions
   71.58%, lines 73.65%; ngưỡng bắt buộc tương ứng 70/60/70/70;
 - `pnpm mcp:check`: PASS; server MCP khởi tạo được;
-- `pnpm rn-observe --version`: `2.5.0`;
+- `pnpm rn-observe --version`: `2.5.1`;
 - `pnpm pack:check`: PASS cho 5 package public;
 - Expo Android/Hermes export: PASS, 581 modules, 2 files và đúng một Hermes bundle;
   output local ở temporary directory;
@@ -99,7 +99,7 @@ JSON/HTML/JUnit/SARIF/GitHub, session stop và evidence graph đều exit 0. Vì
 ADB device/app ID, suite đúng contract trả `NOT_VERIFIED` và capture cuối ghi
 `APP_ID_NOT_FOUND`; đây là host/action-flow evidence, không phải Android PASS.
 
-Registry clean-consumer `2.5.0` được workflow publish kiểm lại sau Trusted
+Registry clean-consumer `2.5.1` được workflow publish kiểm lại sau Trusted
 Publishing; `2.4.1` là baseline public gần nhất trước release này. Một direct
 `pnpm dlx` trên host này gặp stale/missing `better-sqlite3@11.10.0` binding trong
 global dlx store; vì vậy composite action không dùng dlx nữa mà cài một lần vào

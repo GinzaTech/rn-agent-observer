@@ -2,7 +2,7 @@
 
 Tài liệu này là **bộ tham chiếu chuẩn (golden test battery)** để test mọi app React Native/Expo bằng RN Agent Observer, đồng thời regression-test chính observer. Mọi phiên làm việc debug/metrics trên app mới đều quy về và ghi nhận theo ID case trong tài liệu này.
 
-- Phiên bản blueprint: **2.0.0** (áp dụng observer 2.5.0, Android + Windows)
+- Phiên bản blueprint: **2.0.1** (áp dụng observer 2.5.1, Android + Windows)
 - App tham chiếu vàng (golden AUT): `apps/demo-expo` (`dev.rnagentobserver.demo`)
 - App ngoài repo tham chiếu chế độ read-only: Vshop (`com.android.vshop`)
 - Thiết bị xác minh gần nhất: Xiaomi 23013PC75G, Android 15/arm64; AVD tạm API 24/30/36 x86_64. Serial/session được lược; xem [ma trận Android](android-device-matrix.md)
@@ -1577,3 +1577,4 @@ Quy tắc: mỗi dòng FAIL phải kèm hypothesis nguyên nhân và case tái h
 | 1.8.0     | 2026-08-23 | Bổ sung battery evidence-honest cho policy guard, passive/active security, experiment/memory, `.rnobs`, coverage, dashboard/graph, plugin/provider và SecurityLab opt-in; giữ runtime chưa chạy fixture là `NOT_VERIFIED`                     |
 | 1.9.0     | 2026-08-24 | Chạy cùng owned demo acceptance trên AVD tạm API 24/30/36; ghi exact availability, semantic interaction, network redaction, session completion và cleanup; không nâng thành broad OEM/device-farm claim                                       |
 | 2.0.0     | 2026-08-25 | Observer 2.5.0: suite authoring, JUnit/HMAC runner comparison, GitHub Action, app-owned cold-start TTI, signed arm64 release APK/AAB và 16 KB alignment gate; MCP 70 tools                                                                    |
+| 2.0.1     | 2026-08-25 | Observer 2.5.1: tách npm publish/verify để retry hậu kiểm độc lập và retry bounded clean-consumer install khi metadata/CDN registry hội tụ lệch nhịp                                                                                          |

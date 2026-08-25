@@ -5,7 +5,7 @@ community claims that require independent runtime evidence. Dates are targets, n
 support promises. An item is complete only when its acceptance evidence is linked
 from `docs/testing.md`.
 
-## Current baseline — 2.5.0
+## Current baseline — 2.5.1
 
 - Five public npm packages install from a clean consumer and carry registry
   integrity plus npm provenance.

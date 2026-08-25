@@ -1,6 +1,6 @@
 # Đánh giá và nghiệm thu RN Agent Observer ở mốc 9/10
 
-> Snapshot: **2026-08-25**, workspace version **2.5.0**.
+> Snapshot: **2026-08-25**, workspace version **2.5.1**.
 >
 > Kết luận hiện tại: **9.1/10 cho source/release readiness** sau coverage gate,
 > fuzz regression, CodeQL/dependency automation, npm consumer release và repository

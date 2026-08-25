@@ -55,5 +55,25 @@ jobs:
         env:
           NPM_CONFIG_PROVENANCE: true
 
+  verify:
+    name: Verify registry metadata and clean consumer install
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.6.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.14
+
       - name: Verify registry metadata and clean consumer install
         run: pnpm registry:check

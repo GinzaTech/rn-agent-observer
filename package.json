@@ -1,6 +1,6 @@
 {
   "name": "rn-agent-observer",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "description": "Evidence-based local runtime observability for React Native and Expo agents.",
   "license": "Apache-2.0",

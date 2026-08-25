@@ -2,7 +2,7 @@
   "expo": {
     "name": "RN Agent Observer Demo",
     "slug": "rn-agent-observer-demo",
-    "version": "2.5.0",
+    "version": "2.5.1",
     "orientation": "portrait",
     "android": {
       "package": "dev.rnagentobserver.demo"

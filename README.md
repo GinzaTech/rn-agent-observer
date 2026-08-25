@@ -18,7 +18,7 @@ Bề mặt public hiện có CLI, 70 MCP tools, 6 MCP resources và 2 workflow p
 
 ## Cài đặt
 
-Người dùng CLI/MCP nên cài public release `2.5.0` hoặc mới hơn:
+Người dùng CLI/MCP nên cài public release `2.5.1` hoặc mới hơn:
 
 ```powershell
 pnpm add --save-dev @rn-agent-observer/cli @rn-agent-observer/mcp-server
@@ -26,7 +26,7 @@ pnpm exec rn-observe --version
 pnpm exec rn-observer-mcp --check
 ```
 
-Năm package public được phát hành lockstep ở `2.5.0` qua npm Trusted Publishing và
+Năm package public được phát hành lockstep ở `2.5.1` qua npm Trusted Publishing và
 được workflow kiểm tra clean-consumer sau publish. Không cài `2.4.0`: đó là bản bootstrap namespace có
 dependency `workspace:*` không hợp lệ. Contributor phát triển từ source bằng:
 
@@ -301,7 +301,7 @@ The public surface currently includes the CLI, 70 MCP tools, 6 MCP resources, an
 
 ## Installation
 
-CLI/MCP users should install public release `2.5.0` or newer:
+CLI/MCP users should install public release `2.5.1` or newer:
 
 ```powershell
 pnpm add --save-dev @rn-agent-observer/cli @rn-agent-observer/mcp-server

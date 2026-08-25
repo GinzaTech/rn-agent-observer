@@ -1,6 +1,6 @@
 {
   "name": "@rn-agent-observer/cli",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Command-line interface for evidence-based React Native and Expo runtime observation.",
   "license": "Apache-2.0",
   "repository": {

@@ -11,10 +11,10 @@ bản đã cài dùng [hướng dẫn cập nhật](upgrading.md).
 | -------------------------------------- | ---------------------------------------------------- | ------------------------------- |
 | Thử hoặc phát triển Observer           | Clone source và chạy script ở root                   | Dùng được ngay                  |
 | Kết nối AI agent qua MCP               | Clone source, build, trỏ client vào `dist/server.js` | Dùng được ngay                  |
-| Cài CLI/MCP từ npm                     | Cài package scoped `2.5.0` hoặc mới hơn              | Trusted publish + registry gate |
+| Cài CLI/MCP từ npm                     | Cài package scoped `2.5.1` hoặc mới hơn              | Trusted publish + registry gate |
 | Thu route/fetch/render/JS-task của app | Thêm `rn-instrumentation` vào development build      | Không dùng trong production     |
 
-Từ release 2.5.0, năm package `@rn-agent-observer/*` được phát hành lockstep
+Từ release 2.5.1, năm package `@rn-agent-observer/*` được phát hành lockstep
 với npm provenance. `2.4.0` chỉ bootstrap namespace và giữ dependency
 `workspace:*` không hợp lệ; không cài hoặc pin version đó.
 

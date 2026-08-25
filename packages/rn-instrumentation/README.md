@@ -6,7 +6,7 @@ evidence that Android system APIs cannot observe directly.
 
 ## Install
 
-Install the lockstep public release (`2.5.0` or newer):
+Install the lockstep public release (`2.5.1` or newer):
 
 ```sh
 pnpm add --save-dev @rn-agent-observer/rn-instrumentation

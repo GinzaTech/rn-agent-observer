@@ -29,6 +29,7 @@ const expectedVersion = process.argv[2] ?? rootManifest.version;
 const consumerPrefix = 'rn-agent-observer-registry-smoke-';
 const registryAttempts = 120;
 const registryRetryDelayMs = 10_000;
+const consumerInstallAttempts = 120;
 const packages = [
   '@rn-agent-observer/schemas',
   '@rn-agent-observer/core',
@@ -177,6 +178,27 @@ async function waitForRegistry(packageName) {
   throw lastError;
 }
 
+async function installRegistryConsumer(directory) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= consumerInstallAttempts; attempt += 1) {
+    try {
+      pnpm(['install', '--frozen-lockfile=false'], directory);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < consumerInstallAttempts) {
+        const reason =
+          error instanceof Error ? error.message.split('\n')[0] : String(error);
+        console.error(
+          `consumer install wait: attempt ${attempt}/${consumerInstallAttempts}: ${reason}`,
+        );
+        await delay(registryRetryDelayMs);
+      }
+    }
+  }
+  throw lastError;
+}
+
 assert(
   /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(expectedVersion),
   `invalid expected version ${expectedVersion}`,
@@ -205,7 +227,7 @@ try {
     )}\n`,
     'utf8',
   );
-  pnpm(['install', '--frozen-lockfile=false'], consumerDirectory);
+  await installRegistryConsumer(consumerDirectory);
   assert(
     pnpm(['exec', 'rn-observe', '--version'], consumerDirectory) ===
       expectedVersion,
