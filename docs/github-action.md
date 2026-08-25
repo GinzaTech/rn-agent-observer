@@ -29,7 +29,7 @@ jobs:
 ```
 
 Use an exact release tag for protected branches. `observer-version` selects the
-npm CLI and defaults to the action's matching `2.5.0` release; bump both together
+npm CLI and defaults to the action's matching `2.5.1` release; bump both together
 instead of following a moving dist-tag. Repository self-tests use `cli-entrypoint` after building
 source so CI proves the exact commit rather than accidentally testing an older npm
 release. Consumers normally leave `cli-entrypoint` empty; the action installs the
@@ -41,7 +41,7 @@ possibly stale `pnpm dlx` native-module cache.
 Maestro, Detox/Jest and Appium test runners can produce JUnit XML. Keep that report
 inside `project-root` and pass it to the action:
 
-`junit-report`/`runner import` are available from npm `2.5.0`. Set the same masked
+`junit-report`/`runner import` are available from npm `2.5.1`. Set the same masked
 `RN_OBSERVER_RUNNER_HASH_SECRET` for baseline and current jobs when normalized
 artifacts may leave a trusted runner boundary.
 
@@ -72,7 +72,7 @@ reviews limitations. Required checks should keep the default `false`.
 | Input                    | Default                 | Meaning                                                |
 | ------------------------ | ----------------------- | ------------------------------------------------------ |
 | `suite`                  | `smoke`                 | Comma-separated built-in names or project suite files  |
-| `observer-version`       | `2.5.0`                 | npm CLI version; pin with the action release           |
+| `observer-version`       | `2.5.1`                 | npm CLI version; pin with the action release           |
 | `cli-entrypoint`         | empty                   | Optional built source CLI for repository self-test     |
 | `device-id`              | empty                   | Exact ADB serial; required when selection is ambiguous |
 | `app-id`                 | inferred                | Android package override                               |

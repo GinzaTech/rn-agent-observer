@@ -18,7 +18,7 @@ inputs:
   observer-version:
     description: Exact @rn-agent-observer/cli version or dist-tag to execute.
     required: false
-    default: 2.5.0
+    default: 2.5.1
   cli-entrypoint:
     description: Optional built rn-observe JS entrypoint relative to project-root; used to verify unreleased source without npm.
     required: false

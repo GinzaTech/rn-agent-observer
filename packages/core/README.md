@@ -6,7 +6,7 @@ and visual/structural comparison.
 
 ## Install
 
-The current public consumer release is `2.5.0`.
+The current public consumer release is `2.5.1`.
 
 ```sh
 pnpm add @rn-agent-observer/core

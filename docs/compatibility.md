@@ -1,6 +1,6 @@
 # Compatibility and verification matrix
 
-Snapshot: **2026-08-25**, repository version **2.5.0**. Runtime rows retain the
+Snapshot: **2026-08-25**, repository version **2.5.1**. Runtime rows retain the
 exact demo `2.4.0` fixture version where that is the build that actually ran.
 
 This document separates supported contracts from evidence collected on a specific

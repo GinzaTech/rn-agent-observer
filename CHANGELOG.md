@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 2.5.1 — 2026-08-25
+
+### Release verification resilience
+
+- Tách Trusted Publishing và registry consumer verification thành hai job; khi
+  npm CDN chậm đồng bộ, có thể retry riêng hậu kiểm mà không publish lại version
+  immutable đã tồn tại.
+- Retry bounded cho clean-consumer install sau khi metadata năm package đã xuất
+  hiện, khép khoảng trễ giữa npm metadata API và dependency resolver.
+- `2.5.0` đã publish đủ năm package và clean-consumer kiểm lại PASS sau khi registry
+  hội tụ; `2.5.1` mang chính bản vá pipeline này để release có bằng chứng xanh.
+
 ## 2.5.0 — 2026-08-25
 
 ### Reliability, governance and onboarding

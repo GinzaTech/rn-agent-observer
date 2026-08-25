@@ -5,7 +5,7 @@ observer for React Native and Expo applications.
 
 ## Install
 
-The current public consumer release is `2.5.0`.
+The current public consumer release is `2.5.1`.
 
 ```sh
 pnpm add --save-dev @rn-agent-observer/cli

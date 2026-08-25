@@ -1,6 +1,6 @@
 {
   "name": "@rn-agent-observer/rn-instrumentation",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Development-only React Native telemetry and interaction instrumentation for RN Agent Observer.",
   "license": "Apache-2.0",
   "repository": {
