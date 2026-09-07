@@ -65,8 +65,8 @@
   },
   "dependencies": {
     "@rn-agent-observer/schemas": "workspace:*",
-    "better-sqlite3": "^12.11.1",
-    "fast-xml-parser": "^5.11.0",
+    "better-sqlite3": "^13.0.3",
+    "fast-xml-parser": "^5.11.1",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
     "typescript": "~6.0.3",
