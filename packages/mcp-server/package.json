@@ -45,8 +45,8 @@
     "test": "vitest run --exclude \\\"dist/**\\\""
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@rn-agent-observer/core": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   }
 }
