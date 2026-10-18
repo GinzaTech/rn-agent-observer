@@ -77,9 +77,15 @@ describe('plugin manifest file loader', () => {
       'inside projectRoot',
     );
 
-    const link = join(projectRoot, 'linked.json');
-    symlinkSync(outsideManifest, link, 'file');
-    expect(() => loadPluginManifestFile(projectRoot, link)).toThrow(
+    const isWindows = process.platform === 'win32';
+    const link = join(projectRoot, isWindows ? 'linked' : 'linked.json');
+    symlinkSync(
+      isWindows ? outside : outsideManifest,
+      link,
+      isWindows ? 'junction' : 'file',
+    );
+    const linkedManifest = isWindows ? join(link, 'outside.json') : link;
+    expect(() => loadPluginManifestFile(projectRoot, linkedManifest)).toThrow(
       'inside projectRoot',
     );
   });

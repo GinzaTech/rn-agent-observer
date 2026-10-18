@@ -12,15 +12,15 @@
   },
   "dependencies": {
     "@rn-agent-observer/rn-instrumentation": "workspace:*",
-    "expo": "~57.0.15",
+    "expo": "~57.0.30",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.2"
+    "react-native": "0.86.3"
   },
   "devDependencies": {
     "@types/react": "~19.2.18",
-    "babel-preset-expo": "~57.0.7",
+    "babel-preset-expo": "~57.0.16",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "5.0.5"
   }
 }

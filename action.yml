@@ -75,9 +75,12 @@ runs:
   using: composite
   steps:
     - name: Set up pnpm
+      if: ${{ inputs.cli-entrypoint == '' }}
       uses: pnpm/action-setup@v6
       with:
         version: ${{ inputs.pnpm-version }}
+        # Setup replaces its destination; preserve any caller-owned pnpm store.
+        dest: ${{ runner.temp }}/rn-observer-action-pnpm
 
     - name: Set up Node.js
       uses: actions/setup-node@v7
