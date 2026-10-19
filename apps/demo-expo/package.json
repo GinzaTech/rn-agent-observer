@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@rn-agent-observer/rn-instrumentation": "workspace:*",
-    "expo": "~57.0.15",
-    "expo-status-bar": "~57.0.1",
+    "expo": "~58.0.11",
+    "expo-status-bar": "~58.0.3",
     "react": "19.2.3",
     "react-native": "0.86.2"
   },
