@@ -37,13 +37,14 @@
     "release:check": "pnpm check && pnpm coverage:check && pnpm security:dependencies && pnpm mcp:check && pnpm rn-observe --version && pnpm pack:check && pnpm android:export:check"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.0",
-    "@types/node": "^22.15.0",
-    "@vitest/coverage-v8": "4.1.11",
-    "eslint": "^10.0.0",
-    "prettier": "^3.9.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "@vitest/coverage-v8": "5.0.5",
+    "eslint": "^10.13.0",
+    "prettier": "^3.9.10",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.67.0",
-    "vitest": "^4.1.11"
+    "typescript-eslint": "^8.71.2",
+    "vite": "8.2.4",
+    "vitest": "5.0.5"
   }
 }

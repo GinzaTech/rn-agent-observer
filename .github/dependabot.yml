@@ -11,6 +11,17 @@ updates:
     labels:
       - dependencies
     groups:
+      expo-native-stack:
+        # Expo runtime and build tooling must be reviewed together across
+        # production and development dependencies.
+        patterns:
+          - expo
+          - expo-status-bar
+          - react
+          - react-native
+          - '@types/react'
+          - babel-preset-expo
+          - '@babel/core'
       production-dependencies:
         patterns:
           - '*'
@@ -24,6 +35,50 @@ updates:
           - '*'
         dependency-type: development
     ignore:
+      # update-types limits routine version PRs, while security updates remain
+      # eligible. Compatible patch updates are never suppressed here.
+      # An Expo SDK major also requires matching React/React Native versions.
+      - dependency-name: expo
+        update-types:
+          - version-update:semver-major
+      - dependency-name: expo-status-bar
+        update-types:
+          - version-update:semver-major
+      - dependency-name: babel-preset-expo
+        update-types:
+          - version-update:semver-major
+      # Expo SDK 57 requires React 19.2; 19.3+ needs a coordinated SDK upgrade.
+      - dependency-name: react
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+      - dependency-name: '@types/react'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+      # React Native 0.x minor releases change the native SDK baseline. Keep
+      # 0.86.x patches until an Expo development build verifies the next SDK.
+      - dependency-name: react-native
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+      # Expo's Babel preset uses Babel 7; Babel 8 needs a coordinated migration.
+      - dependency-name: '@babel/core'
+        update-types:
+          - version-update:semver-major
+      # Public packages support Node 22.12; newer type majors expose APIs that
+      # are unavailable on the minimum supported runtime.
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
+      # Pixelmatch majors require visual diff API/baseline review.
+      - dependency-name: pixelmatch
+        update-types:
+          - version-update:semver-major
+      # SQLite native ABI changes need Node 22/24 and clean consumer checks.
+      - dependency-name: better-sqlite3
+        update-types:
+          - version-update:semver-major
       # TypeScript 7 uses the new native compiler API and is not yet supported
       # by typescript-eslint. Keep 6.x security/patch updates flowing without
       # repeatedly opening an impossible grouped major update.
